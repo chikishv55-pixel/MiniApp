@@ -3,6 +3,8 @@ import AdBanner from './AdBanner'
 import AdminModal from './AdminModal'
 import Avatar from './Avatar'
 import GameCarousel, { type Game } from './GameCarousel'
+import PassModal from './PassModal'
+import Wardrobe from './Wardrobe'
 import GameFrame, { type GameLaunch } from './GameFrame'
 import PixelIcon from './PixelIcon'
 import ProfileModal from './ProfileModal'
@@ -18,6 +20,7 @@ import {
   type RunInfo,
 } from './challenge'
 import { useProfile } from './profile'
+import { useWallet } from './wallet'
 
 const GAMES: Game[] = [
   { id: 'joe', title: 'МЕТКИЙ ДЖО', desc: 'Лови момент и стреляй в голову', icon: 'target', color: '#ffd93d', art: 'joe' },
@@ -50,6 +53,9 @@ export default function App() {
   const [adminOpen, setAdminOpen] = useState(false)
   const [isAdmin, setIsAdmin] = useState(false)
   const [adKey, setAdKey] = useState(0)
+  const [wardrobeOpen, setWardrobeOpen] = useState(false)
+  const [passOpen, setPassOpen] = useState(false)
+  const wallet = useWallet()
   const [slide, setSlide] = useState(0)
   const [game, setGame] = useState<GameLaunch | null>(null)
   const [incoming, setIncoming] = useState<Challenge | null>(null)
@@ -178,10 +184,12 @@ export default function App() {
           <Avatar value={avatar} size={28} />
           <span className="nick">{nick.toUpperCase()}</span>
         </button>
-        <div className="chip" title="Лучшая серия">
-          <PixelIcon name="trophy" size={14} /> {best[current.id as GameId] ?? 0}
-        </div>
-        <div className="chip">LVL 1</div>
+        <button className="chip chip-btn" onClick={() => setWardrobeOpen(true)} aria-label="Монеты и гардероб">
+          <span className="coin" /> {wallet.coins}
+        </button>
+        <button className="chip chip-btn chip-pass" onClick={() => setPassOpen(true)} aria-label="Пропуск">
+          LVL {wallet.look.pass}
+        </button>
         {isAdmin && (
           <button className="chip chip-admin" onClick={() => setAdminOpen(true)} aria-label="Админка">
             ⚙
@@ -196,7 +204,7 @@ export default function App() {
         <p className="tagline">Бросай вызовы. Бей рекорды.</p>
       </section>
 
-      <GameCarousel games={GAMES} index={slide} onIndex={changeSlide} onPlay={play} best={best} />
+      <GameCarousel games={GAMES} index={slide} onIndex={changeSlide} onPlay={play} best={best} lookKey={wallet.version} />
 
       <div className="actions">
         <button className="btn btn-main" onClick={() => play(current)} disabled={current.soon}>
@@ -213,6 +221,9 @@ export default function App() {
         >
           <PixelIcon name="sword" size={24} />
         </button>
+        <button className="btn btn-cyan btn-square" onClick={() => setWardrobeOpen(true)} aria-label="Гардероб">
+          <PixelIcon name="shirt" size={24} color="#fff" />
+        </button>
       </div>
 
       <AdBanner fresh={isAdmin} reloadKey={adKey} />
@@ -226,6 +237,20 @@ export default function App() {
           onClose={() => setProfileOpen(false)}
         />
       )}
+
+      {wardrobeOpen && (
+        <Wardrobe
+          wallet={wallet}
+          toast={showToast}
+          onClose={() => setWardrobeOpen(false)}
+          onOpenPass={() => {
+            setWardrobeOpen(false)
+            setPassOpen(true)
+          }}
+        />
+      )}
+
+      {passOpen && <PassModal wallet={wallet} toast={showToast} onClose={() => setPassOpen(false)} />}
 
       {adminOpen && (
         <AdminModal
@@ -274,7 +299,10 @@ export default function App() {
       {game && (
         <GameFrame
           launch={game}
-          onExit={() => setGame(null)}
+          onExit={() => {
+            setGame(null)
+            wallet.refresh()
+          }}
           onChallenge={onChallenge}
           onResult={(r) => reportRun(game.game, r.kills)}
         />

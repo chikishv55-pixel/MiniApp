@@ -118,6 +118,7 @@ button{font:inherit;color:inherit;border:0;background:none;cursor:pointer}
   </div>
 </div>
 
+<script src="look.js"></script>
 <script>
 'use strict';
 /* ================= БАЗА (из «Меткий Джо») ================= */
@@ -230,6 +231,8 @@ function drawEnemy(c,e){
   else if(e.hat===3){box(c,'#22262f',-15,-55,32,13);eyes(c,'#f4e7dc');return;}
   eyes(c);poly(c,'#1b1b28',[4,-56,17,-53,17,-51,4,-54]);
 }
+// Джо с косметикой из гардероба (look.js); если файл не загрузился — просто скин
+function drawJoe(c,id){if(window.JoeLook)JoeLook.drawJoe(c,id,drawSkin);else drawSkin(c,id);}
 // универсальная отрисовка фигурки
 function drawDude(c,x,y,dir,s,look,gun,aim,kick,rot){
   c.save();c.translate(x,y);c.scale(dir*s,s);
@@ -312,7 +315,7 @@ function die(reason){
   if(state!=='run')return;
   state='dead';lastReason=reason;p.dead=true;deadT=0;
   if(reason==='hit'){
-    corpses.push({x:PX,y:p.y,dir:1,s:SC,vx:-rnd(160,220),vy:-rnd(420,520),vr:-rnd(6,9),rot:0,t:0,look:c=>drawSkin(c,SKIN)});
+    corpses.push({x:PX,y:p.y,dir:1,s:SC,vx:-rnd(160,220),vy:-rnd(420,520),vr:-rnd(6,9),rot:0,t:0,look:c=>drawJoe(c,SKIN)});
     burst(PX,p.y-HH/2,'#ffc233',18,-1);shake=12;sfx('die');
   }else sfx('fall');
   if(carsDone>D.best){D.best=carsDone;saveD();}
@@ -495,7 +498,7 @@ function draw(){
     const run=state==='run'&&p.ground;
     const bob=run?Math.abs(Math.sin(time*16))*5:0;
     const rot=p.ground?(run?Math.sin(time*16)*.05:0):clamp(p.vy/3200,-.28,.28);
-    drawDude(ctx,PX,p.y-bob,1,SC,cc=>drawSkin(cc,SKIN),GUN,-1.05,0,rot);
+    drawDude(ctx,PX,p.y-bob,1,SC,cc=>drawJoe(cc,SKIN),GUN,-1.05,0,rot);
   }
 
   ctx.textAlign='center';

@@ -355,8 +355,8 @@ button {
 .actions {
   flex: none;
   display: grid;
-  grid-template-columns: 1fr auto;
-  gap: 18px;
+  grid-template-columns: 1fr auto auto;
+  gap: 16px;
   /* место под двойную рамку и тень кнопок: слева 8px, справа/снизу до 14px */
   padding: 8px 12px 14px 8px;
 }
@@ -845,4 +845,264 @@ button {
   margin: 0;
   font-size: 8px;
   color: var(--cyan);
+}
+
+/* ===== монеты и пропуск в шапке ===== */
+.coin {
+  flex: none;
+  width: 12px;
+  height: 12px;
+  background: var(--yellow);
+  box-shadow: inset -3px -3px 0 #c9a200;
+}
+
+.coin.sm {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  box-shadow: inset -2px -2px 0 #c9a200;
+}
+
+.chip-btn:active {
+  transform: translate(2px, 2px);
+}
+
+.chip-pass {
+  color: #000;
+  background: var(--pink);
+}
+
+.btn-cyan {
+  color: #000;
+  background: var(--cyan);
+}
+
+/* узкий экран: три кнопки в ряд не должны раздавить PLAY */
+@media (max-width: 380px) {
+  .btn-square {
+    width: 54px;
+  }
+}
+
+/* ===== гардероб ===== */
+.wardrobe,
+.pass {
+  max-height: 94dvh;
+  box-shadow:
+    0 0 0 var(--px) var(--cyan),
+    calc(var(--px) * 2) calc(var(--px) * 2) 0 var(--px) #000;
+}
+
+.pass {
+  box-shadow:
+    0 0 0 var(--px) var(--pink),
+    calc(var(--px) * 2) calc(var(--px) * 2) 0 var(--px) #000;
+}
+
+.wr-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 10px;
+}
+
+.wr-head .modal-title {
+  margin: 0;
+}
+
+.wr-preview {
+  display: flex;
+  justify-content: center;
+  margin-bottom: 12px;
+  background: radial-gradient(circle at 50% 70%, rgba(61, 255, 224, 0.15), transparent 65%);
+}
+
+.wr-tabs {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  padding: 4px 4px 10px;
+  margin: 0 -4px 6px;
+  scrollbar-width: none;
+}
+
+.wr-tabs::-webkit-scrollbar {
+  display: none;
+}
+
+.wr-tab {
+  flex: none;
+  padding: 8px 10px;
+  font-size: 7px;
+  background: var(--bg);
+  box-shadow: 0 0 0 2px var(--line);
+}
+
+.wr-tab.on {
+  color: #000;
+  background: var(--cyan);
+  box-shadow: 0 0 0 2px #000;
+}
+
+.wr-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+  margin-bottom: 14px;
+}
+
+.wr-item {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 4px;
+  background: var(--bg);
+  box-shadow: 0 0 0 2px var(--line);
+}
+
+.wr-item.on {
+  box-shadow: 0 0 0 var(--px) var(--green);
+}
+
+.wr-item.locked canvas {
+  opacity: 0.45;
+}
+
+.wr-item b {
+  font-size: 6px;
+  line-height: 1.5;
+  text-align: center;
+}
+
+.wr-item em {
+  font-style: normal;
+  font-size: 5px;
+  line-height: 1.5;
+  text-align: center;
+  color: var(--grey);
+}
+
+.wr-item small {
+  font-size: 6px;
+  color: #9a9ab5;
+}
+
+.wr-item.on small {
+  color: var(--green);
+}
+
+.wr-gun {
+  margin: 19px 0;
+}
+
+.wr-pass {
+  position: absolute;
+  top: 4px;
+  left: 4px;
+  padding: 2px 3px;
+  font-size: 5px;
+  color: #000;
+  background: var(--pink);
+}
+
+.price {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--yellow);
+}
+
+.price.no {
+  color: var(--pink);
+}
+
+.wr-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+}
+
+/* ===== пропуск ===== */
+.pass-sub {
+  margin: 0 0 12px;
+  font-size: 7px;
+  color: #9a9ab5;
+}
+
+.pass-bar {
+  position: relative;
+  height: 22px;
+  margin-bottom: 14px;
+  background: var(--bg);
+  box-shadow: 0 0 0 2px var(--line);
+}
+
+.pass-fill {
+  position: absolute;
+  inset: 0 auto 0 0;
+  background: var(--pink);
+}
+
+.pass-bar span {
+  position: relative;
+  display: block;
+  line-height: 22px;
+  font-size: 7px;
+  text-align: center;
+  color: #fff;
+  text-shadow: 1px 1px 0 #000;
+}
+
+.pass-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 14px;
+}
+
+.pass-row {
+  display: grid;
+  grid-template-columns: 22px 52px 1fr auto;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 8px 4px 4px;
+  background: var(--bg);
+  box-shadow: 0 0 0 2px var(--line);
+}
+
+.pass-row.got {
+  opacity: 0.6;
+}
+
+.pass-row.next {
+  box-shadow: 0 0 0 var(--px) var(--yellow);
+}
+
+.pass-lvl {
+  font-size: 9px;
+  text-align: center;
+  color: var(--pink);
+}
+
+.pass-meta {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.pass-meta b {
+  font-size: 7px;
+}
+
+.pass-meta small {
+  font-size: 6px;
+  color: var(--grey);
+}
+
+.pass-state {
+  font-size: 8px;
+  color: var(--green);
 }

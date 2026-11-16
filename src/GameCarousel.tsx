@@ -18,10 +18,11 @@ type Props = {
   onIndex: (i: number) => void
   onPlay: (g: Game) => void
   best: Record<string, number>
+  lookKey?: number // меняется после гардероба — сцены перерисовывают Джо в новом наряде
 }
 
 // Игры по одной, листаются свайпом (нативный scroll-snap — плавно и на телефоне, и мышкой)
-export default function GameCarousel({ games, index, onIndex, onPlay, best }: Props) {
+export default function GameCarousel({ games, index, onIndex, onPlay, best, lookKey = 0 }: Props) {
   const track = useRef<HTMLDivElement>(null)
 
   const onScroll = useCallback(() => {
@@ -53,7 +54,7 @@ export default function GameCarousel({ games, index, onIndex, onPlay, best }: Pr
               {g.soon && <span className="badge">СКОРО</span>}
               {g.art ? (
                 <span className="slide-art">
-                  <JoeScene variant={g.art} />
+                  <JoeScene key={lookKey} variant={g.art} />
                 </span>
               ) : (
                 <span className="slide-icon">

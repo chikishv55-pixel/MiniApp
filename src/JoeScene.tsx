@@ -1,5 +1,6 @@
 import { useEffect, useRef } from 'react'
-import { box, drawDude, drawEnemy, drawSkin } from './joeArt.js'
+import { drawLookJoe } from './JoePreview'
+import { box, drawDude, drawEnemy } from './joeArt.js'
 
 // Мини-сцены для карточек в меню, нарисованные кодом самих игр:
 // joe  — Джо целится во врага на ступеньке, прицел гуляет, как в «Меткий Джо»;
@@ -61,7 +62,7 @@ function makeJoe(skin: number, gun: number) {
     ctx.globalAlpha = 1
 
     drawDude(ctx, ex, ey, -1, es, (c) => drawEnemy(c, ENEMY), 0, 0.1, 0, 0)
-    drawDude(ctx, px, py, 1, ps, (c) => drawSkin(c, skin), gun, aim, 0, 0)
+    drawDude(ctx, px, py, 1, ps, (c) => drawLookJoe(c, skin), gun, aim, 0, 0)
 
     // пунктир прицела от дула, как в игре
     const m = muzzle(px, py, 1, ps, gun, aim)
@@ -104,7 +105,7 @@ function makeDuel(skin: number, gun: number) {
     }
 
     const aim = shot ? aimHit : LOWER + sway
-    drawDude(ctx, px, gy, 1, s, (c) => drawSkin(c, skin), gun, aim, shot && t < 2.4 ? 1 - (t - 2.25) / 0.15 : 0, 0)
+    drawDude(ctx, px, gy, 1, s, (c) => drawLookJoe(c, skin), gun, aim, shot && t < 2.4 ? 1 - (t - 2.25) / 0.15 : 0, 0)
 
     if (shot && t < 2.45) {
       const m = muzzle(px, gy, 1, s, gun, aim)
@@ -172,7 +173,7 @@ function makeTrain(skin: number, gun: number) {
     }
     const bob = lift ? 0 : Math.abs(Math.sin(t * 14)) * 2.5
     const rot = lift ? -0.12 : Math.sin(t * 14) * 0.04
-    drawDude(ctx, px, roof - lift - bob, 1, s, (c) => drawSkin(c, skin), gun, -1.05, 0, rot)
+    drawDude(ctx, px, roof - lift - bob, 1, s, (c) => drawLookJoe(c, skin), gun, -1.05, 0, rot)
   }
 }
 

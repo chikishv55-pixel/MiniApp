@@ -40,6 +40,18 @@ const SPRITES = {
     '..aa....aa..',
     '....aaaa....',
   ],
+  shirt: [
+    '..ooo..ooo..',
+    '.oaaaooaaao.',
+    'oaaaaaaaaaao',
+    'oaaaaaaaaaao',
+    'ooooaaaaoooo',
+    '...oaaaao...',
+    '...oaaaao...',
+    '...oahhao...',
+    '...oaaaao...',
+    '...oooooo...',
+  ],
   memory: [
     'aaaaa..ddddd',
     'ahhaa..ddddd',
