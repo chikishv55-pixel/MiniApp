@@ -1,4 +1,5 @@
 import { useCallback, useRef } from 'react'
+import JoeScene from './JoeScene'
 import PixelIcon, { type IconName } from './PixelIcon'
 
 export type Game = {
@@ -8,6 +9,7 @@ export type Game = {
   icon: IconName
   color: string
   soon?: boolean
+  art?: 'joe' // вместо иконки — живая сцена из игры
 }
 
 type Props = {
@@ -47,9 +49,15 @@ export default function GameCarousel({ games, index, onIndex, onPlay, best }: Pr
               onClick={() => onPlay(g)}
             >
               {g.soon && <span className="badge">СКОРО</span>}
-              <span className="slide-icon">
-                <PixelIcon name={g.icon} size={84} />
-              </span>
+              {g.art === 'joe' ? (
+                <span className="slide-art">
+                  <JoeScene />
+                </span>
+              ) : (
+                <span className="slide-icon">
+                  <PixelIcon name={g.icon} size={84} />
+                </span>
+              )}
               <span className="slide-title">{g.title}</span>
               <span className="slide-desc">{g.desc}</span>
               {g.id === 'joe' && best > 0 && <span className="slide-best">РЕКОРД: {best}</span>}

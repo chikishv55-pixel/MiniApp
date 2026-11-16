@@ -11,7 +11,7 @@ import { createAndShare, plural, readIncomingCode, verifyChallenge, type Challen
 import { useProfile } from './profile'
 
 const GAMES: Game[] = [
-  { id: 'joe', title: 'МЕТКИЙ ДЖО', desc: 'Лови момент и стреляй в голову', icon: 'target', color: '#ffd93d' },
+  { id: 'joe', title: 'МЕТКИЙ ДЖО', desc: 'Лови момент и стреляй в голову', icon: 'target', color: '#ffd93d', art: 'joe' },
   { id: 'reaction', title: 'REACTION', desc: 'Жми быстрее всех', icon: 'bolt', color: '#5cff5c', soon: true },
   { id: 'memory', title: 'MEMORY', desc: 'Запомни порядок', icon: 'memory', color: '#3dffe0', soon: true },
   { id: 'clicker', title: 'SPAM TAP', desc: '10 секунд на рекорд', icon: 'cursor', color: '#ff3d9a', soon: true },

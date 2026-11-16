@@ -256,6 +256,18 @@ button {
   }
 }
 
+.slide-art {
+  display: block;
+  width: min(290px, 80vw);
+}
+
+.joe-scene {
+  display: block;
+  width: 100%;
+  aspect-ratio: 2 / 1;
+  filter: drop-shadow(3px 3px 0 #000);
+}
+
 .slide-title {
   font-size: 16px;
   color: var(--accent);
@@ -344,8 +356,9 @@ button {
   flex: none;
   display: grid;
   grid-template-columns: 1fr auto;
-  gap: 16px;
-  padding: 0 4px 4px 0;
+  gap: 18px;
+  /* место под двойную рамку и тень кнопок: слева 8px, справа/снизу до 14px */
+  padding: 8px 12px 14px 8px;
 }
 
 .btn-main {
@@ -356,7 +369,7 @@ button {
   box-shadow:
     0 0 0 var(--px) #000,
     0 0 0 calc(var(--px) * 2) var(--green),
-    calc(var(--px) * 2) calc(var(--px) * 2) 0 calc(var(--px) * 2) #000;
+    6px 6px 0 calc(var(--px) * 2) #000;
   animation: pulse 1.2s steps(2) infinite;
 }
 
@@ -482,6 +495,10 @@ button {
   .slide-icon .px-icon {
     width: 60px;
     height: 60px;
+  }
+
+  .slide-art {
+    width: min(190px, 60vw);
   }
 
   .btn-main {
