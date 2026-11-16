@@ -6,3 +6,6 @@ dist
 .env*
 *.local
 !.env.example
+tools
+content
+scripts/video/node_modules

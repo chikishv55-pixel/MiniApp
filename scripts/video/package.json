@@ -1,0 +1,11 @@
+{
+  "name": "joe-video-tools",
+  "private": true,
+  "type": "module",
+  "description": "Инструменты для роликов: QR-код и проверка, что он читается",
+  "dependencies": {
+    "jpeg-js": "^0.4.4",
+    "jsqr": "^1.4.0",
+    "qrcode": "^1.5.4"
+  }
+}

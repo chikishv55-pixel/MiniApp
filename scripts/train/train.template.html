@@ -229,10 +229,11 @@ function showMenu(){
 function gunPivotY(){return p.y-(curH()/HH)*SC*22;}
 function muzzle(a){const L=GUN_LEN[GUN],py=gunPivotY();return {wx:dist+PX+SC*(6+L*Math.cos(a)),y:py-SC*L*Math.sin(a)};}
 function heliScreen(){return heli?{x:heli.x,y:heli.y}:null;}
-// цель: ближайший враг или ящик на крыше впереди, иначе — вертолёт (стреляем вверх)
+// цель: ближайший враг или ящик на крыше; вертолёт важнее, пока они дальше 300 px
 function pickAim(){
-  const wx=dist+PX;
-  for(const c of carsIn(wx,wx+520))for(const o of c.obs)if(o.alive&&SHOOTABLE[o.type]&&c.x0+o.x>wx-10&&c.x0+o.x<wx+520)return 0;
+  const wx=dist+PX;let near=1e9;
+  for(const c of carsIn(wx,wx+520))for(const o of c.obs)if(o.alive&&SHOOTABLE[o.type]){const d=c.x0+o.x-wx;if(d>-10&&d<near)near=d;}
+  if(near<=300)return 0;
   if(heli&&heli.alive){const m=muzzle(0);return Math.max(0,Math.atan2(m.y-heli.y,(heli.x+dist)-m.wx));}
   return 0;
 }
@@ -244,7 +245,8 @@ function fireOne(){
   const w=WPN[GUN],m=muzzle(aimAng),n=w.pellets||1;
   for(let i=0;i<n;i++){
     const a=aimAng+(w.pellets?(Math.random()-.5)*w.spread*2:w.burst?(Math.random()-.5)*.05:0);
-    bullets.push({x:m.wx,y:m.y,vx:Math.cos(a)*1500,vy:-Math.sin(a)*1500,dmg:w.dmg,pierce:!!w.pierce,life:w.life||.7,hit:[]});
+    // пуля вылетает с учётом скорости поезда — иначе под углом она почти стоит относительно экрана
+    bullets.push({x:m.wx,y:m.y,vx:Math.cos(a)*1500+speedAt(dist),vy:-Math.sin(a)*1500,dmg:w.dmg,pierce:!!w.pierce,life:w.life||.7,hit:[]});
   }
   p.kick=1;flashT=.05;sfx('shot',GUN);
 }
@@ -335,7 +337,7 @@ function update(dt){
           if(o.kick>0)o.kick=Math.max(0,o.kick-dt*8);
         }
         if(c.heliPlan&&!c.heliDone&&wx>c.x0-260&&wx<c.x0+c.len){
-          if(!heli||heli.car!==c.k)heli={car:c.k,x:W+80,y:200,hp:12,alive:true,plan:c.heliPlan.slice(),t:0};
+          if(!heli||heli.car!==c.k)heli={car:c.k,x:W+80,y:200,hp:8,alive:true,plan:c.heliPlan.slice(),t:0};
         }
       }
       if(heli){
@@ -703,6 +705,8 @@ fit();showMenu();requestAnimationFrame(frame);
 window.__train={press,release,shoot,duck,manual:()=>{MANUAL=true;},step:(ms,noDraw)=>{update(Math.min(.033,ms/1000));if(!noDraw)draw();},
   info:()=>({state,dist,carsDone,y:p.y,vy:p.vy,ground:p.ground,duck:p.duck>0,speed:speedAt(dist),coins:runCoins,reason:lastReason,
     heli:heli&&heli.alive?{x:heli.x,y:heli.y,hp:heli.hp}:null,ebullets:ebullets.map(b=>b.x-dist-PX),fires:fires.map(f=>f.x-dist-PX),bombs:bombs.map(b=>b.tx-dist-PX),fireCD}),
+  // для роликов: перемотать забег к вагону k (поезд при этом ровно тот же, что и при честном беге)
+  skipTo:k=>{carAt(k+3);dist=carAt(k).x0-PX+60;carsDone=k;biome=prevBiome=Math.floor(k/10);biomeT=1;pal=[palFor(k)[0].slice(),palFor(k)[1].slice()];p.y=ROOF;p.vy=0;p.ground=true;},
   car:k=>carAt(k),PX,HW,ROOF,CEIL};
 </script>
 </body>

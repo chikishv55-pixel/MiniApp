@@ -1,0 +1,33 @@
+# Ролики для Shorts / TikTok
+
+Игры прогоняются покадрово прямо в браузере (manual-режим), кадры 1080×1920 уходят на локальный
+приёмник, ffmpeg склеивает их в mp4. Записи экрана нет — картинка идеально ровная, 30 кадров/с.
+
+## Что нужно один раз
+- ffmpeg в `tools/ffmpeg/` (в git не попадает): официальная сборка с gyan.dev, хэш проверен.
+- `cd scripts/video && npm install --registry=https://registry.npmjs.org` — QR и проверка QR.
+- `node scripts/video/qr.mjs` — матрица QR на бота (`qr.json`).
+
+## Как снять ролик
+1. Приёмник кадров: `node scripts/video/sink.mjs content/frames_test`
+2. Dev-сервер на :5173, вкладка браузера 540×960 открыта на
+   `/games/train.html?mode=challenge&target=5&seed=<сид>`.
+3. В консоли страницы:
+   ```js
+   const h = await import('/scripts/video/harness.js')
+   const qr = await (await fetch('/scripts/video/qr.json')).json()
+   h.scan(114)   // найти сид: бот доходит до вагона dieAt, видит и сбивает вертолёт, потом ошибается
+   h.start({ from: 43, dieAt: 52, hook: ['ДОБЕЖИШЬ', 'ДО 55 ВАГОНА?'], after: ['ПОБЕЙ МОЙ', 'РЕКОРД: 52'],
+             afterDelay: 18, afterDeath: 70, slowFrames: 36, endSec: 3.5, qr })
+   // прогресс: window.__vp
+   ```
+4. Сборка (цветовой диапазон tv — иначе часть плееров показывает блёклые цвета):
+   ```
+   ffmpeg -framerate 30 -i content/frames_test/%05d.jpg -f lavfi -i anullsrc=channel_layout=stereo:sample_rate=44100 -shortest \
+     -vf "scale=in_range=pc:out_range=tv:flags=lanczos,format=yuv420p" -c:v libx264 -preset slow -crf 17 -profile:v high \
+     -colorspace bt709 -color_primaries bt709 -color_trc bt709 -color_range tv -movflags +faststart -c:a aac -b:a 96k out.mp4
+   ```
+5. ОБЯЗАТЕЛЬНО проверить QR на готовом видео: вытащить кадры из последних секунд и прогнать через jsqr.
+   Координаты QR должны быть целыми, иначе между модулями появляются щели и сканер не читает.
+
+Выходные файлы лежат в `content/out/` (в git не попадают).
