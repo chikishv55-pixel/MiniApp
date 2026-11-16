@@ -1,7 +1,7 @@
-# Pixel Arena
+# Игры Джо
 
-Telegram Mini App: аркада в 8-бит стиле с вызовами друзьям.
-Бот: [@pixelaren_bot](https://t.me/pixelaren_bot) · прод: https://pixel-arena-omega.vercel.app
+Telegram Mini App: игры про Джо с вызовами друзьям. Перед игрой — обязательная подписка на канал [@JoesGames](https://t.me/JoesGames).
+Бот: [@JoeGame_Bot](https://t.me/JoeGame_Bot) · прод: https://pixel-arena-omega.vercel.app
 
 ## Что внутри
 
@@ -33,6 +33,7 @@ API (`/api/*`) работает только на Vercel или в `vercel dev`.
 | `TELEGRAM_WEBHOOK_SECRET` | сервер | подпись вебхука и вызовов |
 | `WEBAPP_URL` | сервер | адрес сайта для кнопок бота |
 | `ADMIN_IDS` | сервер | Telegram ID админов через запятую |
+| `CHANNEL_USERNAME` | сервер | канал, на который нужна подписка (бот — админ канала) |
 | `BLOB_READ_WRITE_TOKEN` | сервер | Vercel добавляет сам при подключении Blob |
 | `VITE_BOT_USERNAME` | клиент | ник бота без @ |
 | `VITE_APP_SHORTNAME` | клиент | короткое имя мини-аппа из `/newapp` (необязательно) |

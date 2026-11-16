@@ -330,7 +330,7 @@ function showMenu(){
   $('title').hidden=$('hint').hidden=$('menu').hidden=false;$('over').hidden=true;$('shop').hidden=true;$('bHome').hidden=true;
   $('best').hidden=!S.best;$('best').textContent='Лучшая серия: '+S.best+' врагов';$('best').className='';
   if(CH){$('best').hidden=false;$('best').className='ch';$('best').textContent='ВЫЗОВ ОТ '+(RUN.from||'ДРУГА').toUpperCase()+': ПОБЕЙ '+RUN.target;}
-  if(EMBED)$('bHome').hidden=false; // в мини-аппе крестик в меню выводит обратно в Pixel Arena
+  if(EMBED)$('bHome').hidden=false; // в мини-аппе крестик в меню выводит обратно в меню «Игры Джо»
   refreshMenu();hud();
 }
 

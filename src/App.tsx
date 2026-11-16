@@ -6,6 +6,7 @@ import GameCarousel, { type Game } from './GameCarousel'
 import GameFrame, { type GameLaunch } from './GameFrame'
 import PixelIcon from './PixelIcon'
 import ProfileModal from './ProfileModal'
+import SubscribeGate from './SubscribeGate'
 import { api, hasAuth } from './api'
 import {
   GAME_TEXT,
@@ -53,6 +54,11 @@ export default function App() {
   const [game, setGame] = useState<GameLaunch | null>(null)
   const [incoming, setIncoming] = useState<Challenge | null>(null)
   const [toast, setToast] = useState<string | null>(null)
+  // подписка на канал: без initData (браузер, не Telegram) проверку пропускаем
+  const [sub, setSub] = useState<{ state: 'checking' | 'ok' | 'need'; channel: string }>({
+    state: hasAuth ? 'checking' : 'ok',
+    channel: '',
+  })
   const toastTimer = useRef<number>()
   const { nick, avatar, save, tgNick, best, reportRun } = useProfile()
 
@@ -72,6 +78,36 @@ export default function App() {
     // экран не скроллится — свайп вниз не должен случайно сворачивать приложение
     tg?.disableVerticalSwipes?.()
   }, [])
+
+  const checkSub = useCallback(
+    async (manual = false) => {
+      if (!hasAuth) return
+      if (manual) setSub((s) => ({ ...s, state: 'checking' }))
+      try {
+        const r = await api<{ subscribed: boolean; channel: string | null }>('sub')
+        setSub({ state: r.subscribed || !r.channel ? 'ok' : 'need', channel: r.channel || '' })
+        if (manual && !r.subscribed && r.channel) showToast('ПОДПИСКИ ПОКА НЕТ')
+      } catch {
+        // сервер недоступен — не держим игрока у закрытой двери
+        setSub((s) => ({ ...s, state: 'ok' }))
+      }
+    },
+    [showToast],
+  )
+
+  // проверяем при входе и каждый раз, когда игрок возвращается в приложение (например, из канала)
+  useEffect(() => {
+    checkSub()
+    const again = () => {
+      if (!document.hidden) checkSub()
+    }
+    document.addEventListener('visibilitychange', again)
+    tg?.onEvent?.('activated', again)
+    return () => {
+      document.removeEventListener('visibilitychange', again)
+      tg?.offEvent?.('activated', again)
+    }
+  }, [checkSub])
 
   // админ ли я: сервер отдаёт список баннеров только аккаунтам из ADMIN_IDS
   useEffect(() => {
@@ -155,7 +191,7 @@ export default function App() {
 
       <section className="hero">
         <h1 className="logo">
-          PIXEL <span>ARENA</span>
+          ИГРЫ <span>ДЖО</span>
         </h1>
         <p className="tagline">Бросай вызовы. Бей рекорды.</p>
       </section>
@@ -201,7 +237,7 @@ export default function App() {
         />
       )}
 
-      {incoming && !game && (
+      {incoming && !game && sub.state === 'ok' && (
         <div className="modal-back" onClick={() => setIncoming(null)}>
           <div className="modal modal-pink" onClick={(e) => e.stopPropagation()}>
             <div className="modal-icon">
@@ -242,6 +278,10 @@ export default function App() {
           onChallenge={onChallenge}
           onResult={(r) => reportRun(game.game, r.kills)}
         />
+      )}
+
+      {sub.state !== 'ok' && !game && (
+        <SubscribeGate channel={sub.channel || 'JoesGames'} checking={sub.state === 'checking'} onCheck={() => checkSub(true)} />
       )}
 
       {toast && <div className="toast">{toast}</div>}

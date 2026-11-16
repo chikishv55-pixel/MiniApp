@@ -57,7 +57,7 @@ export async function POST(req: Request): Promise<Response> {
         chat_id: chatId,
         text: isChallenge
           ? '⚔ Тебе прилетел вызов! Жми и покажи, кто тут меткий.'
-          : '🕹 Pixel Arena — мини-игры и вызовы друзьям.\n\nБей рекорды, кидай вызовы кентам. Жми «Играть»!',
+          : '🎯 Игры Джо — мини-игры прямо в Telegram.\n\nБей рекорды, кидай вызовы кентам. Жми «Играть»!\n\nНовости и новые игры — в канале @JoesGames',
         reply_markup: {
           inline_keyboard: [[{ text: isChallenge ? '⚔ Принять вызов' : '▶ Играть', web_app: { url } }]],
         },

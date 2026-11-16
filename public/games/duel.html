@@ -146,7 +146,7 @@ let D={best:0,bestMs:0,snd:1};
 try{const r=JSON.parse(localStorage.getItem(DKEY)||'null');if(r&&typeof r==='object')D=Object.assign(D,r);}catch(e){}
 function saveD(){try{localStorage.setItem(DKEY,JSON.stringify(D));}catch(e){}}
 
-/* ================= ВСТРАИВАНИЕ В PIXEL ARENA ================= */
+/* ================= ВСТРАИВАНИЕ В «ИГРЫ ДЖО» ================= */
 // ?embed=1 — открыта внутри мини-аппа; ?mode=challenge&seed=&target=&from= — вызов от друга
 const QS=new URLSearchParams(location.search);
 const EMBED=QS.get('embed')==='1'&&window.parent!==window;

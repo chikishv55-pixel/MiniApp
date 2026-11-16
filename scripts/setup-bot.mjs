@@ -52,9 +52,12 @@ await call('setChatMenuButton', {
   menu_button: { type: 'web_app', text: 'Играть', web_app: { url: APP_URL } },
 })
 await call('setMyCommands', { commands: [{ command: 'start', description: 'Открыть игры' }] })
-await call('setMyShortDescription', { short_description: 'Мини-игры в 8-бит и вызовы друзьям' })
+await call('setMyName', { name: 'Игры Джо' })
+await call('setMyShortDescription', { short_description: 'Игры про Джо прямо в Telegram. Кидай вызовы друзьям! Канал: @JoesGames' })
 await call('setMyDescription', {
-  description: 'Pixel Arena — аркада прямо в Telegram. Бей рекорды и кидай вызовы кентам: кто дальше пройдёт тех же врагов?',
+  description:
+    'Игры Джо — аркада про самого меткого парня на диком западе. Меткий Джо, Дуэль и новые игры. ' +
+    'Бей рекорды и кидай вызовы друзьям: кто пройдёт тех же врагов?\n\nКанал игры: @JoesGames',
 })
 
 const info = await call('getWebhookInfo')

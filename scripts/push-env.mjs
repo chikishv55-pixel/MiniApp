@@ -23,10 +23,15 @@ for (const key of process.argv.slice(2)) {
     console.log(`SKIP ${key} — пусто в .env.local`)
     continue
   }
-  // старое значение убираем, чтобы add не упал на дубликате
-  spawnSync(npx, ['-y', 'vercel@latest', 'env', 'rm', key, 'production', '--yes'], opts)
-  const r = spawnSync(npx, ['-y', 'vercel@latest', 'env', 'add', key, 'production'], { ...opts, input: value })
+  // есть переменная — меняем значение (update), нет — создаём (add). Ничего не удаляем.
+  const args = ['-y', 'vercel@latest', 'env', 'update', key, '--environment', 'production', '--yes']
+  let r = spawnSync(npx, args, { ...opts, input: value })
+  let how = 'updated'
+  if (r.status !== 0 && /not found|does not exist|no environment variable/i.test(`${r.stdout}${r.stderr}`)) {
+    r = spawnSync(npx, ['-y', 'vercel@latest', 'env', 'add', key, '--environment', 'production'], { ...opts, input: value })
+    how = 'added'
+  }
   const ok = r.status === 0
-  console.log(`${ok ? 'OK  ' : 'FAIL'} ${key}`)
-  if (!ok) console.log((r.stderr || r.stdout || '').split(value).join('***').trim().split('\n').slice(-3).join('\n'))
+  console.log(`${ok ? 'OK  ' : 'FAIL'} ${key}${ok ? ` (${how})` : ''}`)
+  if (!ok) console.log(`${r.stderr || ''}${r.stdout || ''}`.split(value).join('***').trim().split('\n').slice(-8).join('\n'))
 }
