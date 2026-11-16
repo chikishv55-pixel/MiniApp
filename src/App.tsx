@@ -22,8 +22,8 @@ import { useProfile } from './profile'
 const GAMES: Game[] = [
   { id: 'joe', title: 'МЕТКИЙ ДЖО', desc: 'Лови момент и стреляй в голову', icon: 'target', color: '#ffd93d', art: 'joe' },
   { id: 'duel', title: 'ДУЭЛЬ', desc: 'Жди сигнала и стреляй первым', icon: 'bolt', color: '#5cff5c', art: 'duel' },
-  { id: 'memory', title: 'MEMORY', desc: 'Запомни порядок', icon: 'memory', color: '#3dffe0', soon: true },
-  { id: 'clicker', title: 'SPAM TAP', desc: '10 секунд на рекорд', icon: 'cursor', color: '#ff3d9a', soon: true },
+  { id: 'train', title: 'ПОБЕГ НА ПОЕЗДЕ', desc: 'Прыгай по крышам вагонов', icon: 'cursor', color: '#3dffe0', art: 'train' },
+  { id: 'next', title: '???', desc: 'Новая игра про Джо — скоро', icon: 'lock', color: '#ff3d9a', soon: true },
 ]
 
 const SHARE_TOAST: Record<string, string | null> = {
@@ -251,7 +251,7 @@ export default function App() {
               <br />
               {GAME_TEXT[incoming.g].inGame}
             </p>
-            <p className="challenge-sub">{incoming.g === 'duel' ? 'Те же бандиты.' : 'Те же враги.'} Побьёшь?</p>
+            <p className="challenge-sub">{incoming.g === 'duel' ? 'Те же бандиты.' : incoming.g === 'train' ? 'Тот же поезд.' : 'Те же враги.'} Побьёшь?</p>
             <div className="modal-actions">
               <button
                 className="btn btn-main-sm"

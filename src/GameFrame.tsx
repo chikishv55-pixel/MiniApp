@@ -13,6 +13,7 @@ type Props = {
 const FILES: Record<GameId, { file: string; title: string }> = {
   joe: { file: 'games/joe.html', title: 'Меткий Джо' },
   duel: { file: 'games/duel.html', title: 'Дуэль' },
+  train: { file: 'games/train.html', title: 'Побег на поезде' },
 }
 
 const tg = (window as any).Telegram?.WebApp

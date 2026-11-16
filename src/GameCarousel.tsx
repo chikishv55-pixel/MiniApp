@@ -9,7 +9,7 @@ export type Game = {
   icon: IconName
   color: string
   soon?: boolean
-  art?: 'joe' | 'duel' // вместо иконки — живая сцена из игры
+  art?: 'joe' | 'duel' | 'train' // вместо иконки — живая сцена из игры
 }
 
 type Props = {
@@ -35,6 +35,8 @@ export default function GameCarousel({ games, index, onIndex, onPlay, best }: Pr
     const el = track.current
     if (!el) return
     const next = (i + games.length) % games.length
+    // выбираем сразу, не дожидаясь конца прокрутки — PLAY и фон не отстают от тапа
+    onIndex(next)
     el.scrollTo({ left: next * el.clientWidth, behavior: 'smooth' })
   }
 
@@ -63,7 +65,7 @@ export default function GameCarousel({ games, index, onIndex, onPlay, best }: Pr
               {!g.soon && (best[g.id] ?? 0) > 0 && (
                 <span className="slide-best">
                   РЕКОРД: {best[g.id]}
-                  {g.id === 'duel' ? ' ПОДРЯД' : ''}
+                  {g.id === 'duel' ? ' ПОДРЯД' : g.id === 'train' ? ' ВАГ.' : ''}
                 </span>
               )}
             </button>

@@ -8,7 +8,7 @@
 import { createHmac, timingSafeEqual } from 'node:crypto'
 import { authUser, cleanNick, fail, isInt, json, readJson, tgNickOf } from './_lib/http.js'
 
-const GAMES = ['joe', 'duel'] as const
+const GAMES = ['joe', 'duel', 'train'] as const
 type GameId = (typeof GAMES)[number]
 
 const HEAD = 9 // сид 4 | уровень 2 | счёт 3

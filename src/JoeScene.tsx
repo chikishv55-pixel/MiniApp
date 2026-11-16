@@ -131,7 +131,52 @@ function makeDuel(skin: number, gun: number) {
   }
 }
 
-export default function JoeScene({ variant = 'joe' }: { variant?: 'joe' | 'duel' }) {
+function makeTrain(skin: number, gun: number) {
+  // Джо бежит по крыше вагона, раз в цикл перепрыгивает бочку; вагоны и столбы проносятся мимо
+  const roof = 78, px = 52, s = 1.0
+  const SPEED = 120
+  const CAR = 170, GAP = 0 // вагоны сплошные — сцена должна читаться с первого взгляда
+  let t = 0
+  let scroll = 0
+
+  return (ctx: Ctx, dt: number) => {
+    t += dt
+    scroll += SPEED * dt
+
+    // столбы на фоне
+    const po = (scroll * 1.6) % 90
+    for (let x = -po; x < W + 10; x += 90) box(ctx, '#1d3b3b', x, 22, 3, roof - 22)
+
+    // вагоны
+    const off = scroll % (CAR + GAP)
+    for (let x = -off; x < W + CAR; x += CAR + GAP) {
+      box(ctx, '#245a5a', x + 2, roof, CAR - 4, 40, 4)
+      box(ctx, '#3dffe0', x, roof - 3, CAR, 4, 2)
+      for (let w = x + 12; w + 16 < x + CAR - 8; w += 26) box(ctx, '#0f2a2a', w, roof + 9, 16, 12, 2)
+    }
+
+    // бочка выезжает справа раз в 2.2 секунды
+    const cycle = 2.2
+    const ph = t % cycle
+    const bx = W + 20 - ph * (W + 60) / cycle
+    box(ctx, '#8a4b22', bx, roof - 22, 18, 22, 5)
+    box(ctx, '#5c2f12', bx, roof - 17, 18, 3)
+    box(ctx, '#5c2f12', bx, roof - 7, 18, 3)
+
+    // прыжок: когда бочка подъезжает — дуга над ней
+    const jumpStart = bx - px
+    let lift = 0
+    if (jumpStart < 46 && jumpStart > -40) {
+      const k = (46 - jumpStart) / 86
+      lift = Math.sin(Math.min(1, k) * Math.PI) * 34
+    }
+    const bob = lift ? 0 : Math.abs(Math.sin(t * 14)) * 2.5
+    const rot = lift ? -0.12 : Math.sin(t * 14) * 0.04
+    drawDude(ctx, px, roof - lift - bob, 1, s, (c) => drawSkin(c, skin), gun, -1.05, 0, rot)
+  }
+}
+
+export default function JoeScene({ variant = 'joe' }: { variant?: 'joe' | 'duel' | 'train' }) {
   const ref = useRef<HTMLCanvasElement>(null)
 
   useEffect(() => {
@@ -139,7 +184,7 @@ export default function JoeScene({ variant = 'joe' }: { variant?: 'joe' | 'duel'
     const ctx = cv?.getContext('2d')
     if (!cv || !ctx) return
     const { skin, gun } = readLoadout()
-    const scene = variant === 'duel' ? makeDuel(skin, gun) : makeJoe(skin, gun)
+    const scene = variant === 'duel' ? makeDuel(skin, gun) : variant === 'train' ? makeTrain(skin, gun) : makeJoe(skin, gun)
 
     const fit = () => {
       const r = cv.getBoundingClientRect()
@@ -175,7 +220,9 @@ export default function JoeScene({ variant = 'joe' }: { variant?: 'joe' | 'duel'
       ref={ref}
       className="joe-scene"
       role="img"
-      aria-label={variant === 'duel' ? 'Дуэль: Джо стреляет первым' : 'Меткий Джо целится во врага'}
+      aria-label={
+        variant === 'duel' ? 'Дуэль: Джо стреляет первым' : variant === 'train' ? 'Джо бежит по крышам поезда' : 'Меткий Джо целится во врага'
+      }
     />
   )
 }

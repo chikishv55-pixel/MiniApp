@@ -1,6 +1,6 @@
 import { api, hasAuth } from './api'
 
-export type GameId = 'joe' | 'duel'
+export type GameId = 'joe' | 'duel' | 'train'
 
 // Вызов целиком живёт в ссылке, но подписан сервером: t.me/бот?start=c4...
 // Поменять игру, сид или счёт в ссылке нельзя — сервер не примет подпись.
@@ -35,6 +35,11 @@ export const GAME_TEXT: Record<GameId, { title: string; inGame: string; score: (
     inGame: 'в «Дуэли»',
     score: (k) => `${k} ${pluralRu(k, 'победа', 'победы', 'побед')} подряд`,
   },
+  train: {
+    title: 'ПОБЕГ НА ПОЕЗДЕ',
+    inGame: 'в «Побеге на поезде»',
+    score: (k) => `${k} ${pluralRu(k, 'вагон', 'вагона', 'вагонов')}`,
+  },
 }
 
 // Telegram кладёт ?startapp=... в start_param; кнопка бота передаёт его в адресе
@@ -47,7 +52,7 @@ export function readIncomingCode(): string | null {
 export async function verifyChallenge(code: string): Promise<Challenge | null> {
   try {
     const ch = (await api<{ challenge: Challenge }>(`challenge?code=${encodeURIComponent(code)}`)).challenge
-    return ch && (ch.g === 'joe' || ch.g === 'duel') ? ch : null
+    return ch && ch.g in GAME_TEXT ? ch : null
   } catch {
     return null
   }
