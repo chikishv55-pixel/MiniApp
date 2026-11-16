@@ -132,6 +132,7 @@ button{font:inherit;color:inherit;border:0;background:none;cursor:pointer}
 </div>
 
 <script src="look.js"></script>
+<script src="scenery.js"></script>
 <script>
 'use strict';
 /* ================= БАЗА ================= */
@@ -499,6 +500,18 @@ function bandPath(i){
 function decor(i,col){
   const t=Math.floor(hsh(i)*7),y=platY(i);if(t<3)return;
   ctx.save();if(i&1){ctx.translate(W,0);ctx.scale(-1,1);}ctx.translate(0,y);
+  // каждый уровень — новое место: пустыня, городок, лес, руины, каньон, горы, город (scenery.js)
+  const bm=window.JoeScenery?JoeScenery.biomeAt(S.level-1):'desert';
+  if(bm!=='desert'){
+    const S2=JoeScenery,win='rgba(255,255,255,.14)',x=60+hsh(i+2)*60;
+    if(bm==='town')S2.house(ctx,x,0,62+hsh(i+5)*30,46+hsh(i+9)*26,col,win,false,i);
+    else if(bm==='ruins')S2.house(ctx,x,0,62+hsh(i+5)*30,50+hsh(i+9)*30,col,win,hsh(i+4)>.3,i);
+    else if(bm==='forest'){S2.tree(ctx,x,0,.8+hsh(i+6)*.5,col);S2.tree(ctx,x+46,0,.6+hsh(i+8)*.4,col);}
+    else if(bm==='canyon')S2.rock(ctx,x,0,.7+hsh(i+6)*.5,col);
+    else if(bm==='snow')S2.peak(ctx,x+20,0,150,70+hsh(i+6)*40,col,win);
+    else if(bm==='city')S2.tower(ctx,x,0,46+hsh(i+5)*20,80+hsh(i+9)*50,col,win,i);
+    ctx.restore();return;
+  }
   if(t===3){box(ctx,col,50,-128,5,128);box(ctx,col,50,-128,34,5,2);poly(ctx,col,[72,-124,96,-124,102,-112,66,-112]);
     const g=ctx.createLinearGradient(0,-112,0,0);g.addColorStop(0,'rgba(255,255,255,.13)');g.addColorStop(1,'rgba(255,255,255,0)');
     ctx.fillStyle=g;ctx.beginPath();ctx.moveTo(68,-112);ctx.lineTo(100,-112);ctx.lineTo(150,0);ctx.lineTo(20,0);ctx.closePath();ctx.fill();}

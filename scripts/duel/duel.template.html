@@ -26,7 +26,7 @@
   <div id="title"><div class="l1">БЫСТРАЯ</div><div class="l2 duel">ДУЭЛЬ</div></div>
   <div id="hint">НАЖМИ, ЧТОБЫ НАЧАТЬ</div>
   <div id="best"></div>
-  <div id="note">Скин и оружие — из «Меткого Джо», монеты общие</div>
+  <div id="note">Скин, одежда и оружие — в гардеробе меню, монеты общие</div>
 
   <div id="menu">
     <button id="bSnd" class="mb half" aria-label="Звук">&#9668;))</button>
@@ -44,6 +44,7 @@
 </div>
 
 <script src="look.js"></script>
+<script src="scenery.js"></script>
 <script>
 'use strict';
 /* ================= БАЗА (из «Меткий Джо») ================= */
@@ -116,6 +117,7 @@ function startRun(){
 }
 function nextEnemy(){
   enemy=makeEnemy(round);player.aim=LOWER;state='enter';
+  if(round>1&&(round-1)%5===0&&window.JoeScenery)addText(W/2,250,JoeScenery.NAMES[JoeScenery.biomeAt(Math.floor((round-1)/5))],'#fff',30);
   if(enemy.boss){sfx('boss');addText(W/2,300,'БОСС · '+enemy.name.toUpperCase(),'#ff4d6d',30);}
   hud();
 }
@@ -245,7 +247,9 @@ function draw(){
   poly(ctx,css(mix(pal[0],pal[1],.45)),[-20,GROUND,40,610,110,598,170,628,240,606,330,636,400,604,470,626,560,596,560,GROUND]);
   box(ctx,css(mix(pal[0],pal[1],.7)),-20,GROUND,W+40,H-GROUND+20);
   box(ctx,css(mix(pal[1],[255,255,255],.3)),-20,GROUND,W+40,4);
-  cactus(52,GROUND,1.25,css(mix(pal[0],pal[1],.55)));cactus(500,GROUND,.95,css(mix(pal[0],pal[1],.55)));
+  // место меняется каждые 5 раундов (scenery.js): пустыня, городок, лес, руины, каньон, горы, город
+  if(window.JoeScenery)JoeScenery.layer(ctx,JoeScenery.biomeAt(Math.floor((round-1)/5)),time*6,GROUND,css(mix(pal[0],pal[1],.55)),css(mix(pal[1],[255,230,150],.35)),W);
+  else{cactus(52,GROUND,1.25,css(mix(pal[0],pal[1],.55)));cactus(500,GROUND,.95,css(mix(pal[0],pal[1],.55)));}
 
   for(const p of parts){ctx.globalAlpha=clamp((p.life-p.t)*2,0,1);ctx.fillStyle=p.col;ctx.fillRect(p.x-p.sz/2,p.y-(p.rest?p.sz*.6:p.sz/2),p.sz,p.rest?p.sz*.6:p.sz);}
   ctx.globalAlpha=1;
