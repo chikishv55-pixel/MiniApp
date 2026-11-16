@@ -263,8 +263,8 @@ const tierOf=k=>k>=60?4:k>=45?3:k>=30?2:k>=15?1:0;
 const WPN=[{cd:.28,dmg:1},{cd:.34,dmg:2},{cd:.45,dmg:3},{cd:.5,dmg:1,burst:3},{cd:.5,dmg:1.5,burst:4},{cd:.6,dmg:1,burst:6},
   {cd:.55,dmg:1.5,pellets:6,spread:.2,life:.3},{cd:.7,dmg:8,pierce:1},{cd:.8,dmg:1.5,burst:10}];
 const GUN_LEN=[32,27,30,48,38,32,52,66,58];
-const GRAF=['ДЖО','BANG!','ЙИХА!','JOE','WANTED','ЖМИ!','GG','ЛЕТИМ','ПИУ','★','♥','ДИКИЙ'];
-const GCOL=['#ff3d9a','#3dffe0','#ffd93d','#5cff5c','#ff9a3d','#b06bff','#ffffff'];
+// узоры на вагонах: полоски, шевроны, точки, зигзаг, ромбы, волны — в тон вагону
+const PCOL=[[255,255,255],[255,217,61],[61,255,224],[255,61,154]];
 const BOMB_FALL=.75,FIRE_T=.6;
 
 let state='menu',dist=0,groundX=0,carsDone=0,runCoins=0,lastReason='fall',deadT=0,clackT=0;
@@ -286,7 +286,7 @@ function genCar(k){
   const len=k===0?560:Math.round(sp0*(1.9+g()*1.0));
   const sp=speedAt(x0+len);
   const gap=k===0?90:Math.round(clamp(sp*(0.18+g()*(0.26+Math.min(.16,k*.006))),70,sp*AIR*0.72));
-  const tier=tierOf(k),obs=[],coins=[],graf=[];
+  const tier=tierOf(k),obs=[],coins=[];
   let heliPlan=null;
   const head=Math.round(Math.max(90+sp*0.35,sp*AIR-(prev?prev.gap:0)+40));
   if(k>=2){
@@ -328,8 +328,8 @@ function genCar(k){
   }
   if(k>=1&&g()<.6){for(let i=0;i<4;i++){const t=(i+.5)/4;coins.push({x:len+gap*t,y:ROOF-70-Math.sin(t*Math.PI)*110,taken:false});}}
   if(k>=1){const first=obs.length?obs[0].x:len;if(first>260&&g()<.6)for(let i=0;i<4;i++)coins.push({x:70+i*44,y:ROOF-42,taken:false});}
-  if(k>=1&&g()<.7){const n=1+(g()<.35?1:0);for(let i=0;i<n;i++)graf.push({t:GRAF[Math.floor(g()*GRAF.length)],c:GCOL[Math.floor(g()*GCOL.length)],x:Math.round(24+g()*Math.max(10,len-150)),rot:(g()-.5)*.28,s:22+Math.floor(g()*12)});}
-  cars[k]={k,x0,len,gap,obs,coins,graf,heliPlan};
+  const pat=k>=1&&g()<.85?{t:Math.floor(g()*6),c:Math.floor(g()*PCOL.length)}:null;
+  cars[k]={k,x0,len,gap,obs,coins,pat,heliPlan};
 }
 function carAt(k){while(cars.length<=k)genCar(cars.length);return cars[k];}
 function carsIn(a,b){
@@ -630,12 +630,18 @@ function drawCar(c){
   box(ctx,light,x-4,ROOF-6,c.len+8,12,4);
   for(let wx=x+22;wx+38<x+c.len-14;wx+=64)box(ctx,dark,wx,ROOF+30,38,30,4);
   box(ctx,css(mix(pal[1],[255,200,80],.5)),x,ROOF+86,c.len,10);
-  // граффити на вагоне
-  for(const g of c.graf){
-    ctx.save();ctx.translate(x+g.x,ROOF+70);ctx.rotate(g.rot);
-    ctx.font='900 '+g.s+'px "Arial Black","Segoe UI",sans-serif';ctx.textAlign='left';ctx.lineJoin='round';
-    ctx.lineWidth=6;ctx.strokeStyle='#14141f';ctx.strokeText(g.t,0,0);ctx.fillStyle=g.c;ctx.fillText(g.t,0,0);
-    ctx.globalAlpha=.6;ctx.fillRect(6,4,3,6+((g.x*7)%9));ctx.globalAlpha=1;ctx.restore();
+  // узор на нижней панели вагона
+  if(c.pat){
+    const y0=ROOF+100,h=20,col=css(mix(mix(pal[1],[40,30,60],.35),PCOL[c.pat.c],.32));
+    ctx.save();ctx.beginPath();ctx.rect(x+8,y0,c.len-16,h);ctx.clip();
+    const t=c.pat.t,x1=x+c.len;
+    if(t===0)for(let xx=x-h;xx<x1;xx+=18)poly(ctx,col,[xx,y0+h,xx+7,y0+h,xx+7+h,y0,xx+h,y0]);
+    else if(t===1)for(let xx=x+10;xx<x1;xx+=26)poly(ctx,col,[xx,y0+2,xx+9,y0+2,xx+17,y0+h/2,xx+9,y0+h-2,xx,y0+h-2,xx+8,y0+h/2]);
+    else if(t===2)for(let xx=x+12,i=0;xx<x1;xx+=16,i++)disc(ctx,col,xx,y0+(i%2?h-6:6),3.2);
+    else if(t===3)for(let xx=x;xx<x1;xx+=24){poly(ctx,col,[xx,y0+h,xx+12,y0+3,xx+15,y0+3,xx+3,y0+h]);poly(ctx,col,[xx+12,y0+3,xx+24,y0+h,xx+21,y0+h,xx+12,y0+8]);}
+    else if(t===4)for(let xx=x+14;xx<x1;xx+=26)poly(ctx,col,[xx,y0+h/2,xx+8,y0+2,xx+16,y0+h/2,xx+8,y0+h-2]);
+    else{ctx.strokeStyle=col;ctx.lineWidth=3.5;ctx.beginPath();for(let xx=x;xx<=x1;xx+=6){const yy=y0+h/2+Math.sin((xx-x)/14)*6;xx===x?ctx.moveTo(xx,yy):ctx.lineTo(xx,yy);}ctx.stroke();}
+    ctx.restore();
   }
   disc(ctx,'#1b1b28',x+46,ROOF+140,17);disc(ctx,'#1b1b28',x+c.len-46,ROOF+140,17);
   disc(ctx,'#4a4a5e',x+46,ROOF+140,6);disc(ctx,'#4a4a5e',x+c.len-46,ROOF+140,6);

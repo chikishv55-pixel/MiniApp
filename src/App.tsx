@@ -83,6 +83,31 @@ export default function App() {
     tg?.setBackgroundColor?.('#0a0a0f')
     // экран не скроллится — свайп вниз не должен случайно сворачивать приложение
     tg?.disableVerticalSwipes?.()
+
+    // Высота экрана = реальная высота окна. Переменная Telegram «stable height» после
+    // сворачивания (вышел в чат и вернулся) может остаться маленькой — меню ужималось в полоску.
+    // Поэтому пересчитываем сами при любом изменении и разворачиваем приложение при возврате.
+    const sync = () => {
+      document.documentElement.style.setProperty('--app-h', `${window.innerHeight}px`)
+    }
+    const back = () => {
+      if (document.hidden) return
+      tg?.expand?.()
+      sync()
+      // Telegram доводит окно до размера с анимацией — досчитываем после неё
+      window.setTimeout(sync, 300)
+    }
+    sync()
+    window.addEventListener('resize', sync)
+    document.addEventListener('visibilitychange', back)
+    tg?.onEvent?.('viewportChanged', sync)
+    tg?.onEvent?.('activated', back)
+    return () => {
+      window.removeEventListener('resize', sync)
+      document.removeEventListener('visibilitychange', back)
+      tg?.offEvent?.('viewportChanged', sync)
+      tg?.offEvent?.('activated', back)
+    }
   }, [])
 
   const checkSub = useCallback(

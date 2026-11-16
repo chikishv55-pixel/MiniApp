@@ -38,8 +38,8 @@ button {
 /* ===== экран: всё помещается без прокрутки ===== */
 .screen {
   position: relative;
-  /* Telegram сам выставляет высоту видимой области */
-  height: var(--tg-viewport-stable-height, 100dvh);
+  /* реальная высота окна — App пересчитывает --app-h при каждом изменении и возврате в приложение */
+  height: var(--app-h, 100dvh);
   max-width: 480px;
   margin: 0 auto;
   padding: 12px 16px calc(12px + env(safe-area-inset-bottom));
