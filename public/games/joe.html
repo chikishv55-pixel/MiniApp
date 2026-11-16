@@ -731,14 +731,15 @@ function fit(){
   cv.width=Math.round(W*r);cv.height=Math.round(H*r);ctx.setTransform(cv.width/W,0,0,cv.height/H,0,0);
 }
 window.addEventListener('resize',fit);
-let last=0;
+let last=0,MANUAL=false; // MANUAL — для роликов и автотестов: время двигает скрипт, а не requestAnimationFrame
 function frame(ts){
+  if(MANUAL){requestAnimationFrame(frame);return;}
   const rdt=Math.min(.033,Math.max(0,(ts-last)/1000)||0);last=ts;let dt=rdt;
   if(slow>0){slow-=rdt;dt*=.25;}
   update(dt);draw();requestAnimationFrame(frame);
 }
 fit();showMenu();requestAnimationFrame(frame);
-window.__game={tap:onTap,retry:()=>{resetWorld();hud();startRun();},dbg:()=>({px:player.x,py:player.y,pk:player.k,pd:player.dir,ex:enemy&&enemy.x,ey:enemy&&enemy.y,es:enemy&&enemy.s,ek:enemy&&enemy.k,boss:enemy&&enemy.boss,hp:enemy&&enemy.hp}),info:()=>({state,aim,aimTarget,level:S.level,coins:S.coins,kills,runKills,bullets:bullets.length})};
+window.__game={tap:onTap,manual:()=>{MANUAL=true;},step:(ms,noDraw)=>{const rdt=Math.min(.033,ms/1000);let dt=rdt;if(slow>0){slow-=rdt;dt*=.25;}update(dt);if(!noDraw)draw();},retry:()=>{resetWorld();hud();startRun();},dbg:()=>({px:player.x,py:player.y,pk:player.k,pd:player.dir,ex:enemy&&enemy.x,ey:enemy&&enemy.y,es:enemy&&enemy.s,ek:enemy&&enemy.k,boss:enemy&&enemy.boss,hp:enemy&&enemy.hp}),info:()=>({state,aim,aimTarget,level:S.level,coins:S.coins,kills,runKills,bullets:bullets.length})};
 </script>
 </body>
 </html>
