@@ -2,27 +2,19 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import AdBanner from './AdBanner'
 import AdminModal from './AdminModal'
 import Avatar from './Avatar'
+import GameCarousel, { type Game } from './GameCarousel'
 import GameFrame, { type GameLaunch } from './GameFrame'
-import PixelIcon, { type IconName } from './PixelIcon'
+import PixelIcon from './PixelIcon'
 import ProfileModal from './ProfileModal'
 import { api, hasAuth } from './api'
 import { createAndShare, plural, readIncomingCode, verifyChallenge, type Challenge, type RunInfo } from './challenge'
 import { useProfile } from './profile'
 
-type Game = {
-  id: string
-  title: string
-  desc: string
-  icon: IconName
-  color: string
-  soon?: boolean
-}
-
 const GAMES: Game[] = [
-  { id: 'joe', title: 'МЕТКИЙ ДЖО', desc: 'Стреляй вовремя', icon: 'target', color: 'var(--yellow)' },
-  { id: 'reaction', title: 'REACTION', desc: 'Жми быстрее всех', icon: 'bolt', color: 'var(--green)', soon: true },
-  { id: 'memory', title: 'MEMORY', desc: 'Запомни порядок', icon: 'memory', color: 'var(--cyan)', soon: true },
-  { id: 'clicker', title: 'SPAM TAP', desc: '10 секунд на рекорд', icon: 'cursor', color: 'var(--pink)', soon: true },
+  { id: 'joe', title: 'МЕТКИЙ ДЖО', desc: 'Лови момент и стреляй в голову', icon: 'target', color: '#ffd93d' },
+  { id: 'reaction', title: 'REACTION', desc: 'Жми быстрее всех', icon: 'bolt', color: '#5cff5c', soon: true },
+  { id: 'memory', title: 'MEMORY', desc: 'Запомни порядок', icon: 'memory', color: '#3dffe0', soon: true },
+  { id: 'clicker', title: 'SPAM TAP', desc: '10 секунд на рекорд', icon: 'cursor', color: '#ff3d9a', soon: true },
 ]
 
 const SHARE_TOAST: Record<string, string | null> = {
@@ -49,11 +41,14 @@ export default function App() {
   const [adminOpen, setAdminOpen] = useState(false)
   const [isAdmin, setIsAdmin] = useState(false)
   const [adKey, setAdKey] = useState(0)
+  const [slide, setSlide] = useState(0)
   const [game, setGame] = useState<GameLaunch | null>(null)
   const [incoming, setIncoming] = useState<Challenge | null>(null)
   const [toast, setToast] = useState<string | null>(null)
   const toastTimer = useRef<number>()
   const { nick, avatar, save, tgNick, best, reportRun } = useProfile()
+
+  const current = GAMES[slide]
 
   const showToast = useCallback((text: string) => {
     setToast(text)
@@ -66,6 +61,8 @@ export default function App() {
     tg?.expand()
     tg?.setHeaderColor?.('#0a0a0f')
     tg?.setBackgroundColor?.('#0a0a0f')
+    // экран не скроллится — свайп вниз не должен случайно сворачивать приложение
+    tg?.disableVerticalSwipes?.()
   }, [])
 
   // админ ли я: сервер отдаёт список баннеров только аккаунтам из ADMIN_IDS
@@ -86,18 +83,23 @@ export default function App() {
     })
   }, [showToast])
 
-  const playJoe = () => {
-    haptic('medium')
-    setGame({ mode: 'free' })
-  }
-
-  const pick = (g: Game) => {
+  const play = (g: Game) => {
     if (g.soon) {
       showToast(`${g.title}: СКОРО`)
       return
     }
-    playJoe()
+    haptic('medium')
+    setGame({ mode: 'free' })
   }
+
+  const changeSlide = useCallback((i: number) => {
+    setSlide(i)
+    try {
+      tg?.HapticFeedback?.selectionChanged()
+    } catch {
+      /* вне телеграма */
+    }
+  }, [])
 
   const onChallenge = useCallback(
     async (r: RunInfo) => {
@@ -108,7 +110,15 @@ export default function App() {
   )
 
   return (
-    <div className="screen">
+    <div className="screen" style={{ ['--theme' as string]: current.color }}>
+      {/* фон под текущую игру: слои плавно меняются местами */}
+      {GAMES.map((g, i) => (
+        <div
+          key={g.id}
+          className={`theme-layer ${i === slide ? 'on' : ''}`}
+          style={{ ['--accent' as string]: g.color }}
+        />
+      ))}
       <div className="scanlines" />
 
       <header className="topbar">
@@ -127,62 +137,40 @@ export default function App() {
           <PixelIcon name="trophy" size={14} /> {best}
         </div>
         <div className="chip">LVL 1</div>
+        {isAdmin && (
+          <button className="chip chip-admin" onClick={() => setAdminOpen(true)} aria-label="Админка">
+            ⚙
+          </button>
+        )}
       </header>
 
       <section className="hero">
-        <p className="hello blink">&gt; PRESS START</p>
         <h1 className="logo">
-          PIXEL
-          <br />
-          <span>ARENA</span>
+          PIXEL <span>ARENA</span>
         </h1>
         <p className="tagline">Бросай вызовы. Бей рекорды.</p>
       </section>
 
-      <button className="btn btn-main" onClick={playJoe}>
-        ▶ PLAY
-      </button>
+      <GameCarousel games={GAMES} index={slide} onIndex={changeSlide} onPlay={play} best={best} />
 
-      <h2 className="section-title">ИГРЫ</h2>
-      <div className="grid">
-        {GAMES.map((g) => (
-          <button
-            key={g.id}
-            className={`card ${g.soon ? 'soon' : ''}`}
-            style={{ ['--accent' as string]: g.color }}
-            onClick={() => pick(g)}
-          >
-            {g.soon && <span className="badge">СКОРО</span>}
-            <span className="card-icon">
-              <PixelIcon name={g.icon} size={36} />
-            </span>
-            <span className="card-title">{g.title}</span>
-            <span className="card-desc">{g.desc}</span>
-          </button>
-        ))}
+      <div className="actions">
+        <button className="btn btn-main" onClick={() => play(current)} disabled={current.soon}>
+          {current.soon ? 'СКОРО' : '▶ PLAY'}
+        </button>
+        <button
+          className="btn btn-pink btn-square"
+          disabled={current.soon}
+          onClick={() => {
+            showToast('СЫГРАЙ И ЖМИ «ВЫЗОВ ДРУГУ»')
+            play(current)
+          }}
+          aria-label="Вызов другу"
+        >
+          <PixelIcon name="sword" size={24} />
+        </button>
       </div>
 
       <AdBanner fresh={isAdmin} reloadKey={adKey} />
-
-      <button
-        className="btn btn-pink btn-icon"
-        onClick={() => {
-          showToast('СЫГРАЙ И ЖМИ «ВЫЗОВ ДРУГУ»')
-          playJoe()
-        }}
-      >
-        <PixelIcon name="sword" size={16} />
-        ВЫЗОВ ДРУГУ
-      </button>
-
-      <footer className="footer">
-        v0.3 · 8-BIT EDITION
-        {isAdmin && (
-          <button className="admin-link" onClick={() => setAdminOpen(true)}>
-            ⚙ АДМИНКА
-          </button>
-        )}
-      </footer>
 
       {profileOpen && (
         <ProfileModal
