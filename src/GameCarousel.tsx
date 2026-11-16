@@ -9,7 +9,7 @@ export type Game = {
   icon: IconName
   color: string
   soon?: boolean
-  art?: 'joe' // вместо иконки — живая сцена из игры
+  art?: 'joe' | 'duel' // вместо иконки — живая сцена из игры
 }
 
 type Props = {
@@ -17,7 +17,7 @@ type Props = {
   index: number
   onIndex: (i: number) => void
   onPlay: (g: Game) => void
-  best: number
+  best: Record<string, number>
 }
 
 // Игры по одной, листаются свайпом (нативный scroll-snap — плавно и на телефоне, и мышкой)
@@ -49,9 +49,9 @@ export default function GameCarousel({ games, index, onIndex, onPlay, best }: Pr
               onClick={() => onPlay(g)}
             >
               {g.soon && <span className="badge">СКОРО</span>}
-              {g.art === 'joe' ? (
+              {g.art ? (
                 <span className="slide-art">
-                  <JoeScene />
+                  <JoeScene variant={g.art} />
                 </span>
               ) : (
                 <span className="slide-icon">
@@ -60,7 +60,12 @@ export default function GameCarousel({ games, index, onIndex, onPlay, best }: Pr
               )}
               <span className="slide-title">{g.title}</span>
               <span className="slide-desc">{g.desc}</span>
-              {g.id === 'joe' && best > 0 && <span className="slide-best">РЕКОРД: {best}</span>}
+              {!g.soon && (best[g.id] ?? 0) > 0 && (
+                <span className="slide-best">
+                  РЕКОРД: {best[g.id]}
+                  {g.id === 'duel' ? ' ПОДРЯД' : ''}
+                </span>
+              )}
             </button>
           </div>
         ))}

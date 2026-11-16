@@ -1,4 +1,5 @@
 import { useCallback, useState } from 'react'
+import type { GameId } from './challenge'
 
 const KEY = 'pixel-arena:profile'
 const BEST_KEY = 'pixel-arena:best'
@@ -41,9 +42,13 @@ export function cleanNick(raw: string): string {
 // Профиль и рекорд хранятся на устройстве (без базы)
 export function useProfile() {
   const [stored, setStored] = useState<Stored>(() => read<Stored>(KEY, {}))
-  const [best, setBestState] = useState<number>(() => {
-    const v = read<unknown>(BEST_KEY, 0)
-    return typeof v === 'number' && v >= 0 ? Math.floor(v) : 0
+  // рекорды по играм; раньше хранилось одно число (рекорд Джо) — подхватываем его
+  const [best, setBestState] = useState<Record<GameId, number>>(() => {
+    const v = read<unknown>(BEST_KEY, {})
+    const num = (x: unknown) => (typeof x === 'number' && x >= 0 ? Math.floor(x) : 0)
+    if (typeof v === 'number') return { joe: num(v), duel: 0 }
+    const o = (v && typeof v === 'object' ? v : {}) as Record<string, unknown>
+    return { joe: num(o.joe), duel: num(o.duel) }
   })
 
   const nick = stored.nick || tgNick
@@ -59,11 +64,12 @@ export function useProfile() {
     setStored(clean)
   }, [])
 
-  const reportRun = useCallback((kills: number) => {
+  const reportRun = useCallback((game: GameId, kills: number) => {
     setBestState((prev) => {
-      if (kills <= prev) return prev
-      write(BEST_KEY, kills)
-      return kills
+      if (kills <= prev[game]) return prev
+      const next = { ...prev, [game]: kills }
+      write(BEST_KEY, next)
+      return next
     })
   }, [])
 

@@ -1,17 +1,20 @@
 // Вызовы без базы: сервер подписывает данные вызова секретом, и вся информация живёт в ссылке.
-// POST /api/challenge { seed, level, kills, nick } → { code }  (нужен initData)
-// GET  /api/challenge?code=c3...                 → { challenge } или 400, если подпись не сходится
+// POST /api/challenge { game, seed, level, kills, nick } → { code }  (нужен initData)
+// GET  /api/challenge?code=c4...                       → { challenge } или 400, если подпись не сходится
 //
-// Формат: c3 + base64url( сид 4 | уровень 2 | счёт 3 | ник UTF-8 ≤24 | HMAC 8 ) — максимум 57 символов,
+// Формат c4: base64url( игра 1 | сид 4 | уровень 2 | счёт 3 | ник UTF-8 ≤24 | HMAC 8 ) — максимум 58 символов,
 // влезает в лимит Telegram на t.me/бот?start= (64). Поменял хоть байт — подпись не сойдётся.
+// Старые ссылки c3 (без поля игры) по-прежнему открываются как «Меткий Джо».
 import { createHmac, timingSafeEqual } from 'node:crypto'
 import { authUser, cleanNick, fail, isInt, json, readJson, tgNickOf } from './_lib/http.js'
 
-const PREFIX = 'c3'
-const HEAD = 9
+const GAMES = ['joe', 'duel'] as const
+type GameId = (typeof GAMES)[number]
+
+const HEAD = 9 // сид 4 | уровень 2 | счёт 3
 const NICK_BYTES = 24
 const SIG = 8
-const CODE_RE = /^c3[A-Za-z0-9_-]{22,55}$/
+const CODE_RE = /^c[34][A-Za-z0-9_-]{22,56}$/
 // потолок правдоподобного счёта за один забег — отсекает самые тупые накрутки
 const MAX_KILLS = 1000
 
@@ -21,7 +24,12 @@ function key(): Buffer {
   return createHmac('sha256', 'pixel-arena/challenge/v1').update(secret).digest()
 }
 
-const sign = (body: Buffer) => createHmac('sha256', key()).update(body).digest().subarray(0, SIG)
+// c3 подписывал только тело; c4 подписывает префикс + тело (форматы не подменить друг другом)
+const sign = (prefix: string, body: Buffer) =>
+  createHmac('sha256', key())
+    .update(prefix === 'c3' ? body : Buffer.concat([Buffer.from(prefix), body]))
+    .digest()
+    .subarray(0, SIG)
 
 function nickBytes(n: string): Buffer {
   let chars = Array.from(n)
@@ -33,38 +41,45 @@ function nickBytes(n: string): Buffer {
   return b
 }
 
-function encode(seed: number, level: number, kills: number, nick: string): string {
+function encode(game: GameId, seed: number, level: number, kills: number, nick: string): string {
   const nb = nickBytes(nick)
-  const body = Buffer.alloc(HEAD + nb.length)
-  body.writeUInt32BE(seed >>> 0, 0)
-  body.writeUInt16BE(level, 4)
-  body.writeUIntBE(kills, 6, 3)
-  nb.copy(body, HEAD)
-  return PREFIX + Buffer.concat([body, sign(body)]).toString('base64url')
+  const body = Buffer.alloc(1 + HEAD + nb.length)
+  body.writeUInt8(GAMES.indexOf(game), 0)
+  body.writeUInt32BE(seed >>> 0, 1)
+  body.writeUInt16BE(level, 5)
+  body.writeUIntBE(kills, 7, 3)
+  nb.copy(body, 1 + HEAD)
+  return 'c4' + Buffer.concat([body, sign('c4', body)]).toString('base64url')
 }
 
 function decode(code: string) {
   if (!CODE_RE.test(code)) return null
-  const all = Buffer.from(code.slice(PREFIX.length), 'base64url')
-  if (all.length < HEAD + SIG || all.length > HEAD + NICK_BYTES + SIG) return null
+  const prefix = code.slice(0, 2)
+  const all = Buffer.from(code.slice(2), 'base64url')
+  const off = prefix === 'c4' ? 1 : 0
+  if (all.length < off + HEAD + SIG || all.length > off + HEAD + NICK_BYTES + SIG) return null
   const body = all.subarray(0, all.length - SIG)
-  const sig = all.subarray(all.length - SIG)
-  if (!timingSafeEqual(sig, sign(body))) return null
-  const l = body.readUInt16BE(4)
-  const k = body.readUIntBE(6, 3)
+  if (!timingSafeEqual(all.subarray(all.length - SIG), sign(prefix, body))) return null
+
+  const g = off ? GAMES[body.readUInt8(0)] : 'joe'
+  if (!g) return null
+  const l = body.readUInt16BE(off + 4)
+  const k = body.readUIntBE(off + 6, 3)
   if (l < 1 || l > 999 || k < 1 || k > MAX_KILLS) return null
-  return { s: body.readUInt32BE(0), l, k, n: cleanNick(body.subarray(HEAD).toString('utf8')) || 'ДРУГ' }
+  const n = cleanNick(body.subarray(off + HEAD).toString('utf8')) || 'ДРУГ'
+  return { g, s: body.readUInt32BE(off), l, k, n }
 }
 
 export async function POST(req: Request): Promise<Response> {
   const user = authUser(req)
   if (!user) return fail(401, 'unauthorized')
-  const { seed, level, kills, nick } = await readJson(req)
+  const { game = 'joe', seed, level, kills, nick } = await readJson(req)
+  if (!GAMES.includes(game as GameId)) return fail(400, 'bad game')
   if (!isInt(seed, 0, 0xffffffff) || !isInt(level, 1, 999) || !isInt(kills, 1, MAX_KILLS)) {
     return fail(400, 'bad params')
   }
   try {
-    return json({ code: encode(seed, level, kills, cleanNick(nick) || tgNickOf(user)) })
+    return json({ code: encode(game as GameId, seed, level, kills, cleanNick(nick) || tgNickOf(user)) })
   } catch (e) {
     console.error(e)
     return fail(500, 'not configured')

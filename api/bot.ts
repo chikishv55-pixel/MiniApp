@@ -5,8 +5,8 @@ const TOKEN = process.env.TELEGRAM_BOT_TOKEN
 const SECRET = process.env.TELEGRAM_WEBHOOK_SECRET
 const APP_URL = process.env.WEBAPP_URL?.replace(/\/+$/, '')
 
-// подписанный вызов из ссылки t.me/<бот>?start=c3... (подпись проверяет /api/challenge)
-const CHALLENGE_RE = /^c3[A-Za-z0-9_-]{22,55}$/
+// подписанный вызов из ссылки t.me/<бот>?start=c4... (c3 — старый формат; подпись проверяет /api/challenge)
+const CHALLENGE_RE = /^c[34][A-Za-z0-9_-]{22,56}$/
 
 async function callTg(method: string, body: unknown): Promise<void> {
   const res = await fetch(`https://api.telegram.org/bot${TOKEN}/${method}`, {

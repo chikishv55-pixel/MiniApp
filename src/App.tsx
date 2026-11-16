@@ -7,12 +7,20 @@ import GameFrame, { type GameLaunch } from './GameFrame'
 import PixelIcon from './PixelIcon'
 import ProfileModal from './ProfileModal'
 import { api, hasAuth } from './api'
-import { createAndShare, plural, readIncomingCode, verifyChallenge, type Challenge, type RunInfo } from './challenge'
+import {
+  GAME_TEXT,
+  createAndShare,
+  readIncomingCode,
+  verifyChallenge,
+  type Challenge,
+  type GameId,
+  type RunInfo,
+} from './challenge'
 import { useProfile } from './profile'
 
 const GAMES: Game[] = [
   { id: 'joe', title: 'МЕТКИЙ ДЖО', desc: 'Лови момент и стреляй в голову', icon: 'target', color: '#ffd93d', art: 'joe' },
-  { id: 'reaction', title: 'REACTION', desc: 'Жми быстрее всех', icon: 'bolt', color: '#5cff5c', soon: true },
+  { id: 'duel', title: 'ДУЭЛЬ', desc: 'Жди сигнала и стреляй первым', icon: 'bolt', color: '#5cff5c', art: 'duel' },
   { id: 'memory', title: 'MEMORY', desc: 'Запомни порядок', icon: 'memory', color: '#3dffe0', soon: true },
   { id: 'clicker', title: 'SPAM TAP', desc: '10 секунд на рекорд', icon: 'cursor', color: '#ff3d9a', soon: true },
 ]
@@ -89,7 +97,7 @@ export default function App() {
       return
     }
     haptic('medium')
-    setGame({ mode: 'free' })
+    setGame({ game: g.id as GameId, mode: 'free' })
   }
 
   const changeSlide = useCallback((i: number) => {
@@ -103,10 +111,11 @@ export default function App() {
 
   const onChallenge = useCallback(
     async (r: RunInfo) => {
-      const msg = SHARE_TOAST[await createAndShare(r, nick)]
+      if (!game) return
+      const msg = SHARE_TOAST[await createAndShare(game.game, r, nick)]
       if (msg) showToast(msg)
     },
-    [nick, showToast],
+    [game, nick, showToast],
   )
 
   return (
@@ -134,7 +143,7 @@ export default function App() {
           <span className="nick">{nick.toUpperCase()}</span>
         </button>
         <div className="chip" title="Лучшая серия">
-          <PixelIcon name="trophy" size={14} /> {best}
+          <PixelIcon name="trophy" size={14} /> {best[current.id as GameId] ?? 0}
         </div>
         <div className="chip">LVL 1</div>
         {isAdmin && (
@@ -202,16 +211,17 @@ export default function App() {
             <p className="challenge-text">
               <b>{incoming.n.toUpperCase()}</b>
               <br />
-              убил(а) {incoming.k} {plural(incoming.k)}
-              <br />в «Метком Джо»
+              {GAME_TEXT[incoming.g].score(incoming.k)}
+              <br />
+              {GAME_TEXT[incoming.g].inGame}
             </p>
-            <p className="challenge-sub">Те же враги. Побьёшь?</p>
+            <p className="challenge-sub">{incoming.g === 'duel' ? 'Те же бандиты.' : 'Те же враги.'} Побьёшь?</p>
             <div className="modal-actions">
               <button
                 className="btn btn-main-sm"
                 onClick={() => {
                   haptic('medium')
-                  setGame({ mode: 'challenge', ch: incoming })
+                  setGame({ game: incoming.g, mode: 'challenge', ch: incoming })
                   setIncoming(null)
                 }}
               >
@@ -230,7 +240,7 @@ export default function App() {
           launch={game}
           onExit={() => setGame(null)}
           onChallenge={onChallenge}
-          onResult={(r) => reportRun(r.kills)}
+          onResult={(r) => reportRun(game.game, r.kills)}
         />
       )}
 

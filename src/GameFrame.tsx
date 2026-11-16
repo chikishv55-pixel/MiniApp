@@ -1,13 +1,18 @@
 import { useEffect, useMemo, useRef } from 'react'
-import type { Challenge, RunInfo } from './challenge'
+import type { Challenge, GameId, RunInfo } from './challenge'
 
-export type GameLaunch = { mode: 'free' } | { mode: 'challenge'; ch: Challenge }
+export type GameLaunch = { game: GameId; mode: 'free' } | { game: GameId; mode: 'challenge'; ch: Challenge }
 
 type Props = {
   launch: GameLaunch
   onExit: () => void
   onChallenge: (r: RunInfo) => void
   onResult: (r: RunInfo) => void
+}
+
+const FILES: Record<GameId, { file: string; title: string }> = {
+  joe: { file: 'games/joe.html', title: 'Меткий Джо' },
+  duel: { file: 'games/duel.html', title: 'Дуэль' },
 }
 
 const tg = (window as any).Telegram?.WebApp
@@ -36,15 +41,15 @@ export default function GameFrame({ launch, onExit, onChallenge, onResult }: Pro
       q.set('target', String(launch.ch.k))
       q.set('from', launch.ch.n)
     }
-    return `${import.meta.env.BASE_URL}games/joe.html?${q}`
+    return `${import.meta.env.BASE_URL}${FILES[launch.game].file}?${q}`
   }, [launch])
 
-  // сообщения из игры: принимаем только от нашего iframe и нашего origin
+  // сообщения из игры: принимаем только от нашего iframe, нашего origin и запущенной игры
   useEffect(() => {
     const onMsg = (e: MessageEvent) => {
       if (e.origin !== location.origin || e.source !== frame.current?.contentWindow) return
       const d = e.data
-      if (!d || d.src !== 'joe') return
+      if (!d || d.src !== launch.game) return
       if (d.type === 'exit') cb.current.onExit()
       if (d.type === 'result') {
         const r = readRun(d)
@@ -57,7 +62,7 @@ export default function GameFrame({ launch, onExit, onChallenge, onResult }: Pro
     }
     window.addEventListener('message', onMsg)
     return () => window.removeEventListener('message', onMsg)
-  }, [])
+  }, [launch.game])
 
   // системная кнопка «Назад» в Telegram
   useEffect(() => {
@@ -72,5 +77,5 @@ export default function GameFrame({ launch, onExit, onChallenge, onResult }: Pro
     }
   }, [])
 
-  return <iframe ref={frame} className="game-frame" src={src} title="Меткий Джо" allow="autoplay" />
+  return <iframe ref={frame} className="game-frame" src={src} title={FILES[launch.game].title} allow="autoplay" />
 }
