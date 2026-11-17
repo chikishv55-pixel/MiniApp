@@ -96,7 +96,7 @@ export function endCard(c, o, t) {
   // Джо в своём наряде
   const joe = JSON.parse(localStorage.getItem('metkiy-joe-v1') || '{}')
   const skin = Number.isInteger(joe.curS) ? joe.curS : 0
-  const gun = Number.isInteger(joe.curW) ? joe.curW : 0
+  const gun = o.noGun ? -1 : Number.isInteger(joe.curW) ? joe.curW : 0 // noGun — «мирные» ролики без оружия
   const bob = Math.sin(t * 5) * 6
   window.drawDude(c, OW / 2 - 330, 620 + bob, 1, 3.2, (k) => window.drawJoe(k, skin), gun, 0.25, 0, 0)
   window.drawDude(c, OW / 2 + 330, 620 - bob, -1, 3.2, (k) => window.drawJoe(k, skin), gun, 0.25, 0, 0)
@@ -120,7 +120,7 @@ export function endCard(c, o, t) {
   c.font = '900 130px ' + FONT
   const fs = Math.min(130, ((pw - 80) / c.measureText(BOT).width) * 130)
   text(c, BOT, OW / 2, py0 + 140 + fs * 0.9, fs, '#ffc233')
-  text(c, 'ссылка — в шапке канала', OW / 2, py0 + 140 + fs * 0.9 + 80, 46, '#fff')
+  text(c, o.linkText || 'ссылка — в шапке канала', OW / 2, py0 + 140 + fs * 0.9 + 80, 46, '#fff')
   // маленький QR для компьютера (целые координаты и модуль ≥ 9 px — иначе сканер не читает)
   const q = o.qr
   const quiet = 4

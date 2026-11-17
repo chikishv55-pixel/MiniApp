@@ -22,6 +22,15 @@
 `const m = await import('/scripts/video/ad-card.js'); const cv = await m.renderCard({ contact: '@ник', prices: [...] }); await m.sendPng(cv, 'http://127.0.0.1:8804')`
 (приёмник: `node scripts/video/sink.mjs content/card 8804`; в файл попадают PNG-байты — сохранить как .png).
 
+## Мирные ролики: Золотая лихорадка и Башня из бочек
+`harness-casual.js`: играет автопилот, время ускорено (подпись «автопилот · ускорено ×N» в кадре — честно), без оружия.
+- Золото: страница `/games/gold.html?mode=challenge&seed=11&target=5`, `h.startGold({qr, sink, noGun:true, linkText:'ссылка — в профиле'})`.
+  Сид 11: бот набирает 133 без потери жизни; на части сидов теряет жизни — их не брать.
+- Башня: `/games/tower.html?mode=challenge&seed=11&target=5`, `h.startTower({...})`; бот бросает бочку с упреждением на покачивание башни (все попадания «идеально»).
+- Вкладка браузера должна быть 540×960 и ПАНЕЛЬ ДОЛЖНА БЫТЬ ВИДНА: в скрытой панели страница работает ~1 кадр/с. Если панель меняет ширину, размер сбрасывается (canvas станет меньше 1080 — смотри `__vp.canvas`).
+- Приёмники: `node scripts/video/sink.mjs content/frames_g1 8811` и `...frames_t1 8812`. Перед пересъёмкой очистить папку кадров.
+- Опции концовки (общие): `noGun` — Джо без оружия, `linkText` — подпись под ником бота.
+
 ## Короткие ролики (~10 с)
 - Поезд: `h.scanClip(seed,{from,until})` ищет сид, где бот проходит от вагона from до until; рендер с `untilCars: until` (без смерти),
   `slowFrames: 0`. Например туннели: from 14 → until 17, сид 322; вертолёт: from 44 → until 47, сид 927.
