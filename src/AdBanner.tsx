@@ -1,5 +1,6 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { api } from './api'
+import { track } from './track'
 
 type Ad = { id: string; image_url: string; link: string | null; title: string | null }
 
@@ -30,6 +31,7 @@ export default function AdBanner({ fresh = false, reloadKey = 0 }: { fresh?: boo
   }, [fresh, reloadKey])
 
   const list = ads.filter((a) => !broken.has(a.id))
+  const seen = useRef<Set<string>>(new Set())
 
   useEffect(() => {
     if (list.length < 2) return
@@ -39,11 +41,20 @@ export default function AdBanner({ fresh = false, reloadKey = 0 }: { fresh?: boo
     return () => window.clearInterval(t)
   }, [list.length])
 
-  if (!list.length) return null
-  const current = list[index % list.length]
+  const current = list.length ? list[index % list.length] : null
+
+  // показ считаем один раз за заход на каждый баннер; админа (он смотрит свежее) не считаем
+  useEffect(() => {
+    if (!current || fresh || seen.current.has(current.id)) return
+    seen.current.add(current.id)
+    track({ e: 'ad_view', ad: current.id })
+  }, [current, fresh])
+
+  if (!current) return null
 
   const open = () => {
     if (!current.link) return
+    if (!fresh) track({ e: 'ad_click', ad: current.id })
     if (tg?.openLink) tg.openLink(current.link)
     else window.open(current.link, '_blank', 'noopener,noreferrer')
   }

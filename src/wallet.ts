@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
+import { track } from './track'
 
 // Кошелёк и гардероб. Монеты, скины и оружие живут в сейве «Меткого Джо» (общий для всех игр),
 // косметика и пропуск — в сейве look.js. Игры пишут туда же из iframe, а событие 'storage'
@@ -102,6 +103,7 @@ export function useWallet() {
       if (s.coins < price) return noCoins(price, s.coins)
       s.coins -= price
       s.ownS = [...s.ownS, i]
+      track({ e: 'buy', item: `skin_${i}` })
     }
     s.curS = i
     writeJoe(s)
@@ -121,6 +123,7 @@ export function useWallet() {
       if (s.coins < price) return noCoins(price, s.coins)
       s.coins -= price
       s.ownW = [...s.ownW, i]
+      track({ e: 'buy', item: `gun_${i}` })
     }
     s.curW = i
     writeJoe(s)
@@ -143,6 +146,7 @@ export function useWallet() {
       l.owned = [...l.owned, id]
       l.equip[it.slot] = id
       writeLook(l)
+      track({ e: 'buy', item: id })
       refresh()
       return { ok: true, msg: 'КУПЛЕНО!' }
     }
@@ -169,6 +173,7 @@ export function useWallet() {
     l.pass = next
     if (!l.owned.includes(item.id)) l.owned = [...l.owned, item.id]
     writeLook(l)
+    track({ e: 'pass', v: next })
     refresh()
     return { ok: true, item }
   }

@@ -20,6 +20,7 @@ import {
   type RunInfo,
 } from './challenge'
 import { useProfile } from './profile'
+import { track } from './track'
 import { useWallet } from './wallet'
 
 const GAMES: Game[] = [
@@ -66,6 +67,7 @@ export default function App() {
     channel: '',
   })
   const toastTimer = useRef<number>()
+  const gateSeen = useRef(false) // показывали ли в этом заходе экран «подпишись» (для воронки)
   const { nick, avatar, save, tgNick, best, reportRun } = useProfile()
 
   const current = GAMES[slide]
@@ -74,6 +76,10 @@ export default function App() {
     setToast(text)
     window.clearTimeout(toastTimer.current)
     toastTimer.current = window.setTimeout(() => setToast(null), 2200)
+  }, [])
+
+  useEffect(() => {
+    track({ e: 'open' })
   }, [])
 
   useEffect(() => {
@@ -116,6 +122,14 @@ export default function App() {
       if (manual) setSub((s) => ({ ...s, state: 'checking' }))
       try {
         const r = await api<{ subscribed: boolean; channel: string | null }>('sub')
+        const gated = !r.subscribed && Boolean(r.channel)
+        if (gated && !gateSeen.current) {
+          gateSeen.current = true
+          track({ e: 'gate_shown' })
+        } else if (!gated && gateSeen.current) {
+          gateSeen.current = false
+          track({ e: 'gate_passed' })
+        }
         setSub({ state: r.subscribed || !r.channel ? 'ok' : 'need', channel: r.channel || '' })
         if (manual && !r.subscribed && r.channel) showToast('ПОДПИСКИ ПОКА НЕТ')
       } catch {
@@ -153,7 +167,10 @@ export default function App() {
     const code = readIncomingCode()
     if (!code) return
     verifyChallenge(code).then((ch) => {
-      if (ch) setIncoming(ch)
+      if (ch) {
+        setIncoming(ch)
+        track({ e: 'ch_open', g: ch.g })
+      }
       else showToast('ССЫЛКА НА ВЫЗОВ БИТАЯ')
     })
   }, [showToast])
@@ -164,6 +181,7 @@ export default function App() {
       return
     }
     haptic('medium')
+    track({ e: 'play', g: g.id })
     setGame({ game: g.id as GameId, mode: 'free' })
   }
 
@@ -179,7 +197,9 @@ export default function App() {
   const onChallenge = useCallback(
     async (r: RunInfo) => {
       if (!game) return
-      const msg = SHARE_TOAST[await createAndShare(game.game, r, nick)]
+      const res = await createAndShare(game.game, r, nick)
+      if (res !== 'failed' && res !== 'noauth' && res !== 'cancelled') track({ e: 'ch_create', g: game.game })
+      const msg = SHARE_TOAST[res]
       if (msg) showToast(msg)
     },
     [game, nick, showToast],
@@ -307,6 +327,8 @@ export default function App() {
                 className="btn btn-main-sm"
                 onClick={() => {
                   haptic('medium')
+                  track({ e: 'ch_play', g: incoming.g })
+                  track({ e: 'play', g: incoming.g })
                   setGame({ game: incoming.g, mode: 'challenge', ch: incoming })
                   setIncoming(null)
                 }}
@@ -329,7 +351,10 @@ export default function App() {
             wallet.refresh()
           }}
           onChallenge={onChallenge}
-          onResult={(r) => reportRun(game.game, r.kills)}
+          onResult={(r) => {
+            reportRun(game.game, r.kills)
+            track({ e: 'result', g: game.game, v: r.kills })
+          }}
         />
       )}
 

@@ -51,7 +51,30 @@ await call('setWebhook', {
 await call('setChatMenuButton', {
   menu_button: { type: 'web_app', text: 'Играть', web_app: { url: APP_URL } },
 })
-await call('setMyCommands', { commands: [{ command: 'start', description: 'Открыть игры' }] })
+await call('setMyCommands', {
+  commands: [
+    { command: 'start', description: 'Открыть игры' },
+    { command: 'help', description: 'Как играть' },
+    { command: 'privacy', description: 'Приватность' },
+  ],
+})
+// админские команды видны только админам (ADMIN_IDS) в их личке с ботом
+for (const id of (env.ADMIN_IDS || '').split(',').map((s) => Number(s.replace(/[^0-9]/g, ''))).filter(Boolean)) {
+  await call('setMyCommands', {
+    scope: { type: 'chat', chat_id: id },
+    commands: [
+      { command: 'stats', description: 'Статистика: сегодня, вчера, 7 дней' },
+      { command: 'games', description: 'Результаты по играм' },
+      { command: 'funnel', description: 'Воронка: открыли → подписались → сыграли' },
+      { command: 'ads', description: 'Показы и клики баннеров' },
+      { command: 'shop', description: 'Покупки и пропуск' },
+      { command: 'start', description: 'Открыть игры' },
+      { command: 'help', description: 'Как играть' },
+      { command: 'privacy', description: 'Приватность' },
+      { command: 'id', description: 'Мой Telegram ID' },
+    ],
+  })
+}
 await call('setMyName', { name: 'Игры Джо' })
 await call('setMyShortDescription', { short_description: 'Игры про Джо прямо в Telegram. Кидай вызовы друзьям! Канал: @JoesGames' })
 await call('setMyDescription', {

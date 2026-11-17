@@ -1,24 +1,72 @@
-// Вебхук Telegram-бота (Vercel Function). Telegram присылает сюда апдейты,
-// а мы отвечаем сообщением с кнопкой, которая открывает мини-апп.
+// Вебхук Telegram-бота (Vercel Function). Telegram присылает сюда апдейты.
+// Всем: /start (кнопка «Играть», вызовы по ссылке), /help, /privacy, /id.
+// Админам из ADMIN_IDS: /stats, /games, /funnel, /ads, /shop — отчёты по статистике.
+import { reportAds, reportFunnel, reportGames, reportShop, reportStats } from './_lib/report.js'
+import { statsReady } from './_lib/stats.js'
+import { adminIds, sendText } from './_lib/tgbot.js'
 
-const TOKEN = process.env.TELEGRAM_BOT_TOKEN
 const SECRET = process.env.TELEGRAM_WEBHOOK_SECRET
 const APP_URL = process.env.WEBAPP_URL?.replace(/\/+$/, '')
+const CHANNEL = (process.env.CHANNEL_USERNAME || '').replace(/^@/, '')
+const BOT_NAME = process.env.VITE_BOT_USERNAME || 'JoeGame_Bot'
 
 // подписанный вызов из ссылки t.me/<бот>?start=c4... (c3 — старый формат; подпись проверяет /api/challenge)
 const CHALLENGE_RE = /^c[34][A-Za-z0-9_-]{22,56}$/
 
-async function callTg(method: string, body: unknown): Promise<void> {
-  const res = await fetch(`https://api.telegram.org/bot${TOKEN}/${method}`, {
-    method: 'POST',
-    headers: { 'content-type': 'application/json' },
-    body: JSON.stringify(body),
-  })
-  if (!res.ok) console.error(`telegram ${method} failed: ${res.status} ${await res.text()}`)
+const HELP = [
+  '🎯 Как играть в «Игры Джо»',
+  '',
+  '1️⃣ Жми «Играть» и выбери игру свайпом.',
+  '• Меткий Джо — жми, когда прицел смотрит на врага.',
+  '• Дуэль — стреляй, когда появится «ОГОНЬ!». Раньше — фальстарт.',
+  '• Побег на поезде — тап слева прыжок (держи — выше), тап справа выстрел, свайп вниз — присесть.',
+  '',
+  '2️⃣ Прошёл? Жми «⚔ Вызов другу» — друг пройдёт ТЕ ЖЕ препятствия, и сразу видно, кто лучше.',
+  '',
+  '3️⃣ За монеты — наряды Джо и уровни пропуска с эксклюзивами.',
+  '',
+  CHANNEL ? `Новости и новые игры: @${CHANNEL}` : '',
+]
+  .filter((l, i, a) => l !== '' || a[i - 1] !== '')
+  .join('\n')
+  .trim()
+
+const PRIVACY = [
+  '🔒 Приватность',
+  '',
+  '• Твой прогресс (монеты, наряды, рекорды, ник и аватар) хранится только на твоём устройстве.',
+  '• На сервере мы считаем лишь общую статистику: сколько людей зашло, сколько игр сыграно. Твои Telegram ID, имя и ник в читаемом виде мы не сохраняем — счётчики ведутся без списка людей.',
+  '• Подписку на канал проверяет Telegram в момент входа, результат мы не записываем.',
+  '• Хостинг (Vercel) может вести технические журналы запросов — это вне нашего контроля.',
+  '',
+  CHANNEL ? `Вопросы — в канале @${CHANNEL}.` : '',
+]
+  .join('\n')
+  .trim()
+
+async function adminReport(cmd: string): Promise<string | null> {
+  const reports: Record<string, () => Promise<string>> = {
+    '/stats': reportStats,
+    '/games': reportGames,
+    '/funnel': reportFunnel,
+    '/ads': reportAds,
+    '/shop': reportShop,
+  }
+  const make = reports[cmd]
+  if (!make) return null
+  if (!statsReady()) {
+    return 'Статистика пока не подключена: нужны переменные UPSTASH_REDIS_REST_URL и UPSTASH_REDIS_REST_TOKEN (бесплатная база на upstash.com).'
+  }
+  try {
+    return await make()
+  } catch (e) {
+    console.error('report failed', e)
+    return 'Не удалось собрать отчёт — попробуй ещё раз через минуту.'
+  }
 }
 
 export async function POST(req: Request): Promise<Response> {
-  if (!TOKEN || !SECRET || !APP_URL) return new Response('bot is not configured', { status: 500 })
+  if (!process.env.TELEGRAM_BOT_TOKEN || !SECRET || !APP_URL) return new Response('bot is not configured', { status: 500 })
 
   // Telegram подписывает каждый запрос секретом, который мы задали в setWebhook
   if (req.headers.get('x-telegram-bot-api-secret-token') !== SECRET) {
@@ -34,36 +82,42 @@ export async function POST(req: Request): Promise<Response> {
 
   const msg = update?.message
   const chatId = msg?.chat?.id
-  const text: string | undefined = msg?.text
+  const fromId = msg?.from?.id
+  const text: string = typeof msg?.text === 'string' ? msg.text : ''
 
-  // /id — показать свой Telegram ID (нужен, чтобы прописать себя в ADMIN_IDS)
-  if (chatId && msg.chat.type === 'private' && text?.trim() === '/id' && msg.from?.id) {
-    try {
-      await callTg('sendMessage', { chat_id: chatId, text: `Твой Telegram ID: ${msg.from.id}` })
-    } catch (e) {
-      console.error('sendMessage error', e)
-    }
-    return new Response('ok')
-  }
+  // всё ниже — только личка с ботом (кнопки web_app в группах не работают)
+  if (chatId && msg.chat.type === 'private' && text.startsWith('/')) {
+    const parts = text.trim().split(/\s+/)
+    const cmd = parts[0].split('@')[0].toLowerCase()
+    const payload = parts[1] ?? ''
 
-  // кнопки web_app работают только в личке с ботом
-  if (chatId && msg.chat.type === 'private' && text?.startsWith('/start')) {
-    const payload = text.split(' ')[1] ?? ''
-    const isChallenge = CHALLENGE_RE.test(payload)
-    const url = isChallenge ? `${APP_URL}/?startapp=${payload}` : APP_URL
-
-    try {
-      await callTg('sendMessage', {
-        chat_id: chatId,
-        text: isChallenge
+    if (cmd === '/id' && fromId) {
+      await sendText(chatId, `Твой Telegram ID: ${fromId}`)
+    } else if (cmd === '/help') {
+      await sendText(chatId, HELP)
+    } else if (cmd === '/privacy') {
+      await sendText(chatId, PRIVACY)
+    } else if (cmd === '/start') {
+      const isChallenge = CHALLENGE_RE.test(payload)
+      const url = isChallenge ? `${APP_URL}/?startapp=${payload}` : APP_URL
+      const share = `https://t.me/share/url?url=${encodeURIComponent(`https://t.me/${BOT_NAME}`)}&text=${encodeURIComponent('Играем в «Игры Джо» — кидаем друг другу вызовы 🎯')}`
+      const rows: unknown[][] = [[{ text: isChallenge ? '⚔ Принять вызов' : '▶ Играть', web_app: { url } }]]
+      const second: unknown[] = []
+      if (CHANNEL) second.push({ text: '📣 Канал', url: `https://t.me/${CHANNEL}` })
+      second.push({ text: '👥 Позвать друга', url: share })
+      rows.push(second)
+      await sendText(
+        chatId,
+        isChallenge
           ? '⚔ Тебе прилетел вызов! Жми и покажи, кто тут меткий.'
-          : '🎯 Игры Джо — мини-игры прямо в Telegram.\n\nБей рекорды, кидай вызовы кентам. Жми «Играть»!\n\nНовости и новые игры — в канале @JoesGames',
-        reply_markup: {
-          inline_keyboard: [[{ text: isChallenge ? '⚔ Принять вызов' : '▶ Играть', web_app: { url } }]],
-        },
-      })
-    } catch (e) {
-      console.error('sendMessage error', e)
+          : '🎯 Игры Джо — игры про Джо прямо в Telegram.\n\n▶ Меткий Джо · ⚡ Дуэль · 🚂 Побег на поезде\n\n⚔ Кидай вызовы друзьям: они пройдут те же препятствия, что и ты.\n\nПравила — /help' +
+              (CHANNEL ? `\nНовости и новые игры — @${CHANNEL}` : ''),
+        { reply_markup: { inline_keyboard: rows } },
+      )
+    } else if (fromId && adminIds().includes(fromId)) {
+      // админские отчёты; чужим эти команды не отвечают вообще
+      const out = await adminReport(cmd)
+      if (out) await sendText(chatId, out)
     }
   }
 
@@ -72,5 +126,5 @@ export async function POST(req: Request): Promise<Response> {
 }
 
 export function GET(): Response {
-  return new Response('pixel arena bot webhook: alive')
+  return new Response('joe games bot webhook: alive')
 }
