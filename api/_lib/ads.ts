@@ -1,7 +1,6 @@
 // Баннеры в Vercel Blob: картинки — отдельными файлами, список — один JSON (ads/index.json).
-// Админка читает список мимо CDN (useCache: false), поэтому всегда видит свежие данные;
-// публичная выдача читает через CDN — дёшево, а свежесть до минуты там не критична.
-import { del, get, put } from '@vercel/blob'
+// Как читаем список — см. indexUrl (метка в адресе, чтобы не получать устаревшую копию из CDN).
+import { del, put } from '@vercel/blob'
 
 export type Ad = {
   id: string
@@ -42,10 +41,22 @@ export function leftText(a: Ad, now = Date.now()): string {
   return h ? `${h}ч ${m % 60}м` : `${m}м`
 }
 
+// Публичный файл нельзя прочитать «мимо кэша» средствами библиотеки (useCache:false у неё работает только
+// для приватных), а CDN держал старый список часами. Поэтому читаем адрес с меткой ?v=…:
+//  fresh (админка и любые правки) — случайная метка, всегда свежий файл;
+//  иначе (игроки) — метка меняется раз в 30 секунд: кэш работает, но отстаёт не больше чем на полминуты.
+function indexUrl(fresh: boolean): string {
+  const storeId = (process.env.BLOB_READ_WRITE_TOKEN || '').split('_')[3] || ''
+  if (!storeId) throw new Error('BLOB_READ_WRITE_TOKEN is not set')
+  const v = fresh ? `${Date.now()}-${Math.random().toString(36).slice(2)}` : String(Math.floor(Date.now() / 30000))
+  return `https://${storeId.toLowerCase()}.public.blob.vercel-storage.com/${INDEX}?v=${v}`
+}
+
 export async function readAds(fresh: boolean): Promise<Ad[]> {
-  const res = await get(INDEX, { access: 'public', useCache: !fresh })
-  if (!res || res.statusCode !== 200) return []
-  const data = await new Response(res.stream).json().catch(() => null)
+  const res = await fetch(indexUrl(fresh), { cache: 'no-store' })
+  if (res.status === 404) return []
+  if (!res.ok) throw new Error('blob read ' + res.status)
+  const data = await res.json().catch(() => null)
   return Array.isArray(data) ? data : []
 }
 

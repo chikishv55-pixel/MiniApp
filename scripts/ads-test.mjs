@@ -29,7 +29,23 @@ export async function del(url) { store.delete(url) }
 
 /* ---------- окружение и обработчики ---------- */
 const TOKEN = '123456:TEST_TOKEN_abcdefghijklmnopqrstuvwxyz'
-Object.assign(process.env, { TELEGRAM_BOT_TOKEN: TOKEN, TELEGRAM_WEBHOOK_SECRET: 'a'.repeat(64), ADMIN_IDS: '777001001', BLOB_READ_WRITE_TOKEN: 'stub' })
+Object.assign(process.env, { TELEGRAM_BOT_TOKEN: TOKEN, TELEGRAM_WEBHOOK_SECRET: 'a'.repeat(64), ADMIN_IDS: '777001001', BLOB_READ_WRITE_TOKEN: 'vercel_blob_rw_TeStStOrE_x' })
+
+// CDN хранилища: на адрес без метки ?v= отдаёт СТАРУЮ копию (так вёл себя настоящий CDN — держал вчерашний список),
+// с меткой — свежую. Так проверяем, что код никогда не читает голый адрес.
+const cdnStale = { body: '[]' }
+const blobReads = []
+const realFetch = globalThis.fetch
+globalThis.fetch = async (url, init) => {
+  const u = new URL(String(url))
+  if (u.hostname.endsWith('.public.blob.vercel-storage.com')) {
+    blobReads.push(u)
+    if (!u.searchParams.get('v')) return new Response(cdnStale.body, { status: 200 })
+    const body = globalThis.__blob?.get('ads/index.json')
+    return body === undefined ? new Response('not found', { status: 404 }) : new Response(body, { status: 200 })
+  }
+  return realFetch(url, init)
+}
 const load = (p) => import(pathToFileURL(resolve('content/api-build/api', p)).href)
 const adPublic = await load('ad.js')
 const adAdmin = await load('admin/ads.js')
@@ -125,6 +141,21 @@ const idx3 = JSON.parse(store.get('ads/index.json'))
 idx3.push({ id: 'bbbbbbbbbbbb', image_url: 'https://stub.blob/old.png', link: null, title: 'старый', active: true, created_at: new Date().toISOString() })
 store.set('ads/index.json', JSON.stringify(idx3))
 check('старый баннер без expires_at по-прежнему показывается', (await publicAds()).some((a) => a.id === 'bbbbbbbbbbbb' && a.until === null))
+
+// РЕГРЕССИЯ: удалённый баннер не должен возвращаться (раньше админка читала старую копию из CDN
+// и следующее действие записывало её обратно)
+cdnStale.body = store.get('ads/index.json') // CDN «запомнил» список, где баннер ещё есть
+const victim = a4.data.ad.id
+const delRes = await adAdmin.DELETE(new Request('http://x/api/admin/ads?id=' + victim, { method: 'DELETE', headers: H(ADMIN) }))
+check('удаление → 200', delRes.status === 200)
+const afterDel = await (await adAdmin.GET(new Request('http://x', { headers: H(ADMIN) }))).json()
+check('после удаления админка его не видит (перезаход)', !afterDel.ads.some((a) => a.id === victim))
+await patch({ id: a2.data.ad.id, active: true }) // любое следующее действие
+check('после другого действия удалённый не воскрес', !JSON.parse(store.get('ads/index.json')).some((a) => a.id === victim))
+check('у игроков удалённого тоже нет', !(await publicAds()).some((a) => a.id === victim))
+check('ни одного чтения голого адреса без метки', blobReads.every((u) => u.searchParams.get('v')))
+const freshV = blobReads.filter((u) => u.searchParams.get('v').includes('-'))
+check('админские чтения — со случайной меткой (каждый раз новая)', freshV.length > 3 && new Set(freshV.map((u) => u.search)).size === freshV.length)
 
 // подписи «осталось»
 const T = Date.now()
