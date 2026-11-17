@@ -1,11 +1,15 @@
 // Управление баннерами. Доступ только Telegram-аккаунтам из ADMIN_IDS (проверка по initData).
-// GET    /api/admin/ads               — все баннеры (заодно клиент так узнаёт, что он админ)
-// POST   /api/admin/ads (form-data)   — image (файл), link?, title? → новый баннер
-// PATCH  /api/admin/ads { id, active } — включить/выключить
-// DELETE /api/admin/ads?id=            — удалить вместе с картинкой
+// GET    /api/admin/ads                          — все баннеры (заодно клиент так узнаёт, что он админ)
+// POST   /api/admin/ads (form-data)              — image (файл), link?, title?, hours? → новый баннер;
+//                                                  hours — на сколько часов (1…2160), 0/пусто — без срока
+// PATCH  /api/admin/ads { id, active?, hours?, extend? }
+//          active   — включить/выключить вручную;
+//          hours    — включить заново на N часов от сейчас (0 — без срока);
+//          extend   — продлить на N часов (от конца срока или от сейчас, если срок уже вышел)
+// DELETE /api/admin/ads?id=                      — удалить вместе с картинкой
 import { randomBytes } from 'node:crypto'
-import { deleteImage, readAds, uploadImage, writeAds, type Ad } from '../_lib/ads.js'
-import { authUser, fail, isAdmin, json, readJson } from '../_lib/http.js'
+import { MAX_HOURS, deleteImage, expiryIn, isExpired, parseHours, readAds, uploadImage, writeAds, type Ad } from '../_lib/ads.js'
+import { authUser, fail, isAdmin, isInt, json, readJson } from '../_lib/http.js'
 
 const MAX_BYTES = 2 * 1024 * 1024
 const MAX_ADS = 50
@@ -61,18 +65,22 @@ export async function POST(req: Request): Promise<Response> {
   if (link === undefined) return fail(400, 'bad link')
   const titleRaw = form.get('title')
   const title = typeof titleRaw === 'string' ? titleRaw.trim().slice(0, 60) || null : null
+  const hours = parseHours(form.get('hours'))
+  if (hours === undefined) return fail(400, `bad hours (1…${MAX_HOURS} or 0)`)
 
   try {
     const ads = await readAds(true)
     if (ads.length >= MAX_ADS) return fail(400, `max ${MAX_ADS} banners`)
     const id = randomBytes(6).toString('hex')
+    const now = Date.now()
     const ad: Ad = {
       id,
       image_url: await uploadImage(id, ext, file),
       link,
       title,
       active: true,
-      created_at: new Date().toISOString(),
+      created_at: new Date(now).toISOString(),
+      expires_at: expiryIn(hours, now),
     }
     await writeAds([ad, ...ads])
     return json({ ad })
@@ -85,13 +93,40 @@ export async function POST(req: Request): Promise<Response> {
 export async function PATCH(req: Request): Promise<Response> {
   const denied = guard(req)
   if (denied) return denied
-  const { id, active } = await readJson(req)
-  if (typeof id !== 'string' || !ID_RE.test(id) || typeof active !== 'boolean') return fail(400, 'bad params')
+  const body = await readJson(req)
+  const { id, active } = body
+  if (typeof id !== 'string' || !ID_RE.test(id)) return fail(400, 'bad id')
+
+  const hasActive = typeof active === 'boolean'
+  const hasHours = body.hours !== undefined
+  const hasExtend = body.extend !== undefined
+  const hours = hasHours ? parseHours(body.hours) : undefined
+  if (hasHours && hours === undefined) return fail(400, 'bad hours')
+  if (hasExtend && !isInt(body.extend, 1, MAX_HOURS)) return fail(400, 'bad extend')
+  if (!hasActive && !hasHours && !hasExtend) return fail(400, 'nothing to change')
+
   try {
     const ads = await readAds(true)
     const ad = ads.find((a) => a.id === id)
     if (!ad) return fail(404, 'not found')
-    ad.active = active
+    const now = Date.now()
+
+    if (hasHours) {
+      // включить заново на выбранный срок от сейчас
+      ad.expires_at = expiryIn(hours ?? null, now)
+      ad.active = true
+    }
+    if (hasExtend) {
+      if (!ad.expires_at) return fail(400, 'banner has no expiry to extend')
+      const base = Math.max(now, Date.parse(ad.expires_at))
+      ad.expires_at = new Date(base + (body.extend as number) * 3600e3).toISOString()
+      ad.active = true
+    }
+    if (hasActive) {
+      // включить просроченный баннер без нового срока нельзя — он тут же выключился бы снова
+      if (active && isExpired(ad, now) && !hasHours && !hasExtend) return fail(400, 'banner expired: pass hours')
+      ad.active = active as boolean
+    }
     await writeAds(ads)
     return json({ ad })
   } catch (e) {

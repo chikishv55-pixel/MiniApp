@@ -1,6 +1,6 @@
 // Тексты отчётов для админа (команды бота /stats, /games, /funnel, /ads, /shop и утренняя сводка).
 // Всё считается из счётчиков в Redis; уникальные люди — оценка HyperLogLog (погрешность около 1%).
-import { readAds } from './ads.js'
+import { isExpired, isLive, leftText, readAds } from './ads.js'
 import { GAMES, GAME_NAMES, TTL_SECONDS, day, redis, toMap, type Cmd } from './stats.js'
 
 const fmt = (x: number) => Math.round(x).toString().replace(/\B(?=(\d{3})+(?!\d))/g, ' ')
@@ -111,7 +111,9 @@ export async function reportAds(): Promise<string> {
   ads.forEach((a, i) => {
     const v = all[`adv:${a.id}`] || 0
     const c = all[`adc:${a.id}`] || 0
-    lines.push(`${a.active ? '🟢' : '⚪'} ${a.title || a.id}`)
+    const live = isLive(a)
+    lines.push(`${live ? '🟢' : isExpired(a) ? '⏰' : '⚪'} ${a.title || a.id}`)
+    lines.push(`  ${live ? `идёт · осталось: ${leftText(a)}` : isExpired(a) ? 'срок вышел' : 'выключен'}`)
     lines.push(`  показов: ${fmt(v)} · уникальных за 7 дней: ${fmt(r[1 + i] as number)}`)
     lines.push(`  кликов: ${fmt(c)} · CTR: ${pct(c, v)}`)
     lines.push('')

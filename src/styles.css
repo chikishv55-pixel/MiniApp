@@ -1106,3 +1106,64 @@ button {
   font-size: 8px;
   color: var(--green);
 }
+
+/* ===== админка: срок размещения баннера ===== */
+.dur-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+}
+
+.dur {
+  padding: 10px 4px;
+  font-size: 7px;
+  line-height: 1.4;
+  background: var(--bg);
+  box-shadow: 0 0 0 2px var(--line);
+}
+
+.dur.on {
+  color: #000;
+  background: var(--yellow);
+  box-shadow: 0 0 0 2px #000;
+}
+
+.dur-hint {
+  margin: 10px 0 0;
+  text-align: left;
+}
+
+/* строка баннера: картинка и описание сверху, кнопки отдельным рядом */
+.ad-row {
+  grid-template-columns: 72px 1fr;
+}
+
+.ad-actions {
+  grid-column: 1 / -1;
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+}
+
+.ad-left.ok {
+  color: var(--green);
+}
+
+.ad-left.soon {
+  color: var(--yellow);
+}
+
+.ad-left.over {
+  color: var(--pink);
+}
+
+/* выключенный/просроченный баннер: приглушаем картинку и текст, а кнопки «ВКЛ» и «ПРОДЛИТЬ» остаются яркими */
+.ad-row.off {
+  opacity: 1;
+}
+
+.ad-row.off > img,
+.ad-row.off .ad-meta b,
+.ad-row.off .ad-meta small:not(.ad-left) {
+  opacity: 0.5;
+}

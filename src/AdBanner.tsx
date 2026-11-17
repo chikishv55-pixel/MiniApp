@@ -2,7 +2,8 @@ import { useEffect, useRef, useState } from 'react'
 import { api } from './api'
 import { track } from './track'
 
-type Ad = { id: string; image_url: string; link: string | null; title: string | null }
+// until — когда баннер заканчивается (мс), null — без срока
+type Ad = { id: string; image_url: string; link: string | null; title: string | null; until?: number | null }
 
 const tg = (window as any).Telegram?.WebApp
 const ROTATE_MS = 5000
@@ -30,7 +31,14 @@ export default function AdBanner({ fresh = false, reloadKey = 0 }: { fresh?: boo
     }
   }, [fresh, reloadKey])
 
-  const list = ads.filter((a) => !broken.has(a.id))
+  // у кого срок вышел, пока игрок сидит в меню, тот исчезает сам — без перезагрузки
+  const [now, setNow] = useState(() => Date.now())
+  useEffect(() => {
+    const t = window.setInterval(() => setNow(Date.now()), 20_000)
+    return () => window.clearInterval(t)
+  }, [])
+
+  const list = ads.filter((a) => !broken.has(a.id) && (!a.until || a.until > now))
   const seen = useRef<Set<string>>(new Set())
 
   useEffect(() => {
