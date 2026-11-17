@@ -17,7 +17,7 @@ export function makeJoeBot(g) {
 }
 
 // сухой прогон: сколько секунд до конца уровня 1 и сколько подряд хедшотов
-export async function scan(seed) {
+export async function scan(seed, { preKills = 0 } = {}) {
   const fr = document.createElement('iframe')
   fr.style.cssText = 'position:fixed;left:-9999px;width:540px;height:960px'
   fr.src = `/games/joe.html?mode=challenge&seed=${seed}&level=1&target=9&r=${Math.random()}`
@@ -28,6 +28,7 @@ export async function scan(seed) {
   const g = w.__game
   g.manual()
   g.tap() // из меню — старт забега
+  if (preKills) w.eval(`kills=${preKills};runKills=${preKills}`) // перемотка: первые враги уже убиты
   const bot = makeJoeBot(g)
   let steps = 0
   let maxCombo = 0
@@ -68,6 +69,7 @@ async function run(o) {
 
   g.manual()
   g.tap()
+  if (o.preKills) (0, eval)(`kills=${o.preKills};runKills=${o.preKills}`)
   const bot = makeJoeBot(g)
 
   const out = document.createElement('canvas')
@@ -97,6 +99,8 @@ async function run(o) {
       s = g.info()
       if (doneF < 0) bot(s)
       g.step(1000 / 60, k === 0)
+      // мягкие формулировки: убираем из кадра слова про голову, остальное («+14», «БОСС!») оставляем
+      if (o.hideHead) (0, eval)('texts=texts.filter(t=>!/ГОЛОВ/.test(t.txt))')
     }
     s = g.info()
     c.drawImage(game, 0, 0, game.width, game.height, 0, 0, OW, OH)

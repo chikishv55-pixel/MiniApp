@@ -4,9 +4,8 @@
 //   h.start({...})       — рендерит ролик 1080×1920 и шлёт кадры на scripts/video/sink.mjs
 // Игра прогоняется покадрово (manual-режим), поэтому кадры идеально ровные, без записи экрана.
 
-import { OW, OH, FPS, banner, counter, plate, endCard } from './common.js'
+import { OW, OH, FPS, banner, counter, plate, endCard, pushFrame } from './common.js'
 
-const SINK = 'http://127.0.0.1:8799'
 
 /* ---------- автопилот (тот же, что проверял проходимость поезда) ---------- */
 export function makeBot(g, { dieAt = 1e9 } = {}) {
@@ -101,6 +100,47 @@ export async function scan(seed, { from = 43, dieAt = 52 } = {}) {
   return { seed, to: e.carsDone, end: e.state === 'run' ? 'alive' : e.reason, heliSeen, heliKill, tunnel, sec: +(steps / 60).toFixed(1) }
 }
 
+/* ---------- поиск сида под короткий ролик: дойти от from до until, ничего не задев ---------- */
+export async function scanClip(seed, { from, until }) {
+  const fr = document.createElement('iframe')
+  fr.style.cssText = 'position:fixed;left:-9999px;width:540px;height:960px'
+  fr.src = `/games/train.html?mode=challenge&target=5&seed=${seed}&r=${Math.random()}`
+  document.body.appendChild(fr)
+  await new Promise((r) => (fr.onload = r))
+  await new Promise((r) => setTimeout(r, 120))
+  const g = fr.contentWindow.__train
+  g.manual()
+  g.press()
+  g.release()
+  g.skipTo(from)
+  const bot = makeBot(g)
+  let heliSeen = false
+  let heliKill = false
+  let last = 0
+  let steps = 0
+  while (steps < 60 * 60) {
+    const s = g.info()
+    if (s.state !== 'run' || s.carsDone >= until) break
+    if (s.heli) heliSeen = true
+    if (s.coins - last >= 20) heliKill = true
+    last = s.coins
+    bot(s)
+    g.step(1000 / 60, true)
+    steps++
+  }
+  const e = g.info()
+  let tunnels = 0
+  let gunners = 0
+  for (let k = from; k < until; k++) {
+    for (const o of g.car(k).obs) {
+      if (o.type === 'tunnel') tunnels++
+      if (o.type === 'gunner') gunners++
+    }
+  }
+  fr.remove()
+  return { seed, ok: e.state === 'run' && e.carsDone >= until, end: e.state === 'run' ? 'ok' : e.reason, sec: +(steps / 60).toFixed(1), tunnels, gunners, heliSeen, heliKill }
+}
+
 /* ---------- рендер ---------- */
 export function start(o) {
   window.__vp = { frames: 0, phase: 'init', done: false, err: null }
@@ -138,9 +178,7 @@ async function run(o) {
 
   let i = 0
   const push = async () => {
-    const blob = await new Promise((r) => out.toBlob(r, 'image/jpeg', 0.92))
-    const res = await fetch(`${SINK}/f/${i}`, { method: 'POST', body: blob })
-    if (!res.ok) throw new Error('sink ' + res.status)
+    await pushFrame(out, i, o.sink)
     i++
     vp.frames = i
   }
@@ -154,6 +192,7 @@ async function run(o) {
     let s = g.info()
     const dead = s.state !== 'run'
     if (dead && deadF < 0) deadF = f
+    if (!dead && o.untilCars && s.carsDone >= o.untilCars && deadF < 0) deadF = f // успешный финал: дошли до нужного вагона
     if (deadF >= 0 && f - deadF > o.afterDeath) break
     const slow = deadF >= 0 && f - deadF < o.slowFrames
     if (!dead) bot(s)
