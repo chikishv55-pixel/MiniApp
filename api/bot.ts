@@ -1,8 +1,8 @@
 // Вебхук Telegram-бота (Vercel Function). Telegram присылает сюда апдейты.
 // Всем: /start (кнопка «Играть», вызовы по ссылке), /help, /privacy, /id.
 // Админам из ADMIN_IDS: /stats, /games, /funnel, /ads, /shop — отчёты по статистике.
-import { reportAds, reportFunnel, reportGames, reportShop, reportStats } from './_lib/report.js'
-import { statsReady } from './_lib/stats.js'
+import { reportAds, reportFunnel, reportGames, reportShop, reportSources, reportStats } from './_lib/report.js'
+import { noteStart, registerSrc, statsReady } from './_lib/stats.js'
 import { adminIds, sendText } from './_lib/tgbot.js'
 
 const SECRET = process.env.TELEGRAM_WEBHOOK_SECRET
@@ -12,6 +12,8 @@ const BOT_NAME = process.env.VITE_BOT_USERNAME || 'JoeGame_Bot'
 
 // подписанный вызов из ссылки t.me/<бот>?start=c4... (c3 — старый формат; подпись проверяет /api/challenge)
 const CHALLENGE_RE = /^c[34][A-Za-z0-9_-]{22,56}$/
+// рекламная ссылка t.me/<бот>?start=ad_<метка>
+const AD_START_RE = /^ad_([A-Za-z0-9]{1,16})$/
 
 const HELP = [
   '🎯 Как играть в «Игры Джо»',
@@ -53,6 +55,7 @@ async function adminReport(cmd: string): Promise<string | null> {
     '/funnel': reportFunnel,
     '/ads': reportAds,
     '/shop': reportShop,
+    '/src': reportSources,
   }
   const make = reports[cmd]
   if (!make) return null
@@ -101,7 +104,15 @@ export async function POST(req: Request): Promise<Response> {
       await sendText(chatId, PRIVACY)
     } else if (cmd === '/start') {
       const isChallenge = CHALLENGE_RE.test(payload)
-      const url = isChallenge ? `${APP_URL}/?startapp=${payload}` : APP_URL
+      const tag = AD_START_RE.exec(payload)?.[1]?.toLowerCase()
+      if (tag && fromId && statsReady()) {
+        try {
+          await noteStart(tag, fromId)
+        } catch (e) {
+          console.error('noteStart failed', e)
+        }
+      }
+      const url = isChallenge ? `${APP_URL}/?startapp=${payload}` : tag ? `${APP_URL}/?src=${tag}` : APP_URL
       const share = `https://t.me/share/url?url=${encodeURIComponent(`https://t.me/${BOT_NAME}`)}&text=${encodeURIComponent('Играем в «Игры Джо» — кидаем друг другу вызовы 🎯')}`
       const rows: unknown[][] = [[{ text: isChallenge ? '⚔ Принять вызов' : '▶ Играть', web_app: { url } }]]
       const second: unknown[] = []
@@ -116,6 +127,27 @@ export async function POST(req: Request): Promise<Response> {
               (CHANNEL ? `\nНовости и новые игры — @${CHANNEL}` : ''),
         { reply_markup: { inline_keyboard: rows } },
       )
+    } else if (fromId && adminIds().includes(fromId) && cmd === '/link') {
+      // /link pub1 → заводит метку и отдаёт рекламную ссылку (только админам)
+      const t = (parts[1] || '').toLowerCase()
+      if (!/^[a-z0-9]{1,16}$/.test(t)) {
+        await sendText(chatId, 'Напиши метку латиницей и цифрами (до 16 символов), например:\n/link pub1')
+      } else if (!statsReady()) {
+        await sendText(chatId, 'Статистика не подключена — метки считать негде.')
+      } else {
+        let ok = false
+        try {
+          ok = await registerSrc(t)
+        } catch (e) {
+          console.error('registerSrc failed', e)
+        }
+        await sendText(
+          chatId,
+          ok
+            ? `Ссылка для рекламы «${t}»:\nhttps://t.me/${BOT_NAME}?start=ad_${t}\n\nСчитаются люди, которые пришли по ней: /src`
+            : 'Не получилось завести метку — попробуй ещё раз.',
+        )
+      }
     } else if (fromId && adminIds().includes(fromId)) {
       // админские отчёты; чужим эти команды не отвечают вообще
       const out = await adminReport(cmd)

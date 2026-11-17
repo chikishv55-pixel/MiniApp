@@ -1,7 +1,7 @@
-// POST /api/track { ev: [{ e, g?, v?, ad?, item?, n? }, …] } — пачка событий для статистики (нужен initData).
+// POST /api/track { ev: [{ e, g?, v?, ad?, item?, n?, src? }, …] } — пачка событий для статистики (нужен initData).
 // Если база не подключена или недоступна — отвечаем ok:false, игра от этого не страдает.
 import { authUser, fail, isInt, json, readJson } from './_lib/http.js'
-import { GAMES, anon, day, redis, statsReady, type Cmd } from './_lib/stats.js'
+import { GAMES, SRC_RE, anon, day, redis, statsReady, type Cmd } from './_lib/stats.js'
 
 const GAME_SET = new Set<string>(GAMES)
 const AD_RE = /^[a-f0-9]{12}$/
@@ -32,6 +32,17 @@ export async function POST(req: Request): Promise<Response> {
   const list = Array.isArray(body.ev) ? (body.ev as unknown[]).slice(0, MAX_EVENTS) : []
   if (!list.length) return fail(400, 'no events')
 
+  // рекламная метка первого захода (её присылает клиент в open/play); считаем, только если админ её заводил
+  let src: string | null = null
+  const cand = list.map((x) => (x as { src?: unknown } | null)?.src).find((s) => typeof s === 'string' && SRC_RE.test(s)) as string | undefined
+  if (cand) {
+    try {
+      if ((await redis([['SISMEMBER', 'srcs', cand]]))[0] === 1) src = cand
+    } catch {
+      /* без метки статистика остаётся общей */
+    }
+  }
+
   const u = anon(user.id)
   const d = day()
   const S = `s:${d}`
@@ -51,6 +62,7 @@ export async function POST(req: Request): Promise<Response> {
         newIdx.push(cmds.length)
         cmds.push(['PFADD', 'u:all', u], ['PFADD', `u:${d}`, u])
         inc('opens')
+        if (src) cmds.push(['PFADD', `src:o:${src}`, u])
         break
       case 'gate_shown':
         cmds.push(['PFADD', `gs:${d}`, u])
@@ -61,6 +73,7 @@ export async function POST(req: Request): Promise<Response> {
       case 'play':
         if (!g) break
         cmds.push(['PFADD', `p:${d}`, u])
+        if (src) cmds.push(['PFADD', `src:p:${src}`, u])
         inc(`play:${g}`, n)
         break
       case 'result': {

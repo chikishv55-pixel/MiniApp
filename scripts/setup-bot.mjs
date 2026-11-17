@@ -68,6 +68,8 @@ for (const id of (env.ADMIN_IDS || '').split(',').map((s) => Number(s.replace(/[
       { command: 'funnel', description: 'Воронка: открыли → подписались → сыграли' },
       { command: 'ads', description: 'Показы и клики баннеров' },
       { command: 'shop', description: 'Покупки и пропуск' },
+      { command: 'src', description: 'Откуда пришли: по рекламным ссылкам' },
+      { command: 'link', description: 'Рекламная ссылка: /link метка' },
       { command: 'start', description: 'Открыть игры' },
       { command: 'help', description: 'Как играть' },
       { command: 'privacy', description: 'Приватность' },

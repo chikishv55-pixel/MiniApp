@@ -181,3 +181,22 @@ export async function setTtls(): Promise<void> {
   }
   await redis(keys.map((k): Cmd => ['EXPIRE', k, TTL_SECONDS]))
 }
+
+// откуда пришли люди: по каждой рекламной метке — нажали «Старт» → открыли игру → сыграли
+export async function reportSources(): Promise<string> {
+  const tags = ((await redis([['SMEMBERS', 'srcs']]))[0] as string[] | null) || []
+  if (!tags.length) {
+    return '🔗 Рекламных ссылок пока нет.\nСделай метку командой /link и дай ссылку в рекламу, например:\n/link pub1'
+  }
+  const r = await redis(tags.flatMap((t): Cmd[] => [['PFCOUNT', `src:s:${t}`], ['PFCOUNT', `src:o:${t}`], ['PFCOUNT', `src:p:${t}`]]))
+  const rows = tags
+    .map((t, i) => ({ t, s: r[i * 3] as number, o: r[i * 3 + 1] as number, p: r[i * 3 + 2] as number }))
+    .sort((a, b) => b.s + b.o - (a.s + a.o))
+  const lines = ['🔗 Откуда пришли (по рекламным ссылкам, за всё время)', '']
+  for (const x of rows) {
+    lines.push(`• ${x.t}`)
+    lines.push(`  нажали «Старт»: ${fmt(x.s)} · открыли игру: ${fmt(x.o)} · сыграли: ${fmt(x.p)} (${pct(x.p, Math.max(x.s, x.o))})`)
+  }
+  lines.push('', 'Считаются только те, кто пришёл по ссылке с меткой (первый заход). Люди без ссылки сюда не попадают.')
+  return lines.join('\n')
+}

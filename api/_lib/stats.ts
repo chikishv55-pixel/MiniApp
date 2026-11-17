@@ -11,6 +11,8 @@
 //   u:<день>, p:<день>, gs:<день>, go:<день> — HLL за день: открыли, играли, увидели «подпишись», подписались
 //   adu:<id>:<день> — HLL уникальных зрителей баннера за день
 //   hist:<игра> — корзины результатов; best:<игра> — лучший результат за всё время (zset)
+//   srcs — множество рекламных меток, заведённых админом (/link метка); src:s:<метка> / src:o:<метка> / src:p:<метка> —
+//          HLL тех, кто нажал «Старт» по ссылке, открыл игру, сыграл. Метки заводит только админ (чужие метки не считаются).
 //   shop — сколько раз купили каждую вещь; passlvl — сколько раз открывали уровни пропуска
 // Дневные ключи живут 120 дней: срок ставит ежедневный cron (api/cron/digest.ts).
 import { createHmac } from 'node:crypto'
@@ -23,6 +25,10 @@ export const TTL_SECONDS = 120 * 86400
 export const GAMES = ['joe', 'duel', 'train', 'gold', 'tower'] as const
 export const GAME_NAMES: Record<string, string> = { joe: 'Меткий Джо', duel: 'Дуэль', train: 'Побег на поезде', gold: 'Золотая лихорадка', tower: 'Башня из бочек' }
 export const statsReady = () => Boolean(BASE && TOKEN)
+
+// рекламная метка: ссылка t.me/бот?start=ad_<метка>
+export const SRC_RE = /^[a-z0-9]{1,16}$/
+export const MAX_SRC = 100
 
 export type Cmd = (string | number)[]
 
@@ -57,4 +63,20 @@ export function toMap(flat: unknown): Record<string, number> {
   const m: Record<string, number> = {}
   if (Array.isArray(flat)) for (let i = 0; i + 1 < flat.length; i += 2) m[String(flat[i])] = Number(flat[i + 1]) || 0
   return m
+}
+
+// админ заводит метку; возвращает false, если метка кривая или их уже слишком много
+export async function registerSrc(tag: string): Promise<boolean> {
+  if (!SRC_RE.test(tag)) return false
+  const [known, count] = await redis([['SISMEMBER', 'srcs', tag], ['SCARD', 'srcs']])
+  if (known !== 1 && Number(count) >= MAX_SRC) return false
+  await redis([['SADD', 'srcs', tag]])
+  return true
+}
+
+// человек нажал «Старт» по рекламной ссылке; чужие метки (не заведённые админом) молча игнорируем
+export async function noteStart(tag: string, id: number): Promise<void> {
+  if (!SRC_RE.test(tag)) return
+  const [known] = await redis([['SISMEMBER', 'srcs', tag]])
+  if (known === 1) await redis([['PFADD', `src:s:${tag}`, anon(id)]])
 }

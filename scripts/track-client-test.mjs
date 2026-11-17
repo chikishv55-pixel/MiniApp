@@ -13,6 +13,9 @@ globalThis.window = {
   clearTimeout: () => {},
   addEventListener: (n, fn) => (listeners['w:' + n] = fn),
 }
+globalThis.location = { search: '?src=PubA' }
+const store = {}
+globalThis.localStorage = { getItem: (k) => store[k] ?? null, setItem: (k, v) => (store[k] = String(v)) }
 globalThis.document = { hidden: false, addEventListener: (n, fn) => (listeners['d:' + n] = fn) }
 globalThis.fetch = async (url, init) => (calls.push({ url, init, body: JSON.parse(init.body) }), new Response('{}'))
 
@@ -24,6 +27,7 @@ const { track, flush } = await import(pathToFileURL(resolve(srcDir, '_track_unde
 let failed = 0
 const check = (name, ok, extra = '') => (console.log(`${ok ? 'OK  ' : 'FAIL'} ${name}${extra ? ' — ' + extra : ''}`), ok || failed++)
 
+track({ e: 'open' })
 track({ e: 'play', g: 'train' })
 track({ e: 'play', g: 'train' })
 track({ e: 'play', g: 'train' })
@@ -39,6 +43,9 @@ const ev = calls[0]?.body.ev || []
 check('повторные запуски склеены: train×3', ev.some((x) => x.e === 'play' && x.g === 'train' && x.n === 3))
 check('разные игры не склеены', ev.some((x) => x.e === 'play' && x.g === 'joe'))
 check('результаты не склеены (нужна каждая цифра)', ev.filter((x) => x.e === 'result').length === 2)
+check('метка источника (?src=PubA → puba) уходит с open и play', ev.filter((x) => x.e === 'open' || x.e === 'play').every((x) => x.src === 'puba'))
+check('в result и прочих событиях метки нет', ev.filter((x) => x.e === 'result').every((x) => x.src === undefined))
+check('метка первого захода сохранена на устройстве', store['joe-src'] === 'puba')
 check('подпись Telegram уходит заголовком', calls[0]?.init.headers['x-init-data'] === 'query_id=x&hash=y')
 check('keepalive для сворачивания приложения', calls[0]?.init.keepalive === true)
 check('в запросе нет ни имён, ни ID', !/user|name|id"/i.test(JSON.stringify(calls[0].body)))

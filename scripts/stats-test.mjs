@@ -11,6 +11,7 @@ const hashes = new Map()
 const sets = new Map()
 const zsets = new Map()
 const ttls = new Map()
+const plain = new Map() // обычные множества (SADD/SISMEMBER)
 const log = []
 
 function run(cmd) {
@@ -50,6 +51,18 @@ function run(cmd) {
       const v = (zsets.get(a[0]) || new Map()).get(a[1])
       return v === undefined ? null : String(v)
     }
+    case 'SADD': {
+      const s = plain.get(a[0]) || plain.set(a[0], new Set()).get(a[0])
+      const before = s.size
+      for (const m of a.slice(1)) s.add(String(m))
+      return s.size - before
+    }
+    case 'SISMEMBER':
+      return (plain.get(a[0]) || new Set()).has(String(a[1])) ? 1 : 0
+    case 'SCARD':
+      return (plain.get(a[0]) || new Set()).size
+    case 'SMEMBERS':
+      return [...(plain.get(a[0]) || new Set())]
     case 'EXPIRE':
       ttls.set(a[0], Number(a[1]))
       return 1
@@ -209,10 +222,46 @@ const all = hashes.get('s:all')
 check('баннер: 2 показа, 1 клик', all.get('adv:abc123abc123') === 2 && all.get('adc:abc123abc123') === 1)
 check('баннер: 2 уникальных зрителя', [...sets.entries()].some(([k, s]) => k.startsWith('adu:abc123abc123:') && s.size === 2))
 
+// ---- рекламные ссылки с метками ----
+const empty = (await say(U[0], '/src')).out[0]?.text || ''
+check('/src без меток подсказывает, что делать', /Рекламных ссылок пока нет/.test(empty) && /\/link pub1/.test(empty))
+const lk = (await say(U[0], '/link PubA')).out[0]?.text || ''
+check('/link заводит метку и отдаёт ссылку (метка в нижнем регистре)', lk.includes('https://t.me/JoeGame_Bot?start=ad_puba'), lk.split('\n')[1])
+check('/link без метки или с кривой — подсказка', /Напиши метку/.test((await say(U[0], '/link')).out[0]?.text || '') && /Напиши метку/.test((await say(U[0], '/link a-b!')).out[0]?.text || ''))
+const strangerLink = await say(U[2], '/link hack')
+check('чужому /link не отвечает и метку не заводит', strangerLink.out.length === 0 && !(plain.get('srcs') || new Set()).has('hack'))
+await say(U[0], '/link pubb') // вторая метка, по ней никто не придёт
+
+// «Старт» по ссылке: кнопка открывает игру с ?src=, метка считается
+const s1 = await say(U[3], '/start ad_puba')
+const url1 = s1.out[0]?.reply_markup?.inline_keyboard?.[0]?.[0]?.web_app?.url
+check('/start ad_puba: кнопка «Играть» открывает игру с ?src=puba', url1 === 'https://example.test/?src=puba', url1)
+await say(U[4], '/start ad_PubA') // другой человек, метка в другом регистре
+await say(U[4], '/start ad_puba') // тот же человек второй раз — уникальных не прибавит
+const unk = await say(U[1], '/start ad_unknownx')
+check('/start с чужой меткой: игра открывается, метка не заводится', unk.out[0]?.reply_markup?.inline_keyboard?.[0]?.[0]?.web_app?.url === 'https://example.test/?src=unknownx' && ![...(sets.keys())].some((k) => k.includes('unknownx')))
+const ch = await say(U[1], '/start c4' + 'A'.repeat(30))
+check('вызов (c4…) по-прежнему открывает ?startapp=', /startapp=c4/.test(ch.out[0]?.reply_markup?.inline_keyboard?.[0]?.[0]?.web_app?.url || ''))
+
+// клиент пришёл с меткой: open + play
+await post(U[3], [{ e: 'open', src: 'puba' }, { e: 'play', g: 'gold', src: 'puba' }])
+await post(U[4], [{ e: 'open', src: 'puba' }])
+await post(U[2], [{ e: 'open', src: 'zzzz' }, { e: 'play', g: 'joe', src: 'zzzz' }]) // метка, которую админ не заводил
+await post(U[1], [{ e: 'open', src: '../x' }]) // мусор вместо метки — просто обычный заход
+check('метка не заведена админом — игнорируется', ![...sets.keys()].some((k) => k.includes(':zzzz')))
+check('мусорная метка не создаёт ключей', ![...sets.keys(), ...hashes.keys()].some((k) => k.includes('..')))
+
+const src = (await say(U[0], '/src')).out[0]?.text || ''
+check('/src: puba — нажали «Старт» 2, открыли 2, сыграли 1 (50%)', /puba\n\s+нажали «Старт»: 2 · открыли игру: 2 · сыграли: 1 \(50%\)/.test(src), src.split('\n').slice(2, 4).join(' | '))
+check('/src: pubb есть в списке с нулями', /pubb\n\s+нажали «Старт»: 0 · открыли игру: 0 · сыграли: 0/.test(src))
+check('/src: чужой не видит', (await say(U[2], '/src')).out.length === 0)
+check('общая статистика не сломалась: открыли сегодня всё ещё считаются', /зашли: 5/.test((await say(U[0], '/stats')).out[0]?.text || ''))
+
 // приватность: в «базе» нет ни одного Telegram ID
 const dump = JSON.stringify({ hashes: [...hashes], sets: [...sets], zsets: [...zsets], log })
 check('приватность: ни одного Telegram ID в базе и в командах', !U.some((id) => dump.includes(String(id))))
-check('приватность: людей считают HLL-множества без имён', [...sets.keys()].every((k) => /^(u|p|gs|go|adu):/.test(k)))
+check('приватность: людей считают HLL-множества без имён', [...sets.keys()].every((k) => /^(u|p|gs|go|adu|src:[sop]):/.test(k)))
+check('приватность: в списке меток только метки', [...(plain.get('srcs') || [])].every((t) => /^[a-z0-9]{1,16}$/.test(t)))
 
 console.log(failed ? `\nПРОВАЛЕНО проверок: ${failed}` : '\nВсе проверки пройдены')
 srv.close()
