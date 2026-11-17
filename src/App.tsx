@@ -27,7 +27,8 @@ const GAMES: Game[] = [
   { id: 'joe', title: 'МЕТКИЙ ДЖО', desc: 'Лови момент и стреляй в голову', icon: 'target', color: '#ffd93d', art: 'joe' },
   { id: 'duel', title: 'ДУЭЛЬ', desc: 'Жди сигнала и стреляй первым', icon: 'bolt', color: '#5cff5c', art: 'duel' },
   { id: 'train', title: 'ПОБЕГ НА ПОЕЗДЕ', desc: 'Прыгай, стреляй, пригибайся', icon: 'cursor', color: '#3dffe0', art: 'train' },
-  { id: 'next', title: '???', desc: 'Новая игра про Джо — скоро', icon: 'lock', color: '#ff3d9a', soon: true },
+  { id: 'gold', title: 'ЗОЛОТАЯ ЛИХОРАДКА', desc: 'Лови золото, не лови динамит', icon: 'target', color: '#ffc233', art: 'gold' },
+  { id: 'tower', title: 'БАШНЯ ИЗ БОЧЕК', desc: 'Ставь ровно — и выше неба', icon: 'trophy', color: '#ff9a3d', art: 'tower' },
 ]
 
 const SHARE_TOAST: Record<string, string | null> = {
@@ -321,7 +322,7 @@ export default function App() {
               <br />
               {GAME_TEXT[incoming.g].inGame}
             </p>
-            <p className="challenge-sub">{incoming.g === 'duel' ? 'Те же бандиты.' : incoming.g === 'train' ? 'Тот же поезд.' : 'Те же враги.'} Побьёшь?</p>
+            <p className="challenge-sub">{({ duel: 'Те же бандиты.', train: 'Тот же поезд.', gold: 'То же золото и динамит.', tower: 'Тот же кран.' } as Record<string, string>)[incoming.g] ?? 'Те же враги.'} Побьёшь?</p>
             <div className="modal-actions">
               <button
                 className="btn btn-main-sm"

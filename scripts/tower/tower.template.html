@@ -1,0 +1,420 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>Башня из бочек</title>
+<style>
+/* стили — как в «Меткий Джо» (public/games/joe.html), чтобы игры выглядели одной семьёй */
+@@CSS@@
+#title .l2.tower{font-size:92px}
+#title .l1.tower{font-size:62px}
+#note{position:absolute;left:0;right:0;bottom:178px;text-align:center;font-size:13px;opacity:.5;pointer-events:none;font-family:"Segoe UI",system-ui,sans-serif;font-weight:700}
+</style>
+</head>
+<body>
+<div id="stage">
+  <canvas id="c" width="540" height="960"></canvas>
+
+  <div id="hud">
+    <div id="hudrow">
+      <button id="bHome" hidden aria-label="В меню">&#10005;</button><span></span>
+      <div id="coins"><i class="coin"></i><span id="coinv">0</span></div>
+    </div>
+    <div id="lvl"><div id="lvlfill"></div><span id="lvltxt">Этаж 0</span></div>
+  </div>
+
+  <div id="title"><div class="l1 tower">БАШНЯ</div><div class="l2 tower">ИЗ БОЧЕК</div></div>
+  <div id="hint">НАЖМИ, ЧТОБЫ НАЧАТЬ</div>
+  <div id="best"></div>
+  <div id="note">Скин и одежда — в гардеробе меню, монеты общие</div>
+
+  <div id="menu">
+    <button id="bSnd" class="mb half" aria-label="Звук">&#9668;))</button>
+  </div>
+
+  <div id="over" hidden>
+    <div class="box">
+      <h2 id="ovh">РУХНУЛА!</h2>
+      <p id="ovtxt"></p>
+      <button id="bChal" class="big chal" hidden>&#9876; ВЫЗОВ ДРУГУ</button>
+      <button id="bRetry" class="big">ЕЩЁ РАЗ</button>
+      <button id="bMenu" class="ghost">В МЕНЮ</button>
+    </div>
+  </div>
+</div>
+
+<script src="look.js"></script>
+<script src="scenery.js"></script>
+<script>
+'use strict';
+/* ================= БАЗА (из «Меткий Джо») ================= */
+@@HELPERS@@
+@@DATA@@
+
+/* ================= СОХРАНЕНИЕ ================= */
+// Монеты и скин общие с «Меткий Джо» — лежат в его сейве. Своё у игры — только рекорд и звук.
+const JKEY='metkiy-joe-v1',DKEY='tower-v1';
+const JDEF={coins:0,level:1,ownW:[0],ownS:[0],curW:0,curS:0,snd:1,mus:1,best:0};
+function readJ(){try{const r=JSON.parse(localStorage.getItem(JKEY)||'null');if(r&&typeof r==='object'&&Array.isArray(r.ownW)&&Array.isArray(r.ownS))return Object.assign({},JDEF,r);}catch(e){}return Object.assign({},JDEF);}
+const okId=v=>Number.isInteger(v)&&v>=0&&v<=8;
+let J=readJ();
+const SKIN=okId(J.curS)?J.curS:0;
+function addCoins(n){if(n<=0)return;J=readJ();J.coins=(J.coins|0)+n;try{localStorage.setItem(JKEY,JSON.stringify(J));}catch(e){}}
+let D={best:0,snd:1};
+try{const r=JSON.parse(localStorage.getItem(DKEY)||'null');if(r&&typeof r==='object')D=Object.assign(D,r);}catch(e){}
+function saveD(){try{localStorage.setItem(DKEY,JSON.stringify(D));}catch(e){}}
+
+/* ================= ВСТРАИВАНИЕ В «ИГРЫ ДЖО» ================= */
+// ?embed=1 — открыта внутри мини-аппа; ?mode=challenge&seed=&target=&from= — вызов от друга
+const QS=new URLSearchParams(location.search);
+const EMBED=QS.get('embed')==='1'&&window.parent!==window;
+const CH=QS.get('mode')==='challenge';
+const RUN={seed:(Number(QS.get('seed'))>>>0),target:clamp(parseInt(QS.get('target'),10)||0,0,100000),from:(QS.get('from')||'').slice(0,12)};
+const esc=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+function post(m){if(EMBED)try{window.parent.postMessage(Object.assign({src:'tower'},m),location.origin);}catch(e){}}
+// Детерминированный рандом: одинаковый сид = одинаковая скорость и размах крана на каждом этаже
+function mulberry(a){return function(){a|=0;a=a+0x6D2B79F5|0;let t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296;};}
+function rngFor(){let h=(RUN.seed^0x70E2)|0;for(let i=0;i<arguments.length;i++){h=Math.imul(h^(arguments[i]|0),0x9E3779B1);h^=h>>>15;}return mulberry(h);}
+
+/* ================= РИСОВАНИЕ ПЕРСОНАЖЕЙ (дословно из «Меткий Джо») ================= */
+@@ART@@
+
+/* ================= БАШНЯ ИЗ БОЧЕК ================= */
+const BW=84,BH=60;                     // бочка
+const GY=880;                          // земля на экране, пока башня низкая
+const BEAM=222,HOOK_Y=336;             // балка крана и крюк
+const G=2600;                          // падение бочки
+const PERFECT=8;                       // точнее 8 px — «идеально», бочка встаёт ровно
+const LEAN_MAX=BW*1.5;                 // крен верха относительно низа, после которого башня рушится
+const LIVES=3,STEP=10;
+
+let state='menu',floors=[],hook=null,drop=null,lives=LIVES,combo=0,lastReason='fall',deadT=0,waitT=0;
+let parts=[],texts=[],timers=[],banner=null,debris=[],cam=0,camT=0;
+let shake=0,time=0,runCoins=0,flashT=0,joeHop=0;
+let biome=0,prevBiome=0,biomeT=1;
+let pal=[PALS[0][0].slice(),PALS[0][1].slice()];
+const after=(t,fn)=>timers.push({t,fn});
+const palFor=n=>PALS[Math.floor(n/STEP)%PALS.length];
+
+// Кран на этаже k целиком задаётся сидом и номером: размах, скорость и направление.
+// У друга в вызове этажи раскачиваются так же.
+function craneFor(k){
+  const g=rngFor(k,9);
+  return {A:Math.min(178,118+k*3)*(0.9+g()*0.1),om:Math.min(3.9,1.45+k*0.085)*(0.88+g()*0.24),dir:g()<.5?-1:1,ph:g()*Math.PI*2};
+}
+const n=()=>floors.length;
+const swayAmp=()=>Math.min(26,Math.max(0,n()-4)*1.3);
+const sway=()=>swayAmp()*Math.sin(time*1.6);
+// экранные координаты этажа i (0 — нижний)
+const floorX=i=>W/2+floors[i]+sway()*(i+1)/Math.max(1,n());
+const floorY=i=>GY+cam-(i+1)*BH;            // верх бочки i
+const topX=()=>n()?floorX(n()-1):W/2;
+const topY=()=>GY+cam-n()*BH;
+const lean=()=>n()?floors[n()-1]-floors[0]:0;
+
+function newHook(){const c=craneFor(n());hook={x:W/2,A:c.A,om:c.om,dir:c.dir,ph:c.ph};hook.x=W/2+hook.A*Math.sin(hook.ph);}
+function resetRun(){
+  if(!CH)RUN.seed=(Math.random()*4294967296)>>>0;
+  floors=[];drop=null;lives=LIVES;combo=0;lastReason='fall';deadT=0;waitT=0;runCoins=0;
+  parts=[];texts=[];timers=[];banner=null;debris=[];cam=0;camT=0;shake=0;flashT=0;joeHop=0;
+  biome=prevBiome=0;biomeT=1;
+  newHook();
+}
+function startRun(){
+  $('title').hidden=$('hint').hidden=$('best').hidden=$('menu').hidden=$('note').hidden=true;
+  $('over').hidden=true;$('bHome').hidden=false;
+  resetRun();state='hang';hud();
+}
+const playing=()=>state==='hang'||state==='fall'||state==='wait';
+function die(reason){
+  if(!playing())return;
+  state='dead';lastReason=reason;deadT=0;drop=null;
+  if(reason==='fall'){
+    // башня разваливается: каждая бочка летит в свою сторону
+    const dir=Math.sign(lean())||1;
+    floors.forEach((f,i)=>debris.push({x:floorX(i),y:floorY(i)+BH/2,vx:dir*rnd(60,260)*(i/Math.max(1,n())+.2),vy:-rnd(50,250),rot:0,vr:dir*rnd(1,4)}));
+    floors=[];sfx('crash');shake=14;
+  }else sfx('fail');
+  const score=reason==='fall'?debris.length:n();
+  if(score>D.best){D.best=score;saveD();}
+  const res={seed:RUN.seed,level:1,kills:score,coins:runCoins};
+  post(Object.assign({type:'result',challenge:CH},res));
+  after(1.5,()=>showOver(res));
+}
+function showOver(res){
+  const h=$('ovh');
+  if(CH){
+    const d=res.kills-RUN.target;
+    h.textContent=d>0?'ПОБЕДА!':d===0?'НИЧЬЯ':'НЕ ХВАТИЛО';h.style.color=d>0?'#5cff5c':d===0?'#ffc233':'#ff4d6d';
+    $('ovtxt').innerHTML='Ты: <b>'+res.kills+'</b> · '+esc(RUN.from||'Друг')+': <b>'+RUN.target+'</b><br>Заработано монет: <b>'+res.coins+'</b>';
+  }else{
+    h.textContent=lastReason==='fall'?'РУХНУЛА!':'РАЗРОНЯЛ!';h.style.color='';
+    $('ovtxt').innerHTML='Этажей: <b>'+res.kills+'</b> · рекорд: <b>'+D.best+'</b><br>Заработано монет: <b>'+res.coins+'</b>';
+  }
+  const bc=$('bChal');bc.hidden=!(EMBED&&res.kills>0);bc.innerHTML=CH?'&#9876; ОТВЕТНЫЙ ВЫЗОВ':'&#9876; ВЫЗОВ ДРУГУ';
+  bc.onclick=()=>{sfx('click');post(Object.assign({type:'challenge'},res));};
+  $('over').hidden=false;$('bHome').hidden=true;
+}
+function showMenu(){
+  resetRun();state='menu';
+  // в меню — готовая башенка для красоты
+  for(let i=0;i<4;i++)floors.push([0,-10,6,-4][i]);
+  $('title').hidden=$('hint').hidden=$('menu').hidden=$('note').hidden=false;$('over').hidden=true;
+  $('bHome').hidden=!EMBED;
+  const b=$('best');b.className='';b.hidden=!D.best;b.textContent='Рекорд: '+D.best+' этажей';
+  if(CH){b.hidden=false;b.className='ch';b.textContent='ВЫЗОВ ОТ '+(RUN.from||'ДРУГА').toUpperCase()+': ПОБЕЙ '+RUN.target;}
+  $('bSnd').className='mb half'+(D.snd?'':' off');
+  hud();
+}
+function addCoinsRun(k,x,y){addCoins(k);runCoins+=k;addText(x,y,'+'+k,'#ffc233',24);hud();}
+
+/* ================= ЭФФЕКТЫ ================= */
+function burst(x,y,col,k){
+  for(let i=0;i<k;i++)parts.push({x,y,vx:rnd(-240,240),vy:rnd(-360,-40),col,sz:rnd(3,7),t:0,life:rnd(.5,1.1)});
+  if(parts.length>320)parts.splice(0,parts.length-320);
+}
+function addText(x,y,txt,col,size){texts.push({x:clamp(x,90,W-90),y,txt,col,size:size||24,t:0});}
+
+/* ================= ОБНОВЛЕНИЕ ================= */
+function dropIt(){
+  if(state!=='hang')return;
+  drop={x:hook.x,y:HOOK_Y+BH/2+8,vy:0,vx:0,rot:0,miss:false};state='fall';sfx('drop');
+}
+function land(){
+  const tx=topX(),tol=n()?BW*.72:BW*1.05;
+  let dx=drop.x-tx;
+  if(Math.abs(dx)>tol){drop.miss=true;drop.vx=Math.sign(dx)*160;drop.vr=Math.sign(dx)*5;return false;}
+  const perfect=Math.abs(dx)<PERFECT;
+  if(perfect){dx=0;combo++;}else combo=0;
+  const before=n();
+  floors.push(0);                                       // временно — чтобы sway() считался с новой высотой
+  floors[before]=(tx+dx)-W/2-sway();
+  if(before===0)floors[0]=dx;                           // нижняя бочка — относительно площадки
+  const y=topY();
+  burst(tx+dx,y+BH,'rgba(255,255,255,.7)',6);shake=Math.max(shake,3);joeHop=.25;
+  if(perfect){
+    sfx('perfect');flashT=.1;
+    addText(tx,y-30,combo>1?'ИДЕАЛЬНО ×'+combo:'ИДЕАЛЬНО!','#5cff5c',combo>1?28:26);
+    addCoinsRun(Math.min(5,combo),tx+70,y-4);
+  }else sfx('thud');
+  if(n()%STEP===0){
+    addCoinsRun(5,W/2,y-70);sfx('bonus');prevBiome=biome;biome=n()/STEP;biomeT=0;
+    const place=window.JoeScenery?JoeScenery.NAMES[JoeScenery.biomeAt(biome)]:'';
+    banner={t:2.2,txt:n()+' ЭТАЖЕЙ!',sub:place?'ДАЛЬШЕ: '+place:''};
+  }
+  if(Math.abs(lean())>LEAN_MAX){die('fall');return true;}
+  hud();return true;
+}
+function update(dt){
+  time+=dt;
+  for(let i=timers.length-1;i>=0;i--){const t=timers[i];t.t-=dt;if(t.t<=0){timers.splice(i,1);t.fn();}}
+  const tp=palFor(n()),kk=Math.min(1,dt*1.2);pal=[mix(pal[0],tp[0],kk),mix(pal[1],tp[1],kk)];
+  if(biomeT<1)biomeT=Math.min(1,biomeT+dt/1.2);
+  if(flashT>0)flashT-=dt;if(joeHop>0)joeHop-=dt;
+
+  // крюк ездит по синусоиде; в меню — просто покачивается
+  if(hook&&state!=='dead'){
+    hook.ph+=hook.om*hook.dir*dt*(state==='menu'?.5:1);
+    hook.x=W/2+hook.A*Math.sin(hook.ph);
+  }
+  // камера держит верх башни на экране
+  camT=Math.max(0,n()*BH-290);cam+=(camT-cam)*Math.min(1,dt*5);
+
+  if(state==='fall'&&drop){
+    drop.vy+=G*dt;drop.y+=drop.vy*dt;drop.x+=drop.vx*dt;
+    if(drop.miss){
+      drop.rot+=drop.vr*dt;
+      if(drop.y>H+80){
+        drop=null;lives--;combo=0;sfx('fail');shake=6;
+        if(lives<=0){die('miss');}
+        else{state='wait';waitT=.35;}
+      }
+    }else if(drop.y+BH/2>=topY()){
+      const ok=land();
+      if(ok){drop=null;if(state==='fall'){state='wait';waitT=.3;}}
+      else addText(drop.x,topY()-40,'МИМО!','#ff4d6d',30);
+    }
+  }
+  if(state==='wait'){waitT-=dt;if(waitT<=0){newHook();state='hang';}}
+  if(state==='dead')deadT+=dt;
+
+  for(const d of debris){d.vy+=G*.7*dt;d.x+=d.vx*dt;d.y+=d.vy*dt;d.rot+=d.vr*dt;}
+  for(let i=parts.length-1;i>=0;i--){const q=parts[i];q.t+=dt;if(q.t>q.life){parts.splice(i,1);continue;}q.vy+=1100*dt;q.x+=q.vx*dt;q.y+=q.vy*dt;}
+  for(let i=texts.length-1;i>=0;i--){const t=texts[i];t.t+=dt;t.y-=46*dt;if(t.t>1)texts.splice(i,1);}
+  if(banner){banner.t-=dt;if(banner.t<=0)banner=null;}
+  if(shake>0)shake=Math.max(0,shake-dt*40);
+}
+
+/* ================= ОТРИСОВКА ================= */
+function barrel(x,y,rot,warn){
+  // x,y — центр бочки
+  ctx.save();ctx.translate(x,y);if(rot)ctx.rotate(rot);
+  const w=BW,h=BH;
+  box(ctx,'#5c2f12',-w/2,-h/2,w,h,12);
+  box(ctx,warn?'#c0503a':'#a8642e',-w/2+3,-h/2+2,w-6,h-4,11);
+  box(ctx,'#c98a4e',-w/2+10,-h/2+4,8,h-8,4);
+  for(let i=1;i<4;i++)box(ctx,'#7a4318',-w/2+3+i*(w-6)/4-1,-h/2+3,2,h-6);
+  box(ctx,'#454d5e',-w/2,-h/2+9,w,6,2);box(ctx,'#454d5e',-w/2,h/2-15,w,6,2);
+  box(ctx,'#9aa3b8',-w/2+4,-h/2+10,w-8,2);
+  ctx.restore();
+}
+function drawBiome(k,alpha){
+  if(!window.JoeScenery||alpha<=0)return;
+  const gy=GY+cam;if(gy-260>H)return;
+  ctx.globalAlpha=alpha;
+  JoeScenery.layer(ctx,JoeScenery.biomeAt(k),0,gy+4,css(mix(pal[0],pal[1],.38)),css(mix(pal[1],[255,230,150],.35)),W);
+  ctx.globalAlpha=1;
+}
+function draw(){
+  const sx=shake?rnd(-shake,shake):0,sy=shake?rnd(-shake,shake):0;
+  // чем выше башня, тем темнее и «выше» небо
+  const hk=clamp(cam/2500,0,1);
+  const g=ctx.createLinearGradient(0,0,0,H);g.addColorStop(0,css(mix(pal[0],[6,4,20],hk*.5)));g.addColorStop(1,css(mix(pal[0],pal[1],.55-hk*.25)));
+  ctx.fillStyle=g;ctx.fillRect(0,0,W,H);
+  ctx.save();ctx.translate(sx,sy);
+  disc(ctx,css(mix(pal[1],[255,230,160],.55)),W-110,300+cam*.05,60);
+  // облака проплывают, когда башня растёт
+  for(let i=0;i<7;i++){
+    const y=((i*260+cam*.6)%1820)-300,x=(hsh(i)*W+time*(8+i*3))%(W+200)-100;
+    ctx.globalAlpha=.18;box(ctx,'#fff',x,y,120,26,13);box(ctx,'#fff',x+30,y-14,70,26,13);ctx.globalAlpha=1;
+  }
+  drawBiome(prevBiome,1-biomeT);drawBiome(biome,biomeT);
+  const gy=GY+cam;
+  if(gy<H+20){
+    box(ctx,css(mix(pal[0],pal[1],.62)),-20,gy,W+40,H-gy+40);
+    box(ctx,'#2a2236',-20,gy,W+40,8);
+    // площадка под башню
+    box(ctx,'#3a3446',W/2-BW*.75,gy-14,BW*1.5,14,4);box(ctx,'#ffc233',W/2-BW*.75,gy-14,BW*1.5,4,2);
+  }
+
+  // башня
+  const warn=Math.abs(lean())>LEAN_MAX*.65;
+  for(let i=0;i<n();i++){
+    const y=floorY(i)+BH/2;if(y<-BH||y>H+BH)continue;
+    barrel(floorX(i),y,0,warn&&i>=n()-3&&Math.floor(time*6)%2===0);
+  }
+  if(warn&&playing()&&n()){
+    const x=topX(),y=topY()-26;box(ctx,'#ff3355',x-14,y-34,28,30,6);ctx.fillStyle='#fff';ctx.font='900 24px "Arial Black",sans-serif';ctx.textAlign='center';ctx.fillText('!',x,y-11);
+    ctx.font='900 17px "Arial Black",sans-serif';ctx.fillText(lean()>0?'КРЕН ВПРАВО':'КРЕН ВЛЕВО',x,y+14);
+  }
+  for(const d of debris)barrel(d.x,d.y,d.rot,false);
+
+  // кран: балка, тележка с Джо, трос, крюк
+  box(ctx,'#2a2a3d',-20,BEAM,W+40,16);
+  for(let x=-10;x<W+20;x+=36)poly(ctx,'#3a3a52',[x,BEAM+16,x+18,BEAM+16,x+9,BEAM+30]);
+  box(ctx,'#ffc233',-20,BEAM,W+40,4);
+  if(hook){
+    const hx=hook.x;
+    box(ctx,'#454d5e',hx-30,BEAM-14,60,16,4);disc(ctx,'#1b1b28',hx-18,BEAM+2,6);disc(ctx,'#1b1b28',hx+18,BEAM+2,6);
+    // Джо едет на тележке и держит рычаг
+    const hop=joeHop>0?Math.sin(joeHop/.25*Math.PI)*10:0;
+    drawDude(ctx,hx,BEAM-14-hop,hook.dir>0?1:-1,1.05,cc=>drawJoe(cc,SKIN),-1,0,0,0);
+    const hy=state==='hang'||state==='menu'?HOOK_Y:HOOK_Y-24;
+    box(ctx,'#1b1b28',hx-2,BEAM+16,4,hy-BEAM-16);
+    box(ctx,'#9aa3b8',hx-10,hy-4,20,8,4);
+    if(state==='hang'||state==='menu')barrel(hx,HOOK_Y+BH/2+8,0,false);
+    // пунктир вниз — куда упадёт
+    if(state==='hang'){ctx.fillStyle='rgba(255,255,255,.28)';for(let y=HOOK_Y+BH+20;y<topY()-6;y+=22)ctx.fillRect(hx-2,y,4,10);}
+  }
+  if(drop)barrel(drop.x,drop.y,drop.rot,false);
+
+  for(const q of parts){ctx.globalAlpha=clamp((q.life-q.t)*2,0,1);ctx.fillStyle=q.col;ctx.fillRect(q.x-q.sz/2,q.y-q.sz/2,q.sz,q.sz);}
+  ctx.globalAlpha=1;
+  ctx.textAlign='center';
+  for(const t of texts){
+    const a=t.t<.7?1:1-(t.t-.7)/.3,sc=t.t<.12?.6+t.t/.12*.4:1;
+    ctx.globalAlpha=Math.max(0,a);ctx.font='900 '+Math.round(t.size*sc)+'px "Arial Black","Segoe UI",sans-serif';
+    ctx.fillStyle='rgba(0,0,0,.45)';ctx.fillText(t.txt,t.x,t.y+3);ctx.fillStyle=t.col;ctx.fillText(t.txt,t.x,t.y);
+  }
+  ctx.globalAlpha=1;ctx.restore();
+
+  if(flashT>0){ctx.globalAlpha=flashT/.1*.25;ctx.fillStyle='#5cff5c';ctx.fillRect(0,0,W,H);ctx.globalAlpha=1;}
+  if(state!=='menu')for(let i=0;i<LIVES;i++){
+    const x=36+i*36,y=BEAM+52,on=i<lives;ctx.globalAlpha=on?1:.25;
+    disc(ctx,'#ff4d6d',x-6,y-3,8);disc(ctx,'#ff4d6d',x+6,y-3,8);poly(ctx,'#ff4d6d',[x-13,y,x+13,y,x,y+14]);ctx.globalAlpha=1;
+  }
+  if(banner){
+    const full=banner.sub?2.2:1.8,pp=full-banner.t,s=pp<.18?pp/.18:1,a=banner.t<.4?banner.t/.4:1;
+    ctx.save();ctx.globalAlpha=a;ctx.translate(W/2,420);ctx.scale(s,s);ctx.rotate(-.05);
+    box(ctx,'#ffc233',-230,-44,460,banner.sub?110:84,18);ctx.fillStyle='#231700';ctx.textAlign='center';
+    ctx.font='900 34px "Arial Black","Segoe UI",sans-serif';ctx.fillText(banner.txt,0,banner.sub?4:12);
+    if(banner.sub){ctx.font='900 17px "Arial Black","Segoe UI",sans-serif';ctx.fillText(banner.sub,0,40);}
+    ctx.restore();
+  }
+  if(playing()&&n()<3&&!D.best){
+    ctx.globalAlpha=.75+Math.sin(time*5)*.2;ctx.fillStyle='#fff';ctx.textAlign='center';ctx.font='900 20px "Arial Black","Segoe UI",sans-serif';
+    ctx.fillText('ТАП — БРОСИТЬ БОЧКУ',W/2,H-60);ctx.fillText('СТАВЬ РОВНО, ИНАЧЕ РУХНЕТ',W/2,H-30);ctx.globalAlpha=1;
+  }
+}
+
+/* ================= ИНТЕРФЕЙС ================= */
+function hud(){
+  $('coinv').textContent=readJ().coins|0;
+  $('lvltxt').textContent='Этаж '+(state==='menu'?0:n());
+  $('lvlfill').style.width=Math.round(((state==='menu'?0:n())%STEP)/STEP*100)+'%';
+}
+
+/* ================= ЗВУК ================= */
+let AC=null,sfxG=null,nbuf=null;
+function initAudio(){
+  try{
+    if(AC){if(AC.state==='suspended')AC.resume();return;}
+    const A=window.AudioContext||window.webkitAudioContext;if(!A)return;
+    AC=new A();sfxG=AC.createGain();sfxG.connect(AC.destination);sfxG.gain.value=.55;
+    nbuf=AC.createBuffer(1,AC.sampleRate*.4,AC.sampleRate);const d=nbuf.getChannelData(0);for(let i=0;i<d.length;i++)d[i]=Math.random()*2-1;
+  }catch(e){AC=null;}
+}
+function osc(t,f,d,type,v,slide){const o=AC.createOscillator(),g=AC.createGain();o.type=type;o.frequency.setValueAtTime(f,t);
+  if(slide)o.frequency.exponentialRampToValueAtTime(Math.max(25,f+slide),t+d);g.gain.setValueAtTime(v,t);g.gain.exponentialRampToValueAtTime(.001,t+d);o.connect(g);g.connect(sfxG);o.start(t);o.stop(t+d+.03);}
+function noise(t,d,v,fq,type){const s=AC.createBufferSource(),f=AC.createBiquadFilter(),g=AC.createGain();s.buffer=nbuf;f.type=type||'lowpass';f.frequency.value=fq;
+  g.gain.setValueAtTime(v,t);g.gain.exponentialRampToValueAtTime(.001,t+d);s.connect(f);f.connect(g);g.connect(sfxG);s.start(t);s.stop(t+d+.03);}
+function sfx(name){
+  if(!AC||!D.snd||AC.state!=='running')return;
+  try{
+    const t=AC.currentTime;
+    if(name==='drop'){osc(t,500,.12,'square',.1,-250);}
+    else if(name==='thud'){noise(t,.12,.4,400);osc(t,110,.1,'square',.18,-50);}
+    else if(name==='perfect'){osc(t,784,.07,'square',.14,0);osc(t+.07,1047,.07,'square',.14,0);osc(t+.14,1568,.12,'square',.14,0);noise(t,.08,.25,500);}
+    else if(name==='fail'){osc(t,330,.35,'sawtooth',.2,-200);}
+    else if(name==='crash'){noise(t,.5,.6,600);osc(t,90,.5,'sawtooth',.3,-60);}
+    else if(name==='bonus'){[523,659,784,1047].forEach((f,i)=>osc(t+i*.08,f,.16,'square',.14,0));}
+    else if(name==='click'){osc(t,620,.04,'square',.12,0);}
+  }catch(e){}
+}
+
+/* ================= ВВОД ================= */
+// Тап в любом месте (или пробел) — бросить бочку.
+function press(){initAudio();if(state==='menu'){startRun();return;}dropIt();}
+cv.addEventListener('pointerdown',ev=>{ev.preventDefault();press();});
+window.addEventListener('keydown',ev=>{
+  if(!$('over').hidden)return;
+  if(ev.code==='Space'||ev.code==='Enter'||ev.code==='ArrowDown'){ev.preventDefault();if(!ev.repeat)press();}
+});
+$('bSnd').addEventListener('click',()=>{initAudio();D.snd=D.snd?0:1;saveD();$('bSnd').className='mb half'+(D.snd?'':' off');sfx('click');});
+$('bRetry').addEventListener('click',()=>{sfx('click');startRun();});
+$('bMenu').addEventListener('click',()=>{sfx('click');showMenu();});
+$('bHome').addEventListener('click',()=>{sfx('click');if(EMBED&&state==='menu'){post({type:'exit'});return;}showMenu();});
+document.addEventListener('visibilitychange',()=>{if(!AC)return;try{if(document.hidden)AC.suspend();else AC.resume();}catch(e){}});
+
+/* ================= МАСШТАБ И ЦИКЛ ================= */
+function fit(){
+  const s=Math.min(window.innerWidth/W,window.innerHeight/H)||1;
+  $('stage').style.transform='translate(-50%,-50%) scale('+s+')';
+  const r=clamp(s*(window.devicePixelRatio||1),1,3);
+  cv.width=Math.round(W*r);cv.height=Math.round(H*r);ctx.setTransform(cv.width/W,0,0,cv.height/H,0,0);
+}
+window.addEventListener('resize',fit);
+let last=0,MANUAL=false; // MANUAL — для автотестов: время двигает тест, а не requestAnimationFrame
+function frame(ts){
+  if(MANUAL){requestAnimationFrame(frame);return;}
+  const dt=Math.min(.033,Math.max(0,(ts-last)/1000)||0);last=ts;
+  update(dt);draw();requestAnimationFrame(frame);
+}
+fit();showMenu();requestAnimationFrame(frame);
+window.__tower={start:startRun,drop:dropIt,manual:()=>{MANUAL=true;},step:(ms,noDraw)=>{update(Math.min(.033,ms/1000));if(!noDraw)draw();},
+  info:()=>({state,floors:n(),lives,combo,lean:lean(),hookX:hook&&hook.x,topX:topX(),topY:topY(),dropY:drop&&drop.y,coins:runCoins}),
+  crane:k=>craneFor(k),BW,BH,HOOK_Y,G,LEAN_MAX,W};
+</script>
+</body>
+</html>

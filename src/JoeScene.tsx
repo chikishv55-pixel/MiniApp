@@ -177,7 +177,84 @@ function makeTrain(skin: number, gun: number) {
   }
 }
 
-export default function JoeScene({ variant = 'joe' }: { variant?: 'joe' | 'duel' | 'train' }) {
+function makeGold(skin: number) {
+  // Джо с корытом на голове бегает под падающими самородками; динамит пролетает мимо
+  const gy = 98, s = 0.95
+  const items = [
+    { x: 40, y: -10, v: 70, dyn: false },
+    { x: 120, y: -60, v: 80, dyn: true },
+    { x: 180, y: -30, v: 75, dyn: false },
+  ]
+  let jx = 110
+  return (ctx: Ctx, dt: number) => {
+    box(ctx, '#3a2c10', 0, gy, W, H - gy)
+    ctx.globalAlpha = 0.55
+    box(ctx, '#ffc233', 0, gy, W, 2)
+    ctx.globalAlpha = 1
+    // цель — ближайший самородок
+    const gold = items.filter((i) => !i.dyn).sort((a, b) => b.y - a.y)[0]
+    jx += Math.max(-90 * dt, Math.min(90 * dt, gold.x - jx))
+    const catchY = gy - 62 * s - 4
+    for (const it of items) {
+      it.y += it.v * dt
+      const caught = !it.dyn && it.y > catchY && Math.abs(it.x - jx) < 26
+      if (caught || it.y > gy + 10) {
+        it.y = -20 - Math.random() * 30
+        it.x = 20 + Math.random() * (W - 40)
+      }
+      if (it.dyn) {
+        box(ctx, '#d6334a', it.x - 4, it.y - 8, 8, 16, 2)
+        box(ctx, '#ffe066', it.x - 1, it.y - 13, 2, 5)
+      } else {
+        box(ctx, '#a45f00', it.x - 7, it.y - 5, 14, 11, 4)
+        box(ctx, '#ffc233', it.x - 6, it.y - 6, 12, 9, 4)
+      }
+    }
+    drawDude(ctx, jx, gy, 1, s, (c) => drawLookJoe(c, skin), -1, 0, 0, 0)
+    box(ctx, '#8a5428', jx - 26, catchY - 6, 52, 8, 4)
+    box(ctx, '#4a2c14', jx - 28, catchY, 56, 4, 2)
+  }
+}
+
+function makeTower(skin: number) {
+  // Джо на кране роняет бочку на башню; башня растёт и сбрасывается
+  const BW = 30, BH = 20, ground = 106, beam = 18
+  let t = 0
+  let floors = 2
+  let dropY = -1
+  const barrel = (ctx: Ctx, x: number, y: number) => {
+    box(ctx, '#5c2f12', x - BW / 2, y, BW, BH, 5)
+    box(ctx, '#a8642e', x - BW / 2 + 1, y + 1, BW - 2, BH - 2, 5)
+    box(ctx, '#454d5e', x - BW / 2, y + 4, BW, 2)
+    box(ctx, '#454d5e', x - BW / 2, y + BH - 6, BW, 2)
+  }
+  return (ctx: Ctx, dt: number) => {
+    t += dt
+    const hx = W / 2 + Math.sin(t * 2.2) * 60
+    box(ctx, '#2a2a3d', 0, beam, W, 5)
+    box(ctx, '#ffc233', 0, beam, W, 1.5)
+    box(ctx, '#3a3446', W / 2 - 24, ground - 4, 48, 4, 2)
+    const shift = Math.max(0, floors - 3) * BH
+    for (let i = 0; i < floors; i++) barrel(ctx, W / 2 + (i % 2 ? 2 : -2), ground - 4 - (i + 1) * BH + shift)
+    drawDude(ctx, hx, beam, 1, 0.8, (c) => drawLookJoe(c, skin), -1, 0, 0, 0)
+    box(ctx, '#1b1b28', hx - 0.5, beam + 5, 1, 12)
+    const top = ground - 4 - floors * BH + shift
+    if (dropY < 0) {
+      barrel(ctx, hx, beam + 17)
+      // бросает, когда крюк над башней
+      if (Math.abs(hx - W / 2) < 3 && Math.cos(t * 2.2) > 0) dropY = beam + 17
+    } else {
+      dropY += 160 * dt
+      barrel(ctx, W / 2, dropY)
+      if (dropY + BH >= top) {
+        dropY = -1
+        floors = floors >= 6 ? 2 : floors + 1
+      }
+    }
+  }
+}
+
+export default function JoeScene({ variant = 'joe' }: { variant?: 'joe' | 'duel' | 'train' | 'gold' | 'tower' }) {
   const ref = useRef<HTMLCanvasElement>(null)
 
   useEffect(() => {
@@ -185,7 +262,16 @@ export default function JoeScene({ variant = 'joe' }: { variant?: 'joe' | 'duel'
     const ctx = cv?.getContext('2d')
     if (!cv || !ctx) return
     const { skin, gun } = readLoadout()
-    const scene = variant === 'duel' ? makeDuel(skin, gun) : variant === 'train' ? makeTrain(skin, gun) : makeJoe(skin, gun)
+    const scene =
+      variant === 'duel'
+        ? makeDuel(skin, gun)
+        : variant === 'train'
+          ? makeTrain(skin, gun)
+          : variant === 'gold'
+            ? makeGold(skin)
+            : variant === 'tower'
+              ? makeTower(skin)
+              : makeJoe(skin, gun)
 
     const fit = () => {
       const r = cv.getBoundingClientRect()
@@ -222,7 +308,13 @@ export default function JoeScene({ variant = 'joe' }: { variant?: 'joe' | 'duel'
       className="joe-scene"
       role="img"
       aria-label={
-        variant === 'duel' ? 'Дуэль: Джо стреляет первым' : variant === 'train' ? 'Джо бежит по крышам поезда' : 'Меткий Джо целится во врага'
+        {
+          joe: 'Меткий Джо целится во врага',
+          duel: 'Дуэль: Джо стреляет первым',
+          train: 'Джо бежит по крышам поезда',
+          gold: 'Джо ловит падающее золото',
+          tower: 'Джо строит башню из бочек',
+        }[variant]
       }
     />
   )

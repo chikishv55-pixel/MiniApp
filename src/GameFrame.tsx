@@ -14,6 +14,8 @@ const FILES: Record<GameId, { file: string; title: string }> = {
   joe: { file: 'games/joe.html', title: 'Меткий Джо' },
   duel: { file: 'games/duel.html', title: 'Дуэль' },
   train: { file: 'games/train.html', title: 'Побег на поезде' },
+  gold: { file: 'games/gold.html', title: 'Золотая лихорадка' },
+  tower: { file: 'games/tower.html', title: 'Башня из бочек' },
 }
 
 const tg = (window as any).Telegram?.WebApp

@@ -1,6 +1,6 @@
 import { api, hasAuth } from './api'
 
-export type GameId = 'joe' | 'duel' | 'train'
+export type GameId = 'joe' | 'duel' | 'train' | 'gold' | 'tower'
 
 // Вызов целиком живёт в ссылке, но подписан сервером: t.me/бот?start=c4...
 // Поменять игру, сид или счёт в ссылке нельзя — сервер не примет подпись.
@@ -39,6 +39,12 @@ export const GAME_TEXT: Record<GameId, { title: string; inGame: string; score: (
     title: 'ПОБЕГ НА ПОЕЗДЕ',
     inGame: 'в «Побеге на поезде»',
     score: (k) => `${k} ${pluralRu(k, 'вагон', 'вагона', 'вагонов')}`,
+  },
+  gold: { title: 'ЗОЛОТАЯ ЛИХОРАДКА', inGame: 'в «Золотой лихорадке»', score: (k) => `${k} золота` },
+  tower: {
+    title: 'БАШНЯ ИЗ БОЧЕК',
+    inGame: 'в «Башне из бочек»',
+    score: (k) => `${k} ${pluralRu(k, 'этаж', 'этажа', 'этажей')}`,
   },
 }
 

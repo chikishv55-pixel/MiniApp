@@ -1,0 +1,424 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>Золотая лихорадка</title>
+<style>
+/* стили — как в «Меткий Джо» (public/games/joe.html), чтобы игры выглядели одной семьёй */
+@@CSS@@
+#title .l2.gold{font-size:84px}
+#title .l1.gold{font-size:58px}
+#note{position:absolute;left:0;right:0;bottom:178px;text-align:center;font-size:13px;opacity:.5;pointer-events:none;font-family:"Segoe UI",system-ui,sans-serif;font-weight:700}
+</style>
+</head>
+<body>
+<div id="stage">
+  <canvas id="c" width="540" height="960"></canvas>
+
+  <div id="hud">
+    <div id="hudrow">
+      <button id="bHome" hidden aria-label="В меню">&#10005;</button><span></span>
+      <div id="coins"><i class="coin"></i><span id="coinv">0</span></div>
+    </div>
+    <div id="lvl"><div id="lvlfill"></div><span id="lvltxt">Золото 0</span></div>
+  </div>
+
+  <div id="title"><div class="l1 gold">ЗОЛОТАЯ</div><div class="l2 gold">ЛИХОРАДКА</div></div>
+  <div id="hint">НАЖМИ, ЧТОБЫ НАЧАТЬ</div>
+  <div id="best"></div>
+  <div id="note">Скин и одежда — в гардеробе меню, монеты общие</div>
+
+  <div id="menu">
+    <button id="bSnd" class="mb half" aria-label="Звук">&#9668;))</button>
+  </div>
+
+  <div id="over" hidden>
+    <div class="box">
+      <h2 id="ovh">БАБАХ!</h2>
+      <p id="ovtxt"></p>
+      <button id="bChal" class="big chal" hidden>&#9876; ВЫЗОВ ДРУГУ</button>
+      <button id="bRetry" class="big">ЕЩЁ РАЗ</button>
+      <button id="bMenu" class="ghost">В МЕНЮ</button>
+    </div>
+  </div>
+</div>
+
+<script src="look.js"></script>
+<script src="scenery.js"></script>
+<script>
+'use strict';
+/* ================= БАЗА (из «Меткий Джо») ================= */
+@@HELPERS@@
+@@DATA@@
+
+/* ================= СОХРАНЕНИЕ ================= */
+// Монеты и скин общие с «Меткий Джо» — лежат в его сейве. Своё у игры — только рекорд и звук.
+const JKEY='metkiy-joe-v1',DKEY='gold-v1';
+const JDEF={coins:0,level:1,ownW:[0],ownS:[0],curW:0,curS:0,snd:1,mus:1,best:0};
+function readJ(){try{const r=JSON.parse(localStorage.getItem(JKEY)||'null');if(r&&typeof r==='object'&&Array.isArray(r.ownW)&&Array.isArray(r.ownS))return Object.assign({},JDEF,r);}catch(e){}return Object.assign({},JDEF);}
+const okId=v=>Number.isInteger(v)&&v>=0&&v<=8;
+let J=readJ();
+const SKIN=okId(J.curS)?J.curS:0;
+function addCoins(n){if(n<=0)return;J=readJ();J.coins=(J.coins|0)+n;try{localStorage.setItem(JKEY,JSON.stringify(J));}catch(e){}}
+let D={best:0,snd:1};
+try{const r=JSON.parse(localStorage.getItem(DKEY)||'null');if(r&&typeof r==='object')D=Object.assign(D,r);}catch(e){}
+function saveD(){try{localStorage.setItem(DKEY,JSON.stringify(D));}catch(e){}}
+
+/* ================= ВСТРАИВАНИЕ В «ИГРЫ ДЖО» ================= */
+// ?embed=1 — открыта внутри мини-аппа; ?mode=challenge&seed=&target=&from= — вызов от друга
+const QS=new URLSearchParams(location.search);
+const EMBED=QS.get('embed')==='1'&&window.parent!==window;
+const CH=QS.get('mode')==='challenge';
+const RUN={seed:(Number(QS.get('seed'))>>>0),target:clamp(parseInt(QS.get('target'),10)||0,0,100000),from:(QS.get('from')||'').slice(0,12)};
+const esc=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+function post(m){if(EMBED)try{window.parent.postMessage(Object.assign({src:'gold'},m),location.origin);}catch(e){}}
+// Детерминированный рандом: одинаковый сид = одинаковый дождь из золота и динамита
+function mulberry(a){return function(){a|=0;a=a+0x6D2B79F5|0;let t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296;};}
+function rngFor(){let h=(RUN.seed^0x601D)|0;for(let i=0;i<arguments.length;i++){h=Math.imul(h^(arguments[i]|0),0x9E3779B1);h^=h>>>15;}return mulberry(h);}
+
+/* ================= РИСОВАНИЕ ПЕРСОНАЖЕЙ (дословно из «Меткий Джо») ================= */
+@@ART@@
+
+/* ================= ЗОЛОТАЯ ЛИХОРАДКА ================= */
+const GROUND=830,SC=1.55,HW=52;                  // земля, масштаб Джо, полуширина корыта
+const CATCH=GROUND-62*SC-8;                      // высота корыта над головой
+const MAXV=1250;                                  // скорость Джо, px/с
+const LIVES=3,STEP=25;                            // жизни; каждые 25 золота — быстрее и новое место
+const VAL={nugget:1,bag:3,heart:0,dyn:0};
+const R={nugget:17,bag:22,heart:17,dyn:16};
+
+let state='menu',runT=0,gold=0,lives=LIVES,lastReason='boom',deadT=0;
+let p=null,sched=[],next=0,items=[],parts=[],texts=[],timers=[],banner=null,booms=[];
+let shake=0,time=0,flashT=0,hurtT=0,targetX=null,keyDir=0,level=0,catchT=0;
+let biome=0,prevBiome=0,biomeT=1;
+let pal=[PALS[0][0].slice(),PALS[0][1].slice()];
+const after=(t,fn)=>timers.push({t,fn});
+const palFor=n=>PALS[Math.floor(n/STEP)%PALS.length];
+
+// Предмет i целиком задаётся сидом и номером: время появления, место, тип, скорость.
+// Не зависит от того, как бегал игрок, — у друга в вызове падает то же самое.
+// Честность: два динамита не падают ближе 0.45 с друг к другу — всегда можно увернуться.
+function genItem(i){
+  const prev=sched[i-1],g=rngFor(i,5);
+  const gap=i===0?0.9:Math.max(0.27,0.82-i*0.0068)*(0.75+g()*0.5);
+  const t=(prev?prev.t:0)+gap;
+  const r=g();
+  const pDyn=i<6?0:Math.min(0.42,0.13+i*0.0024);
+  let type=r<pDyn?'dyn':r<pDyn+0.16?'bag':'nugget';
+  const lastDyn=(()=>{for(let k=i-1;k>=0&&k>i-6;k--)if(sched[k].type==='dyn')return sched[k];return null;})();
+  if(type==='dyn'&&lastDyn&&t-lastDyn.t<0.45)type='nugget';
+  if(type==='nugget'&&i>30&&g()<0.025)type='heart';
+  const vy=Math.min(720,260+i*2.7)+g()*60;
+  const x=Math.round(40+g()*(W-80));
+  sched[i]={t,type,x,vy,spin:(g()-.5)*6};
+}
+function itemAt(i){while(sched.length<=i)genItem(sched.length);return sched[i];}
+
+function resetRun(){
+  if(!CH)RUN.seed=(Math.random()*4294967296)>>>0;
+  sched=[];next=0;items=[];parts=[];texts=[];timers=[];booms=[];banner=null;
+  runT=0;gold=0;lives=LIVES;lastReason='boom';deadT=0;level=0;hurtT=0;flashT=0;shake=0;targetX=null;keyDir=0;catchT=0;
+  p={x:W/2,vx:0,dead:false};
+  biome=prevBiome=0;biomeT=1;
+  itemAt(10);
+}
+function startRun(){
+  $('title').hidden=$('hint').hidden=$('best').hidden=$('menu').hidden=$('note').hidden=true;
+  $('over').hidden=true;$('bHome').hidden=false;
+  resetRun();state='run';hud();
+}
+function die(){
+  if(state!=='run')return;
+  state='dead';p.dead=true;deadT=0;
+  const coins=Math.floor(gold/2);addCoins(coins);
+  if(gold>D.best){D.best=gold;saveD();}
+  const res={seed:RUN.seed,level:1,kills:gold,coins};
+  post(Object.assign({type:'result',challenge:CH},res));
+  after(1.3,()=>showOver(res));
+}
+function showOver(res){
+  const h=$('ovh');
+  if(CH){
+    const d=gold-RUN.target;
+    h.textContent=d>0?'ПОБЕДА!':d===0?'НИЧЬЯ':'НЕ ХВАТИЛО';h.style.color=d>0?'#5cff5c':d===0?'#ffc233':'#ff4d6d';
+    $('ovtxt').innerHTML='Ты: <b>'+gold+'</b> · '+esc(RUN.from||'Друг')+': <b>'+RUN.target+'</b><br>Заработано монет: <b>'+res.coins+'</b>';
+  }else{
+    h.textContent='БАБАХ!';h.style.color='';
+    $('ovtxt').innerHTML='Золота: <b>'+gold+'</b> · рекорд: <b>'+D.best+'</b><br>Заработано монет: <b>'+res.coins+'</b>';
+  }
+  const bc=$('bChal');bc.hidden=!(EMBED&&gold>0);bc.innerHTML=CH?'&#9876; ОТВЕТНЫЙ ВЫЗОВ':'&#9876; ВЫЗОВ ДРУГУ';
+  bc.onclick=()=>{sfx('click');post(Object.assign({type:'challenge'},res));};
+  $('over').hidden=false;$('bHome').hidden=true;
+}
+function showMenu(){
+  resetRun();state='menu';
+  $('title').hidden=$('hint').hidden=$('menu').hidden=$('note').hidden=false;$('over').hidden=true;
+  $('bHome').hidden=!EMBED;
+  const b=$('best');b.className='';b.hidden=!D.best;b.textContent='Рекорд: '+D.best+' золота';
+  if(CH){b.hidden=false;b.className='ch';b.textContent='ВЫЗОВ ОТ '+(RUN.from||'ДРУГА').toUpperCase()+': ПОБЕЙ '+RUN.target;}
+  $('bSnd').className='mb half'+(D.snd?'':' off');
+  hud();
+}
+
+/* ================= ЭФФЕКТЫ ================= */
+function burst(x,y,col,n,up){
+  for(let i=0;i<n;i++)parts.push({x,y,vx:rnd(-260,260),vy:rnd(-420,up?-80:60),col,sz:rnd(3,8),t:0,life:rnd(.6,1.3)});
+  if(parts.length>320)parts.splice(0,parts.length-320);
+}
+function addText(x,y,txt,col,size){texts.push({x:clamp(x,80,W-80),y,txt,col,size:size||24,t:0});}
+
+/* ================= ОБНОВЛЕНИЕ ================= */
+function catchItem(it){
+  if(it.type==='dyn'){
+    lives--;hurtT=.6;shake=14;flashT=.12;sfx('boom');
+    booms.push({x:it.x,y:CATCH,t:0});burst(it.x,CATCH,'#ff9a3d',22,true);burst(it.x,CATCH,'#3a3a48',10,true);
+    addText(it.x,CATCH-50,'БАХ!','#ff4d6d',34);
+    if(lives<=0){lastReason='boom';die();}
+    return;
+  }
+  if(it.type==='heart'){
+    if(lives<LIVES){lives++;addText(it.x,CATCH-40,'+ЖИЗНЬ','#ff6fa5',26);}else addText(it.x,CATCH-40,'+5','#ffc233',26),gold+=5;
+    sfx('heart');catchT=.18;hud();return;
+  }
+  const v=VAL[it.type],before=gold;gold+=v;catchT=.18;
+  burst(it.x,CATCH,'#ffe066',it.type==='bag'?12:6,true);
+  addText(it.x,CATCH-40,'+'+v,'#ffc233',it.type==='bag'?30:24);
+  sfx(it.type==='bag'?'bag':'coin');
+  if(Math.floor(before/STEP)!==Math.floor(gold/STEP)){
+    level=Math.floor(gold/STEP);prevBiome=biome;biome=level;biomeT=0;sfx('bonus');
+    const place=window.JoeScenery?JoeScenery.NAMES[JoeScenery.biomeAt(level)]:'';
+    banner={t:2.2,txt:'БЫСТРЕЕ!',sub:place?'ДАЛЬШЕ: '+place:''};
+  }
+  hud();
+}
+function update(dt){
+  time+=dt;
+  for(let i=timers.length-1;i>=0;i--){const t=timers[i];t.t-=dt;if(t.t<=0){timers.splice(i,1);t.fn();}}
+  const tp=palFor(gold),kk=Math.min(1,dt*1.2);pal=[mix(pal[0],tp[0],kk),mix(pal[1],tp[1],kk)];
+  if(biomeT<1)biomeT=Math.min(1,biomeT+dt/1.2);
+  if(flashT>0)flashT-=dt;if(hurtT>0)hurtT-=dt;if(catchT>0)catchT-=dt;
+
+  if(state==='menu'){p.x=W/2+Math.sin(time*1.4)*150;}
+  if(state==='run'){
+    runT+=dt;
+    // Джо едет к пальцу (или по стрелкам), но не быстрее MAXV — увернуться надо успевать
+    let want=p.x;
+    if(keyDir)want=p.x+keyDir*MAXV*dt;else if(targetX!==null)want=targetX;
+    const step=clamp(want-p.x,-MAXV*dt,MAXV*dt);
+    p.vx=step/Math.max(dt,1e-4);p.x=clamp(p.x+step,HW,W-HW);
+    while(itemAt(next).t<=runT){const s=itemAt(next);items.push({type:s.type,x:s.x,y:-40,vy:s.vy,rot:0,spin:s.spin});next++;}
+  }
+  for(let i=items.length-1;i>=0;i--){
+    const it=items[i],py=it.y;it.y+=it.vy*dt;it.rot+=it.spin*dt;
+    if(state==='run'&&py<CATCH&&it.y>=CATCH&&Math.abs(it.x-p.x)<HW+R[it.type]*.6){items.splice(i,1);catchItem(it);continue;}
+    if(it.y>GROUND+10){
+      items.splice(i,1);
+      if(it.type==='dyn'){booms.push({x:it.x,y:GROUND,t:0});burst(it.x,GROUND,'#ff9a3d',10,true);if(state==='run')sfx('pop');}
+      else burst(it.x,GROUND,'#c9a24a',4,true);
+    }
+  }
+  for(let i=booms.length-1;i>=0;i--){booms[i].t+=dt;if(booms[i].t>.5)booms.splice(i,1);}
+  for(let i=parts.length-1;i>=0;i--){const q=parts[i];q.t+=dt;if(q.t>q.life){parts.splice(i,1);continue;}q.vy+=1100*dt;q.x+=q.vx*dt;q.y+=q.vy*dt;}
+  for(let i=texts.length-1;i>=0;i--){const t=texts[i];t.t+=dt;t.y-=50*dt;if(t.t>1)texts.splice(i,1);}
+  if(banner){banner.t-=dt;if(banner.t<=0)banner=null;}
+  if(state==='dead')deadT+=dt;
+  if(shake>0)shake=Math.max(0,shake-dt*40);
+}
+
+/* ================= ОТРИСОВКА ================= */
+function mountains(col,base,amp,seedK){
+  const pts=[-20,GROUND];
+  for(let i=0;i<=8;i++){const x=-20+i*(W+40)/8;pts.push(x,base-hsh(i+seedK)*amp);}
+  pts.push(W+20,GROUND);poly(ctx,col,pts);
+}
+function drawBiome(n,alpha){
+  if(!window.JoeScenery||alpha<=0)return;
+  ctx.globalAlpha=alpha;
+  JoeScenery.layer(ctx,JoeScenery.biomeAt(n),time*6,GROUND+4,css(mix(pal[0],pal[1],.38)),css(mix(pal[1],[255,230,150],.35)),W);
+  ctx.globalAlpha=1;
+}
+function drawItem(it){
+  const x=it.x,y=it.y;
+  ctx.save();ctx.translate(x,y);
+  if(it.type==='nugget'){
+    ctx.rotate(it.rot);
+    poly(ctx,'#a45f00',[-17,4,-10,-12,4,-16,16,-6,15,9,2,16,-12,13]);
+    poly(ctx,'#ffc233',[-15,1,-9,-13,4,-15,14,-6,12,7,1,12,-11,10]);
+    poly(ctx,'#fff1a8',[-8,-8,-2,-11,3,-6,-4,-3]);
+  }else if(it.type==='bag'){
+    ctx.rotate(Math.sin(it.rot)*.25);
+    box(ctx,'#6e3d18',-21,-6,42,30,12);box(ctx,'#a8642e',-19,-4,38,26,11);
+    box(ctx,'#6e3d18',-8,-18,16,14,4);box(ctx,'#e8c46a',-11,-8,22,4,2);
+    ctx.fillStyle='#ffc233';ctx.font='900 22px "Arial Black",sans-serif';ctx.textAlign='center';ctx.fillText('$',0,19);
+  }else if(it.type==='heart'){
+    const s=1+Math.sin(time*8)*.08;ctx.scale(s,s);
+    disc(ctx,'#ff4d6d',-7,-4,9);disc(ctx,'#ff4d6d',7,-4,9);poly(ctx,'#ff4d6d',[-15,0,15,0,0,16]);disc(ctx,'#ffd0dc',-9,-7,3);
+  }else{
+    ctx.rotate(it.rot*.5);
+    box(ctx,'#8a1c2c',-9,-17,18,34,4);box(ctx,'#d6334a',-8,-17,16,34,4);
+    box(ctx,'#f3e2c0',-8,-6,16,6);box(ctx,'#3a2a20',-1,-25,2,9);
+    if(Math.floor(time*16)%2===0){disc(ctx,'#ffe066',0,-27,5);disc(ctx,'#fff',0,-27,2);}
+    // тень-предупреждение: красная полоска на земле там, куда он упадёт
+  }
+  ctx.restore();
+}
+function drawPan(x,y){
+  // корыто для промывки золота над головой
+  box(ctx,'#4a2c14',x-HW-4,y-4,HW*2+8,10,5);
+  box(ctx,'#8a5428',x-HW,y-12,HW*2,16,7);
+  box(ctx,'#b8783c',x-HW+6,y-10,HW*2-12,5,3);
+  if(catchT>0){ctx.globalAlpha=catchT/.18*.8;box(ctx,'#fff1a8',x-HW+8,y-18,HW*2-16,8,4);ctx.globalAlpha=1;}
+}
+function draw(){
+  const sx=shake?rnd(-shake,shake):0,sy=shake?rnd(-shake,shake):0;
+  const g=ctx.createLinearGradient(0,0,0,GROUND);g.addColorStop(0,css(pal[0]));g.addColorStop(1,css(mix(pal[0],pal[1],.55)));
+  ctx.fillStyle=g;ctx.fillRect(0,0,W,H);
+  ctx.save();ctx.translate(sx,sy);
+  disc(ctx,css(mix(pal[1],[255,230,160],.55)),W-120,250,64);
+  mountains(css(mix(pal[0],pal[1],.28)),620,140,7);
+  drawBiome(prevBiome,1-biomeT);drawBiome(biome,biomeT);
+  box(ctx,css(mix(pal[0],pal[1],.62)),-20,GROUND,W+40,H-GROUND);
+  box(ctx,'#2a2236',-20,GROUND,W+40,8);
+  for(let x=10;x<W;x+=58)box(ctx,css(mix(pal[0],pal[1],.5)),x+(hsh(x)*20|0),GROUND+30+(hsh(x+3)*60|0),18,6,3);
+
+  // тени под падающим динамитом — видно, куда упадёт
+  for(const it of items)if(it.type==='dyn'){const k=clamp(it.y/GROUND,0,1);ctx.globalAlpha=.25+k*.45;box(ctx,'#ff3355',it.x-14*k-6,GROUND-4,28*k+12,5,3);ctx.globalAlpha=1;}
+
+  // Джо с корытом
+  if(p){
+    const moving=state==='run'&&Math.abs(p.vx)>60;
+    const bob=moving?Math.abs(Math.sin(time*18))*4:Math.abs(Math.sin(time*3))*1.5;
+    const rot=clamp(-p.vx/5000,-.12,.12);
+    const blink=hurtT>0&&Math.floor(time*20)%2===0;
+    if(!(state==='dead'&&deadT>.2)&&!blink){
+      drawDude(ctx,p.x,GROUND-bob,p.vx<-60?-1:1,SC,cc=>drawJoe(cc,SKIN),-1,0,0,rot);
+      // руки от плеч поднимают корыто
+      const sh=GROUND-bob-40*SC,aw=6*SC;
+      box(ctx,'#fff',p.x-15*SC-aw/2,CATCH-bob,aw,sh-CATCH+bob,aw/2);box(ctx,'#fff',p.x+15*SC-aw/2,CATCH-bob,aw,sh-CATCH+bob,aw/2);
+      drawPan(p.x,CATCH-bob);
+    }
+    if(state==='dead'&&deadT<1.2){
+      // взрыв на месте Джо
+      const k=deadT/1.2;ctx.globalAlpha=1-k;disc(ctx,'#ff9a3d',p.x,GROUND-60,40+k*120);disc(ctx,'#ffe066',p.x,GROUND-60,20+k*70);ctx.globalAlpha=1;
+    }
+  }
+  for(const it of items)drawItem(it);
+  for(const b of booms){const k=b.t/.5;ctx.globalAlpha=1-k;disc(ctx,'#ff9a3d',b.x,b.y,20+k*60);disc(ctx,'#ffe066',b.x,b.y,10+k*30);ctx.globalAlpha=1;}
+  for(const q of parts){ctx.globalAlpha=clamp((q.life-q.t)*2,0,1);ctx.fillStyle=q.col;ctx.fillRect(q.x-q.sz/2,q.y-q.sz/2,q.sz,q.sz);}
+  ctx.globalAlpha=1;
+  ctx.textAlign='center';
+  for(const t of texts){
+    const a=t.t<.7?1:1-(t.t-.7)/.3,sc=t.t<.12?.6+t.t/.12*.4:1;
+    ctx.globalAlpha=Math.max(0,a);ctx.font='900 '+Math.round(t.size*sc)+'px "Arial Black","Segoe UI",sans-serif';
+    ctx.fillStyle='rgba(0,0,0,.45)';ctx.fillText(t.txt,t.x,t.y+3);ctx.fillStyle=t.col;ctx.fillText(t.txt,t.x,t.y);
+  }
+  ctx.globalAlpha=1;ctx.restore();
+
+  if(flashT>0){ctx.globalAlpha=flashT/.12*.5;ctx.fillStyle='#ff4d6d';ctx.fillRect(0,0,W,H);ctx.globalAlpha=1;}
+  // жизни
+  if(state!=='menu')for(let i=0;i<LIVES;i++){
+    const x=40+i*40,y=150,on=i<lives;ctx.globalAlpha=on?1:.25;
+    disc(ctx,'#ff4d6d',x-6,y-3,8);disc(ctx,'#ff4d6d',x+6,y-3,8);poly(ctx,'#ff4d6d',[x-13,y,x+13,y,x,y+14]);ctx.globalAlpha=1;
+  }
+  if(banner){
+    const full=banner.sub?2.2:1.8,pp=full-banner.t,s=pp<.18?pp/.18:1,a=banner.t<.4?banner.t/.4:1;
+    ctx.save();ctx.globalAlpha=a;ctx.translate(W/2,330);ctx.scale(s,s);ctx.rotate(-.05);
+    box(ctx,'#ffc233',-230,-44,460,banner.sub?110:84,18);ctx.fillStyle='#231700';ctx.textAlign='center';
+    ctx.font='900 34px "Arial Black","Segoe UI",sans-serif';ctx.fillText(banner.txt,0,banner.sub?4:12);
+    if(banner.sub){ctx.font='900 17px "Arial Black","Segoe UI",sans-serif';ctx.fillText(banner.sub,0,40);}
+    ctx.restore();
+  }
+  if(state==='run'&&runT<5&&!D.best){
+    ctx.globalAlpha=.75+Math.sin(time*5)*.2;ctx.fillStyle='#fff';ctx.textAlign='center';ctx.font='900 20px "Arial Black","Segoe UI",sans-serif';
+    ctx.fillText('ВОДИ ПАЛЬЦЕМ — ЛОВИ ЗОЛОТО',W/2,H-60);ctx.fillStyle='#ff8a9e';ctx.fillText('ДИНАМИТ НЕ ЛОВИ!',W/2,H-30);ctx.globalAlpha=1;
+  }
+  const v=ctx.createLinearGradient(0,0,0,150);v.addColorStop(0,'rgba(0,0,0,.45)');v.addColorStop(1,'rgba(0,0,0,0)');ctx.fillStyle=v;ctx.fillRect(0,0,W,150);
+}
+
+/* ================= ИНТЕРФЕЙС ================= */
+function hud(){
+  $('coinv').textContent=readJ().coins|0;
+  $('lvltxt').textContent='Золото '+gold;
+  $('lvlfill').style.width=Math.round((gold%STEP)/STEP*100)+'%';
+}
+
+/* ================= ЗВУК ================= */
+let AC=null,sfxG=null,nbuf=null;
+function initAudio(){
+  try{
+    if(AC){if(AC.state==='suspended')AC.resume();return;}
+    const A=window.AudioContext||window.webkitAudioContext;if(!A)return;
+    AC=new A();sfxG=AC.createGain();sfxG.connect(AC.destination);sfxG.gain.value=.55;
+    nbuf=AC.createBuffer(1,AC.sampleRate*.4,AC.sampleRate);const d=nbuf.getChannelData(0);for(let i=0;i<d.length;i++)d[i]=Math.random()*2-1;
+  }catch(e){AC=null;}
+}
+function osc(t,f,d,type,v,slide){const o=AC.createOscillator(),g=AC.createGain();o.type=type;o.frequency.setValueAtTime(f,t);
+  if(slide)o.frequency.exponentialRampToValueAtTime(Math.max(25,f+slide),t+d);g.gain.setValueAtTime(v,t);g.gain.exponentialRampToValueAtTime(.001,t+d);o.connect(g);g.connect(sfxG);o.start(t);o.stop(t+d+.03);}
+function noise(t,d,v,fq,type){const s=AC.createBufferSource(),f=AC.createBiquadFilter(),g=AC.createGain();s.buffer=nbuf;f.type=type||'lowpass';f.frequency.value=fq;
+  g.gain.setValueAtTime(v,t);g.gain.exponentialRampToValueAtTime(.001,t+d);s.connect(f);f.connect(g);g.connect(sfxG);s.start(t);s.stop(t+d+.03);}
+function sfx(name){
+  if(!AC||!D.snd||AC.state!=='running')return;
+  try{
+    const t=AC.currentTime;
+    if(name==='coin'){osc(t,1250,.05,'triangle',.2,0);osc(t+.05,1680,.08,'triangle',.2,0);}
+    else if(name==='bag'){osc(t,880,.06,'square',.14,0);osc(t+.06,1175,.06,'square',.14,0);osc(t+.12,1568,.1,'square',.14,0);}
+    else if(name==='heart'){osc(t,660,.1,'sine',.2,0);osc(t+.1,990,.16,'sine',.2,0);}
+    else if(name==='boom'){noise(t,.45,.6,500);osc(t,90,.4,'sawtooth',.3,-60);}
+    else if(name==='pop'){noise(t,.15,.25,400);}
+    else if(name==='bonus'){[523,659,784,1047].forEach((f,i)=>osc(t+i*.08,f,.16,'square',.14,0));}
+    else if(name==='click'){osc(t,620,.04,'square',.12,0);}
+  }catch(e){}
+}
+
+/* ================= ВВОД ================= */
+// Палец в любом месте экрана — Джо едет под палец. Стрелки/A,D — на компьютере.
+function toGame(ev){const r=cv.getBoundingClientRect();return (ev.clientX-r.left)/r.width*W;}
+let dragging=false;
+cv.addEventListener('pointerdown',ev=>{
+  ev.preventDefault();initAudio();
+  if(state==='menu'){startRun();}
+  if(state==='run'){dragging=true;targetX=toGame(ev);}
+});
+cv.addEventListener('pointermove',ev=>{if(dragging&&state==='run')targetX=toGame(ev);});
+const endDrag=()=>{dragging=false;};
+window.addEventListener('pointerup',endDrag);
+window.addEventListener('pointercancel',endDrag);
+const keys={};
+function keyUpd(){keyDir=(keys.r?1:0)-(keys.l?1:0);if(keyDir)targetX=null;}
+window.addEventListener('keydown',ev=>{
+  if(!$('over').hidden)return;
+  const c=ev.code;
+  if(c==='ArrowLeft'||c==='KeyA'){ev.preventDefault();keys.l=1;keyUpd();}
+  else if(c==='ArrowRight'||c==='KeyD'){ev.preventDefault();keys.r=1;keyUpd();}
+  else if((c==='Space'||c==='Enter')&&state==='menu'){ev.preventDefault();initAudio();startRun();}
+  if(state==='menu'&&(keys.l||keys.r)){initAudio();startRun();}
+});
+window.addEventListener('keyup',ev=>{const c=ev.code;if(c==='ArrowLeft'||c==='KeyA')keys.l=0;if(c==='ArrowRight'||c==='KeyD')keys.r=0;keyUpd();});
+$('bSnd').addEventListener('click',()=>{initAudio();D.snd=D.snd?0:1;saveD();$('bSnd').className='mb half'+(D.snd?'':' off');sfx('click');});
+$('bRetry').addEventListener('click',()=>{sfx('click');startRun();});
+$('bMenu').addEventListener('click',()=>{sfx('click');showMenu();});
+$('bHome').addEventListener('click',()=>{sfx('click');if(EMBED&&state==='menu'){post({type:'exit'});return;}showMenu();});
+document.addEventListener('visibilitychange',()=>{if(!AC)return;try{if(document.hidden)AC.suspend();else AC.resume();}catch(e){}});
+
+/* ================= МАСШТАБ И ЦИКЛ ================= */
+function fit(){
+  const s=Math.min(window.innerWidth/W,window.innerHeight/H)||1;
+  $('stage').style.transform='translate(-50%,-50%) scale('+s+')';
+  const r=clamp(s*(window.devicePixelRatio||1),1,3);
+  cv.width=Math.round(W*r);cv.height=Math.round(H*r);ctx.setTransform(cv.width/W,0,0,cv.height/H,0,0);
+}
+window.addEventListener('resize',fit);
+let last=0,MANUAL=false; // MANUAL — для автотестов: время двигает тест, а не requestAnimationFrame
+function frame(ts){
+  if(MANUAL){requestAnimationFrame(frame);return;}
+  const dt=Math.min(.033,Math.max(0,(ts-last)/1000)||0);last=ts;
+  update(dt);draw();requestAnimationFrame(frame);
+}
+fit();showMenu();requestAnimationFrame(frame);
+window.__gold={start:startRun,setTarget:x=>{targetX=x;},manual:()=>{MANUAL=true;},step:(ms,noDraw)=>{update(Math.min(.033,ms/1000));if(!noDraw)draw();},
+  info:()=>({state,gold,lives,x:p.x,runT,items:items.map(i=>({type:i.type,x:i.x,y:i.y,vy:i.vy}))}),
+  item:i=>itemAt(i),HW,CATCH,MAXV,W};
+</script>
+</body>
+</html>

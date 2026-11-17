@@ -1,6 +1,8 @@
 // Собирает игру из шаблона + дословных кусков joe.html (стили, база, палитры, отрисовка Джо):
 //   node scripts/build-game.mjs public/games/joe.html scripts/duel/duel.template.html public/games/duel.html
 //   node scripts/build-game.mjs public/games/joe.html scripts/train/train.template.html public/games/train.html
+//   node scripts/build-game.mjs public/games/joe.html scripts/gold/gold.template.html public/games/gold.html
+//   node scripts/build-game.mjs public/games/joe.html scripts/tower/tower.template.html public/games/tower.html
 import { readFileSync, writeFileSync } from 'node:fs'
 
 const [, , joePath, tplPath, outPath] = process.argv
