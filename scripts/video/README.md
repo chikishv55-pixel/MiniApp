@@ -17,6 +17,11 @@
 - В игре есть настоящая случайность (искры, разброс очереди), поэтому кадры при повторном рендере совпадают не побитно;
   оверлеи и финальный экран совпадают точно.
 
+## Рекламная карточка-прайс
+`scripts/video/ad-card.js` рисует карточку 1080×1350 для рекламодателей (Джо с рупором, тарифы, бартер, контакты). Грузится в games/train.html:
+`const m = await import('/scripts/video/ad-card.js'); const cv = await m.renderCard({ contact: '@ник', prices: [...] }); await m.sendPng(cv, 'http://127.0.0.1:8804')`
+(приёмник: `node scripts/video/sink.mjs content/card 8804`; в файл попадают PNG-байты — сохранить как .png).
+
 ## Короткие ролики (~10 с)
 - Поезд: `h.scanClip(seed,{from,until})` ищет сид, где бот проходит от вагона from до until; рендер с `untilCars: until` (без смерти),
   `slowFrames: 0`. Например туннели: from 14 → until 17, сид 322; вертолёт: from 44 → until 47, сид 927.
