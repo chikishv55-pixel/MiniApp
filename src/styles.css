@@ -1202,3 +1202,26 @@ button {
   font-size: 8px;
   padding: 6px 7px;
 }
+
+/* постер подстраивается под ВЫСОТУ карточки: в Telegram сверху шапка, снизу баннер — места меньше,
+   чем в браузере. Без этого верх рамки уезжал под подзаголовок, а описание пропадало. */
+.slide-card {
+  container-type: size;
+  overflow: hidden;
+}
+
+@supports (width: 1cqh) {
+  .slide-art {
+    width: min(300px, 86cqw, calc(100cqh - 150px));
+  }
+
+  @container (max-height: 430px) {
+    .slide-desc {
+      display: none;
+    }
+
+    .slide-art {
+      width: min(300px, 86cqw, calc(100cqh - 90px));
+    }
+  }
+}
