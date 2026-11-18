@@ -624,7 +624,7 @@ function draw(){
   }
   ctx.globalAlpha=1;ctx.restore();
 
-  if(state!=='menu')for(let i=0;i<LIVES;i++){
+  if(state!=='menu'&&!window.__video)for(let i=0;i<LIVES;i++){
     const x=36+i*36,y=166,on=i<lives;ctx.globalAlpha=on?1:.25;
     disc(ctx,'#ff4d6d',x-6,y-3,8);disc(ctx,'#ff4d6d',x+6,y-3,8);poly(ctx,'#ff4d6d',[x-13,y,x+13,y,x,y+14]);ctx.globalAlpha=1;
   }
@@ -711,6 +711,8 @@ fit();showMenu();requestAnimationFrame(frame);
 window.__rodeo={start:startRun,throwAt,manual:()=>{MANUAL=true;},step:(ms,noDraw)=>{update(Math.min(.033,ms/1000));if(!noDraw)draw();},
   aim:(x0,y0,x,y)=>{beginAim(x0,y0);moveAim(x,y);},release:endAim,
   info:()=>({state,score,combo,lives,caught,runT,busy:!!lasso,critters:critters.filter(c=>!c.caught).map(c=>({type:c.type,x:c.x,y:critterY(c),v:c.v,hop:c.hop,t:c.t,ph:c.ph,h:KIND[c.type].h}))}),
+  // для роликов: начать с k-го зверя (в клипе звери разнообразнее, чем в первых секундах забега)
+  skipTo:k=>{spawnAt(k+8);next=k;critters=[];runT=sched[k].t-.4;},
   HAND,GRAV,GROUND,VMIN,VMAX,CATCH_R};
 </script>
 </body>

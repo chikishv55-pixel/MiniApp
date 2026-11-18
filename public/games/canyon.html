@@ -789,6 +789,8 @@ function frame(ts){
 fit();showMenu();requestAnimationFrame(frame);
 window.__canyon={start:startRun,hold:startHold,release,manual:()=>{MANUAL=true;},step:(ms,noDraw)=>{update(Math.min(.033,ms/1000));if(!noDraw)draw();},
   info:()=>{const n=platAt(cur+1),p=plats[cur];return {state,score,streak,mode:joe.mode,x:joe.x,cur,next:n?{x:px(n),w:n.w,type:n.type,amp:n.amp}:null,here:p?{type:p.type,lit:p.lit,fuse:p.fuse}:null,holdT};},
+  // для роликов: начать забег с столба k (счёт и серия с нуля — в ролике считаются очки именно за клип)
+  skipTo:k=>{platAt(k+6);cur=k;const p=plats[k];joe.mode='stand';joe.off=0;joe.t=0;joe.x=px(p);joe.y=p.top;cam=px(p)-CAMX;score=0;streak=0;bestStreak=0;},
   plat:i=>platAt(i),SPEED,MAXT,JT,PERF};
 </script>
 </body>
