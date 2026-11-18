@@ -16,7 +16,7 @@ const ENEMY = { col: '#ff4d6d', col2: '#22283a', hat: 1 }
 const BANDIT = { col: '#35d6c9', col2: '#22283a', hat: 2 }
 
 type Ctx = CanvasRenderingContext2D
-type Variant = 'joe' | 'duel' | 'train' | 'gold' | 'tower'
+type Variant = 'joe' | 'duel' | 'train' | 'gold' | 'tower' | 'canyon' | 'rodeo'
 
 // небо каждой игры: верх и низ градиента
 const SKY: Record<Variant, [string, string]> = {
@@ -25,6 +25,8 @@ const SKY: Record<Variant, [string, string]> = {
   train: ['#04222b', '#1fb6c9'],
   gold: ['#2a1206', '#ffa531'],
   tower: ['#2b0d1c', '#ff6b5e'],
+  canyon: ['#2a1206', '#ff8a3d'],
+  rodeo: ['#062a22', '#7fd36a'],
 }
 
 function backdrop(ctx: Ctx, variant: Variant, t: number) {
@@ -316,6 +318,129 @@ function makeTower(skin: number) {
   }
 }
 
+function makeCanyon(skin: number) {
+  // Джо прыгает с сальто между скальными столбами
+  const A = { x: 52, top: 66, w: 34 }
+  const B = { x: 168, top: 60, w: 30 }
+  let t = 0
+  const rock = (ctx: Ctx, p: { x: number; top: number; w: number }) => {
+    box(ctx, '#c4703e', p.x - p.w / 2, p.top, p.w, 120)
+    box(ctx, '#8f4a26', p.x + p.w * 0.15, p.top, p.w * 0.35, 120)
+    for (let y = p.top + 10; y < 110; y += 12) box(ctx, '#a95a30', p.x - p.w / 2, y, p.w, 2)
+    box(ctx, '#f0b270', p.x - p.w / 2 - 3, p.top, p.w + 6, 5, 2)
+  }
+  return (ctx: Ctx, dt: number) => {
+    t = (t + dt) % 2.6
+    box(ctx, '#3f8fc9', 0, 100, W, 10)
+    box(ctx, '#bfe6ff', 20 + ((t * 30) % 60), 103, 16, 1.5)
+    box(ctx, '#bfe6ff', 120 + ((t * 30) % 60), 106, 16, 1.5)
+    rock(ctx, A)
+    rock(ctx, B)
+    const charge = t < 0.9 ? Math.min(1, t / 0.9) : 0
+    if (t < 0.9) {
+      ctx.save()
+      ctx.translate(A.x, A.top + charge * 2)
+      ctx.scale(1 + charge * 0.25, 1 - charge * 0.28)
+      drawDude(ctx, 0, 0, 1, 0.8, (c) => drawLookJoe(c, skin), -1, 0, 0, 0)
+      ctx.restore()
+    } else if (t < 1.45) {
+      const k = (t - 0.9) / 0.55
+      const x = A.x + (B.x - A.x) * k
+      const y = A.top + (B.top - A.top) * k - 46 * 4 * k * (1 - k)
+      ctx.save()
+      ctx.translate(x, y - 24)
+      ctx.rotate(Math.PI * 2 * k)
+      ctx.translate(0, 24)
+      drawDude(ctx, 0, 0, 1, 0.8, (c) => drawLookJoe(c, skin), -1, 0, 0, 0)
+      ctx.restore()
+    } else {
+      const s = t < 1.6 ? 1 - (t - 1.45) * 1.2 : 1
+      ctx.save()
+      ctx.translate(B.x, B.top)
+      ctx.scale(2 - s, s)
+      drawDude(ctx, 0, 0, 1, 0.8, (c) => drawLookJoe(c, skin), -1, 0, 0, 0)
+      ctx.restore()
+      if (t < 1.9) {
+        ctx.globalAlpha = Math.max(0, 1 - (t - 1.45) * 2.2)
+        ctx.strokeStyle = '#5cff5c'
+        ctx.lineWidth = 2
+        ctx.beginPath()
+        ctx.ellipse(B.x, B.top, 10 + (t - 1.45) * 60, 3 + (t - 1.45) * 14, 0, 0, Math.PI * 2)
+        ctx.stroke()
+        ctx.globalAlpha = 1
+      }
+    }
+  }
+}
+
+function makeRodeo(skin: number) {
+  // Джо со стога бросает лассо на бегущего телёнка
+  const gy = 104
+  let t = 0
+  const calf = (ctx: Ctx, x: number, run: boolean) => {
+    const a = run ? Math.sin(t * 22) * 2 : 0
+    for (const [dx, s] of [[-9, 1], [-3, -1], [5, 1], [10, -1]] as const) box(ctx, '#d9d2c4', x + dx + a * s, gy - 6, 3, 6, 1)
+    box(ctx, '#f4f1ea', x - 10, gy - 18, 24, 13, 6)
+    box(ctx, '#2b2b35', x + 1, gy - 17, 7, 5, 2)
+    box(ctx, '#f4f1ea', x - 16, gy - 22, 11, 10, 4)
+    box(ctx, '#ffb3c0', x - 18, gy - 17, 5, 5, 2)
+    box(ctx, '#1b1b28', x - 13, gy - 20, 2, 2, 1)
+  }
+  return (ctx: Ctx, dt: number) => {
+    t = (t + dt) % 3
+    box(ctx, '#6fae4a', 0, gy, W, 10)
+    for (let x = 60; x < W; x += 34) box(ctx, '#7a5236', x, gy - 22, 3, 22)
+    box(ctx, '#7a5236', 56, gy - 17, W, 2.5)
+    box(ctx, '#7a5236', 56, gy - 8, W, 2.5)
+    box(ctx, '#e8c25a', 18, 76, 46, 30, 6)
+    box(ctx, '#c99a30', 18, 86, 46, 2)
+    drawDude(ctx, 40, 76, 1, 0.75, (c) => drawLookJoe(c, skin), -1, 0, 0, 0)
+    const hx = 50, hy = 50
+    let cx = 230 - t * 70
+    const throwT = 1.0
+    const fly = 0.6
+    if (t > throwT + fly) cx = Math.max(64, 230 - (throwT + fly) * 70 - (t - throwT - fly) * 160)
+    const rope = (x: number, y: number) => {
+      ctx.strokeStyle = '#8a5a2b'
+      ctx.lineWidth = 1.8
+      ctx.beginPath()
+      ctx.moveTo(hx, hy)
+      ctx.quadraticCurveTo((hx + x) / 2, Math.max(hy, y) + 10, x, y)
+      ctx.stroke()
+    }
+    const loop = (x: number, y: number, r: number, sq: number) => {
+      ctx.save()
+      ctx.translate(x, y)
+      ctx.scale(1, sq)
+      ctx.strokeStyle = '#c98f4f'
+      ctx.lineWidth = 2.4
+      ctx.beginPath()
+      ctx.arc(0, 0, r, 0, Math.PI * 2)
+      ctx.stroke()
+      ctx.restore()
+    }
+    if (t < throwT) loop(hx - 4, 34, 8, 0.35 + Math.sin(t * 14) * 0.06)
+    else if (t < throwT + fly) {
+      const k = (t - throwT) / fly
+      const tx = 230 - (throwT + fly) * 70
+      const x = hx + (tx - hx) * k
+      const y = hy + (gy - 14 - hy) * k - 40 * 4 * k * (1 - k)
+      rope(x, y)
+      loop(x, y, 9, 0.45)
+    } else {
+      rope(cx, gy - 12)
+      loop(cx, gy - 12, 7, 0.5)
+    }
+    if (cx > 64) calf(ctx, cx, t < throwT + fly)
+    if (t > throwT + fly && t < throwT + fly + 0.6) {
+      ctx.fillStyle = '#ffe066'
+      ctx.font = '900 11px "Arial Black",sans-serif'
+      ctx.textAlign = 'center'
+      ctx.fillText('ЙИ-ХА!', 130, 40 - (t - throwT - fly) * 20)
+    }
+  }
+}
+
 export default function JoeScene({ variant = 'joe' }: { variant?: Variant }) {
   const ref = useRef<HTMLCanvasElement>(null)
 
@@ -333,7 +458,11 @@ export default function JoeScene({ variant = 'joe' }: { variant?: Variant }) {
             ? makeGold(skin)
             : variant === 'tower'
               ? makeTower(skin)
-              : makeJoe(skin, gun)
+              : variant === 'canyon'
+                ? makeCanyon(skin)
+                : variant === 'rodeo'
+                  ? makeRodeo(skin)
+                  : makeJoe(skin, gun)
 
     const fit = () => {
       const r = cv.getBoundingClientRect()
@@ -382,6 +511,8 @@ export default function JoeScene({ variant = 'joe' }: { variant?: Variant }) {
           train: 'Джо бежит по крышам поезда',
           gold: 'Джо ловит падающее золото',
           tower: 'Джо строит башню из бочек',
+          canyon: 'Джо прыгает с сальто через каньон',
+          rodeo: 'Джо ловит телёнка лассо',
         }[variant]
       }
     />

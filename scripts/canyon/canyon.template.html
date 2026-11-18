@@ -1,0 +1,598 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>Каньон</title>
+<style>
+/* стили — как в «Меткий Джо» (public/games/joe.html), чтобы игры выглядели одной семьёй */
+@@CSS@@
+#title .l1.canyon{font-size:40px;letter-spacing:5px}
+#title .l2.canyon{font-size:96px;letter-spacing:3px}
+#note{display:none}
+</style>
+</head>
+<body>
+<div id="stage">
+  <canvas id="c" width="540" height="960"></canvas>
+
+  <div id="hud">
+    <div id="hudrow">
+      <button id="bHome" hidden aria-label="В меню">&#10005;</button><span></span>
+      <div id="coins"><i class="coin"></i><span id="coinv">0</span></div>
+    </div>
+    <div id="lvl"><div id="lvlfill"></div><span id="lvltxt">Очки 0</span></div>
+  </div>
+
+  <div id="title"><div class="l1 canyon">ПРЫЖОК ЧЕРЕЗ</div><div class="l2 canyon">КАНЬОН</div></div>
+  <div id="hint">ДЕРЖИ И ОТПУСКАЙ</div>
+  <div id="best"></div>
+  <div id="note"></div>
+
+  <div id="menu">
+    <button id="bSnd" class="mb half" aria-label="Звук">&#9668;))</button>
+  </div>
+
+  <div id="over" hidden>
+    <div class="box">
+      <h2 id="ovh">МИМО!</h2>
+      <p id="ovtxt"></p>
+      <button id="bChal" class="big chal" hidden>&#9876; ВЫЗОВ ДРУГУ</button>
+      <button id="bRetry" class="big">ЕЩЁ РАЗ</button>
+      <button id="bMenu" class="ghost">В МЕНЮ</button>
+    </div>
+  </div>
+</div>
+
+<script src="look.js"></script>
+<script src="scenery.js"></script>
+<script>
+'use strict';
+/* ================= БАЗА (из «Меткий Джо») ================= */
+@@HELPERS@@
+@@DATA@@
+
+/* ================= СОХРАНЕНИЕ ================= */
+// Монеты и скин общие с «Меткий Джо» — лежат в его сейве. Своё у игры — только рекорд и звук.
+const JKEY='metkiy-joe-v1',DKEY='canyon-v1';
+const JDEF={coins:0,level:1,ownW:[0],ownS:[0],curW:0,curS:0,snd:1,mus:1,best:0};
+function readJ(){try{const r=JSON.parse(localStorage.getItem(JKEY)||'null');if(r&&typeof r==='object'&&Array.isArray(r.ownW)&&Array.isArray(r.ownS))return Object.assign({},JDEF,r);}catch(e){}return Object.assign({},JDEF);}
+const okId=v=>Number.isInteger(v)&&v>=0&&v<=8;
+let J=readJ();
+const SKIN=okId(J.curS)?J.curS:0;
+function addCoins(n){if(n<=0)return;J=readJ();J.coins=(J.coins|0)+n;try{localStorage.setItem(JKEY,JSON.stringify(J));}catch(e){}}
+let D={best:0,snd:1,runs:0};
+try{const r=JSON.parse(localStorage.getItem(DKEY)||'null');if(r&&typeof r==='object')D=Object.assign(D,r);}catch(e){}
+function saveD(){try{localStorage.setItem(DKEY,JSON.stringify(D));}catch(e){}}
+
+/* ================= ВСТРАИВАНИЕ В «ИГРЫ ДЖО» ================= */
+// ?embed=1 — открыта внутри мини-аппа; ?mode=challenge&seed=&target=&from= — вызов от друга
+const QS=new URLSearchParams(location.search);
+const EMBED=QS.get('embed')==='1'&&window.parent!==window;
+const CH=QS.get('mode')==='challenge';
+const RUN={seed:(Number(QS.get('seed'))>>>0),target:clamp(parseInt(QS.get('target'),10)||0,0,100000),from:(QS.get('from')||'').slice(0,12)};
+const esc=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+function post(m){if(EMBED)try{window.parent.postMessage(Object.assign({src:'canyon'},m),location.origin);}catch(e){}}
+// Детерминированный рандом: одинаковый сид = одинаковые столбы (расстояния, ширина, что на них стоит)
+function mulberry(a){return function(){a|=0;a=a+0x6D2B79F5|0;let t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296;};}
+function rngFor(){let h=(RUN.seed^0xCA27)|0;for(let i=0;i<arguments.length;i++){h=Math.imul(h^(arguments[i]|0),0x9E3779B1);h^=h>>>15;}return mulberry(h);}
+
+/* ================= РИСОВАНИЕ ПЕРСОНАЖЕЙ (дословно из «Меткий Джо») ================= */
+@@ART@@
+
+/* ================= КАНЬОН ================= */
+// Держишь палец — Джо приседает и копит силу; отпускаешь — прыжок с сальто.
+// Дальность = время удержания × SPEED. Попал в центр столба — «идеально», серия удваивает очки.
+const TOP=640;                 // средняя высота верха столбов
+const FLOOR=905;               // река на дне каньона
+const SC=1.38;                 // масштаб Джо
+const MAXT=1.38,SPEED=430;     // удержание → дальность; максимум ≈ 590 px (медленнее набор — точнее управление)
+const REACH=MAXT*SPEED;
+const JT=.56;                  // длительность прыжка, с
+const PERF=9;                  // ±9 px от центра — «идеально»
+const EDGE=11;                 // до 11 px за краем — Джо балансирует и всё равно падает
+const CAMX=150;                // где на экране стоит Джо
+const FUSE=1.6;                // фитиль динамита, с
+const STEP=20;                 // каждые 20 очков — новое время суток
+
+const OH={rock:0,gold:0,barrel:52,crate:50,cactus:0,tower:74,cart:34,tnt:46};   // высота предмета над столбом
+const WR={rock:[88,130],gold:[82,112],barrel:[54,58],crate:[60,64],cactus:[46,50],tower:[112,128],cart:[72,76],tnt:[58,62]};
+
+let state='menu',plats=[],cur=0,cam=0,score=0,streak=0,bestStreak=0,jumps=0,runCoins=0,lastReason='fall',deadT=0;
+let joe=null,holdT=0,holding=false,landAnim=0,training=false;
+let parts=[],texts=[],rings=[],timers=[],banner=null,booms=[];
+let shake=0,time=0,flashT=0;
+let biome=0,prevBiome=0,biomeT=1;
+let pal=[PALS[0][0].slice(),PALS[0][1].slice()];
+const after=(t,fn)=>timers.push({t,fn});
+const palFor=n=>PALS[Math.floor(n/STEP)%PALS.length];
+
+// Столб i целиком задаётся сидом и номером: тип, ширина, высота, расстояние от предыдущего.
+// Расстояние всегда меньше максимальной дальности прыжка (с учётом хода вагонетки).
+function genPlat(i){
+  const g=rngFor(i,11),prev=plats[i-1];
+  let type='rock';
+  if(i>0){
+    const r=g();
+    // узкие и хитрые столбы вводятся постепенно: первые прыжки — широкие скалы и башни
+    if(i>=22&&r<.13)type='tnt';
+    else if(i>=12&&r<.28)type='cart';
+    else if(i>=4&&r<.38)type='gold';
+    else if(i>=7&&r<.5)type='barrel';
+    else if(i>=10&&r<.6)type='cactus';
+    else if(r<.68)type='tower';
+    else if(i>=4&&r<.78)type='crate';
+  }
+  const R=WR[type];
+  let w=R[0]+g()*(R[1]-R[0]);
+  if(type==='rock'||type==='gold')w=Math.max(56,w-Math.min(42,i*.6));
+  w=Math.round(w);
+  const top=i===0?TOP:TOP+Math.round((g()-.5)*72);
+  const amp=type==='cart'?Math.round(34+g()*30):0;
+  let x=0;
+  if(prev){
+    const lo=prev.w/2+(prev.amp||0)+w/2+amp+36;
+    const hi=REACH*.92-amp-(prev.amp||0);
+    x=prev.x+Math.round(clamp(165+g()*(120+Math.min(190,i*4)),lo,hi));
+  }
+  plats[i]={i,type,x,w,top,amp,om:type==='cart'?1.1+g()*1.2:0,ph:g()*6.283,fuse:0,lit:false,gone:false,press:0,bob:0};
+}
+function platAt(i){while(plats.length<=i)genPlat(plats.length);return plats[i];}
+const px=p=>p.x+(p.amp?p.amp*Math.sin(time*p.om+p.ph):0);
+
+function resetRun(){
+  if(!CH)RUN.seed=(Math.random()*4294967296)>>>0;
+  plats=[];cur=0;score=0;streak=0;bestStreak=0;jumps=0;runCoins=0;lastReason='fall';deadT=0;
+  parts=[];texts=[];rings=[];timers=[];banner=null;booms=[];shake=0;flashT=0;holdT=0;holding=false;landAnim=0;
+  biome=prevBiome=0;biomeT=1;
+  platAt(4);
+  joe={mode:'stand',x:0,y:TOP,off:0,t:0,x0:0,y0:0,x1:0,y1:0,h:0,vx:0,vy:0,rot:0};
+  cam=px(plats[0])-CAMX;
+  training=(D.runs|0)<2;     // первые два забега — подсказка, куда приземлишься
+}
+function startRun(){
+  $('title').hidden=$('hint').hidden=$('best').hidden=$('menu').hidden=$('note').hidden=true;
+  $('over').hidden=true;$('bHome').hidden=false;
+  resetRun();state='run';hud();
+}
+function die(reason){
+  if(state!=='run')return;
+  state='dead';lastReason=reason;deadT=0;holding=false;stopCharge();
+  D.runs=(D.runs|0)+1;
+  if(score>D.best){D.best=score;}
+  saveD();
+  const res={seed:RUN.seed,level:1,kills:score,coins:runCoins};
+  post(Object.assign({type:'result',challenge:CH},res));
+  after(1.25,()=>showOver(res));
+}
+function showOver(res){
+  const h=$('ovh');
+  if(CH){
+    const d=score-RUN.target;
+    h.textContent=d>0?'ПОБЕДА!':d===0?'НИЧЬЯ':'НЕ ХВАТИЛО';h.style.color=d>0?'#5cff5c':d===0?'#ffc233':'#ff4d6d';
+    $('ovtxt').innerHTML='Ты: <b>'+score+'</b> · '+esc(RUN.from||'Друг')+': <b>'+RUN.target+'</b><br>Заработано монет: <b>'+runCoins+'</b>';
+  }else{
+    h.textContent=lastReason==='boom'?'БАБАХ!':lastReason==='edge'?'НЕ УДЕРЖАЛСЯ!':'МИМО!';h.style.color='';
+    $('ovtxt').innerHTML='Очки: <b>'+score+'</b> · рекорд: <b>'+D.best+'</b><br>Лучшая серия «идеально»: <b>'+bestStreak+'</b> · монет: <b>'+runCoins+'</b>';
+  }
+  const bc=$('bChal');bc.hidden=!(EMBED&&score>0);bc.innerHTML=CH?'&#9876; ОТВЕТНЫЙ ВЫЗОВ':'&#9876; ВЫЗОВ ДРУГУ';
+  bc.onclick=()=>{sfx('click');post(Object.assign({type:'challenge'},res));};
+  $('over').hidden=false;$('bHome').hidden=true;
+}
+function showMenu(){
+  resetRun();state='menu';
+  $('title').hidden=$('hint').hidden=$('menu').hidden=false;$('over').hidden=true;
+  $('bHome').hidden=!EMBED;
+  const b=$('best');b.className='';b.hidden=!D.best;b.textContent='Рекорд: '+D.best;
+  if(CH){b.hidden=false;b.className='ch';b.textContent='ВЫЗОВ ОТ '+(RUN.from||'ДРУГА').toUpperCase()+': ПОБЕЙ '+RUN.target;}
+  $('bSnd').className='mb half'+(D.snd?'':' off');
+  hud();
+}
+function addCoinsRun(n,x,y){addCoins(n);runCoins+=n;addText(x,y,'+'+n,'#ffc233',22);hud();}
+
+/* ================= ЭФФЕКТЫ ================= */
+function burst(x,y,col,n,up,spd){
+  spd=spd||1;
+  for(let i=0;i<n;i++)parts.push({x,y,vx:rnd(-220,220)*spd,vy:rnd(-380,up?-60:40)*spd,col,sz:rnd(3,7),t:0,life:rnd(.5,1.1),g:1});
+  if(parts.length>360)parts.splice(0,parts.length-360);
+}
+function dust(x,y,n){for(let i=0;i<n;i++)parts.push({x:x+rnd(-14,14),y,vx:rnd(-160,160),vy:rnd(-90,-10),col:'rgba(255,240,215,.8)',sz:rnd(4,9),t:0,life:rnd(.35,.6),g:.15});}
+function addText(x,y,txt,col,size){texts.push({x:clamp(x,90,W-90),y,txt,col,size:size||24,t:0});}
+
+/* ================= ПРЫЖОК ================= */
+function startHold(){
+  if(state!=='run'||joe.mode!=='stand')return;
+  joe.mode='charge';holdT=0;holding=true;startCharge();
+}
+function release(){
+  holding=false;
+  if(state!=='run'||joe.mode!=='charge')return;
+  stopCharge();
+  const p=plats[cur],d=Math.min(holdT,MAXT)*SPEED;
+  const next=platAt(cur+1);
+  joe.mode='jump';joe.t=0;joe.x0=joe.x;joe.y0=p.top;joe.x1=joe.x+d;joe.y1=next.top;joe.h=120+d*.22;joe.rot=0;
+  p.bob=1;jumps++;sfx('jump');dust(joe.x-cam,p.top,5);
+}
+// приземление: на следующий столб (очки), обратно на свой (без очков) или мимо
+function land(){
+  const next=plats[cur+1],p=plats[cur];
+  const nx=px(next),nl=nx-next.w/2,nr=nx+next.w/2;
+  const x=joe.x1;
+  if(x>=nl&&x<=nr){
+    cur++;joe.mode='stand';joe.off=x-nx;joe.y=next.top;landAnim=.18;next.bob=1;
+    dust(x-cam,next.top,8);shake=Math.max(shake,3);
+    const perfect=Math.abs(x-nx)<=PERF;
+    let gain=1;
+    if(perfect){
+      streak++;bestStreak=Math.max(bestStreak,streak);gain=2*streak;joe.off=0;
+      rings.push({x:nx,y:next.top,t:0});flashT=.08;sfx('perfect',streak);
+      addText(nx-cam,next.top-96,streak>1?'ИДЕАЛЬНО ×'+streak:'ИДЕАЛЬНО!','#5cff5c',streak>1?30:28);
+      addCoinsRun(next.type==='gold'?5:1,nx-cam+60,next.top-60);
+      if(next.type==='gold')burst(nx-cam,next.top,'#ffd24a',18,true);
+    }else{
+      streak=0;sfx('land');
+      if(next.type==='gold')addCoinsRun(2,nx-cam+60,next.top-60);
+    }
+    const before=score;score+=gain;
+    addText(nx-cam,next.top-60,'+'+gain,perfect?'#fff':'#ffe9a6',perfect?26:22);
+    if(next.type==='cactus')addText(nx-cam-40,next.top-120,'АЙ!','#ff8fa3',22);
+    if(next.type==='tnt'){next.lit=true;next.fuse=FUSE;sfx('fuse');}
+    // вагонетка тормозит под Джо: попасть на неё трудно, а прыгать с неё — честно
+    if(next.type==='cart'&&next.amp){next.x=nx;next.amp=0;sfx('brake');for(let i=0;i<14;i++)parts.push({x:nx-cam+rnd(-30,30),y:next.top+OH.cart-4,vx:rnd(-260,260),vy:rnd(-260,-60),col:Math.random()<.5?'#ffd24a':'#fff3b0',sz:rnd(2,4),t:0,life:.35,g:1});}
+    if(Math.floor(before/STEP)!==Math.floor(score/STEP)){
+      prevBiome=biome;biome=Math.floor(score/STEP);biomeT=0;sfx('bonus');
+      const place=window.JoeScenery?JoeScenery.NAMES[JoeScenery.biomeAt(biome)]:'';
+      banner={t:2,txt:score+' ОЧКОВ!',sub:place?'ДАЛЬШЕ: '+place:''};
+    }
+    hud();return;
+  }
+  const px0=px(p);
+  if(x>=px0-p.w/2&&x<=px0+p.w/2){joe.mode='stand';joe.off=x-px0;joe.y=p.top;landAnim=.18;dust(x-cam,p.top,5);sfx('land');return;}   // недопрыгнул, но остался на своём
+  // чуть-чуть не хватило — балансирует на краю и падает (смешно и честно)
+  const edge=(x>nr&&x<nr+EDGE)?nr:(x<nl&&x>nl-EDGE)?nl:null;
+  if(edge!==null){joe.mode='teeter';joe.t=0;joe.x=edge;joe.y=next.top;joe.dir=x>nr?1:-1;sfx('teeter');return;}
+  joe.mode='fall';joe.vx=(joe.x1-joe.x0)/JT*.6;joe.vy=-80;sfx('whistle');
+}
+
+/* ================= ОБНОВЛЕНИЕ ================= */
+function update(dt){
+  time+=dt;
+  for(let i=timers.length-1;i>=0;i--){const t=timers[i];t.t-=dt;if(t.t<=0){timers.splice(i,1);t.fn();}}
+  const tp=palFor(score),kk=Math.min(1,dt*1.2);pal=[mix(pal[0],tp[0],kk),mix(pal[1],tp[1],kk)];
+  if(biomeT<1)biomeT=Math.min(1,biomeT+dt/1.2);
+  if(flashT>0)flashT-=dt;if(landAnim>0)landAnim-=dt;
+  for(const p of plats){if(p.bob>0)p.bob=Math.max(0,p.bob-dt*5);}
+
+  if(state==='menu'){
+    // в меню Джо сам прыгает по столбам — сразу видно, во что играть
+    if(joe.mode==='stand'){joe.t+=dt;if(joe.t>.9){joe.mode='charge';holdT=0;}}
+    else if(joe.mode==='charge'){const n=platAt(cur+1),want=(px(n)-joe.x)/SPEED;if(holdT>=want)release2();}
+  }
+  if(joe.mode==='charge'){holdT+=dt;updateCharge();}
+  const p=plats[cur];
+  if(joe.mode==='stand'||joe.mode==='charge'){
+    joe.x=px(p)+joe.off;
+    p.press=joe.mode==='charge'?Math.min(1,holdT/MAXT):Math.max(0,p.press-dt*8);
+    joe.y=p.top+p.press*7;
+  }else p.press=Math.max(0,p.press-dt*8);
+  if(joe.mode==='jump'){
+    joe.t+=dt;const k=Math.min(1,joe.t/JT);
+    joe.x=lerp(joe.x0,joe.x1,k);joe.y=lerp(joe.y0,joe.y1,k)-joe.h*4*k*(1-k);
+    joe.rot=Math.PI*2*(k<.5?2*k*k:1-Math.pow(-2*k+2,2)/2);
+    if(k>=1){joe.rot=0;if(state==='run')land();else menuLand();}
+  }else if(joe.mode==='teeter'){
+    joe.t+=dt;
+    if(joe.t>.55){joe.mode='fall';joe.vx=joe.dir*60;joe.vy=-40;lastReason='edge';sfx('whistle');}
+  }else if(joe.mode==='fall'){
+    joe.vy+=2400*dt;joe.x+=joe.vx*dt;joe.y+=joe.vy*dt;joe.rot+=dt*7*(joe.vx>=0?1:-1);
+    if(joe.y>FLOOR+10&&!joe.splashed){joe.splashed=true;burst(joe.x-cam,FLOOR,'#9fe3ff',22,true);burst(joe.x-cam,FLOOR,'#ffffff',8,true);sfx('splash');die(lastReason);}
+  }
+  // динамит: фитиль горит, пока Джо стоит на ящике
+  for(const q of plats){
+    if(!q.lit||q.gone)continue;
+    q.fuse-=dt;
+    if(Math.random()<.6)parts.push({x:px(q)-cam+q.w*.3,y:q.top-OH.tnt-8,vx:rnd(-50,50),vy:rnd(-120,-30),col:Math.random()<.5?'#ffb347':'#fff3b0',sz:rnd(2,4),t:0,life:.3,g:1});
+    if(q.fuse<=0){
+      q.gone=true;q.lit=false;booms.push({x:px(q),y:q.top-20,t:0});shake=14;sfx('boom');
+      burst(px(q)-cam,q.top-20,'#ff9a3d',26,true,1.3);burst(px(q)-cam,q.top-20,'#3a3a48',12,true);
+      if(state==='run'&&plats[cur]===q&&(joe.mode==='stand'||joe.mode==='charge')){
+        holding=false;stopCharge();joe.mode='fall';joe.vx=-160;joe.vy=-900;lastReason='boom';
+      }
+    }
+  }
+  // камера плавно ведёт Джо
+  const target=(joe.mode==='fall'||joe.mode==='jump'?px(plats[cur]):px(plats[cur]))-CAMX;
+  cam+=(target-cam)*Math.min(1,dt*4.5);
+
+  for(let i=booms.length-1;i>=0;i--){booms[i].t+=dt;if(booms[i].t>.5)booms.splice(i,1);}
+  for(let i=rings.length-1;i>=0;i--){rings[i].t+=dt;if(rings[i].t>.55)rings.splice(i,1);}
+  for(let i=parts.length-1;i>=0;i--){const q=parts[i];q.t+=dt;if(q.t>q.life){parts.splice(i,1);continue;}q.vy+=1100*q.g*dt;q.x+=q.vx*dt;q.y+=q.vy*dt;}
+  for(let i=texts.length-1;i>=0;i--){const t=texts[i];t.t+=dt;t.y-=46*dt;if(t.t>1)texts.splice(i,1);}
+  if(banner){banner.t-=dt;if(banner.t<=0)banner=null;}
+  if(state==='dead')deadT+=dt;
+  if(shake>0)shake=Math.max(0,shake-dt*40);
+}
+// прыжок в меню (демо): без очков и звука
+function release2(){
+  const p=plats[cur],d=Math.min(holdT,MAXT)*SPEED,next=platAt(cur+1);
+  joe.mode='jump';joe.t=0;joe.x0=joe.x;joe.y0=p.top;joe.x1=joe.x+d;joe.y1=next.top;joe.h=120+d*.22;p.bob=1;
+}
+function menuLand(){
+  cur++;const n=plats[cur];joe.mode='stand';joe.t=0;joe.off=0;joe.y=n.top;landAnim=.18;n.bob=1;dust(px(n)-cam,n.top,6);
+  if(cur>14){const keep=cam;plats=[];cur=0;platAt(4);joe.x=px(plats[0]);cam=px(plats[0])-CAMX;}
+}
+
+/* ================= ОТРИСОВКА ================= */
+function mesas(off,col,base,amp,seed,step){
+  const span=step*8,o=((off%span)+span)%span;
+  ctx.fillStyle=col;
+  for(let rep=-1;rep<=1;rep++){
+    const x0=rep*span-o;
+    ctx.beginPath();ctx.moveTo(x0,H);
+    for(let i=0;i<8;i++){
+      const x=x0+i*step,h=hsh(i+seed)*amp+amp*.35,w=step*(.55+hsh(i+seed+9)*.35),y=base-h;
+      ctx.lineTo(x,base);ctx.lineTo(x+step*.08,y+6);ctx.lineTo(x+step*.1,y);ctx.lineTo(x+w-step*.1,y);ctx.lineTo(x+w-step*.08,y+6);ctx.lineTo(x+w,base);
+    }
+    ctx.lineTo(x0+span,base);ctx.lineTo(x0+span,H);ctx.closePath();ctx.fill();
+  }
+}
+function drawBiome(n,alpha){
+  if(!window.JoeScenery||alpha<=0)return;
+  ctx.globalAlpha=alpha*.55;
+  JoeScenery.layer(ctx,JoeScenery.biomeAt(n),cam*.2,FLOOR-170,css(mix(pal[0],pal[1],.3)),css(mix(pal[1],[255,230,150],.3)),W);
+  ctx.globalAlpha=1;
+}
+function rockCol(t){return css(mix(mix([196,112,62],pal[1],.22),[0,0,0],t));}
+function pillar(x,w,top,seed){
+  // скала: неровные края (по мировому сиду — не дрожат при движении камеры), слои породы разной толщины, тень справа
+  const bot=FLOOR+40,step=26,L=[],R=[];
+  for(let y=top+16;y<bot;y+=step){const k=(y-top)*.025;L.push(x-w/2-k+(hsh(seed+y*.07)-.5)*9,y);R.push(x+w/2+k+(hsh(seed+y*.11+5)-.5)*9,y);}
+  const pts=[x-w/2,top,x+w/2,top].concat(R,[x+w/2+(bot-top)*.025,bot,x-w/2-(bot-top)*.025,bot]);
+  for(let i=L.length-2;i>=0;i-=2)pts.push(L[i],L[i+1]);
+  ctx.save();ctx.beginPath();ctx.moveTo(pts[0],pts[1]);for(let i=2;i<pts.length;i+=2)ctx.lineTo(pts[i],pts[i+1]);ctx.closePath();
+  ctx.fillStyle=rockCol(0);ctx.fill();ctx.clip();
+  let y=top+12,i=0;
+  while(y<bot){const h=8+hsh(seed+i*3.3)*24;ctx.fillStyle=rockCol(i%2?.14:.05);ctx.fillRect(x-w,y,w*2,h*.55);y+=h;i++;}
+  ctx.globalAlpha=.55;ctx.fillStyle=rockCol(.42);ctx.fillRect(x+w*.16,top,w,bot-top);ctx.globalAlpha=1;
+  // трещины
+  ctx.strokeStyle=rockCol(.5);ctx.lineWidth=2;ctx.beginPath();const cx=x-w*.15+hsh(seed)*w*.3;ctx.moveTo(cx,top+30);ctx.lineTo(cx+6,top+62);ctx.lineTo(cx-2,top+90);ctx.stroke();
+  ctx.restore();
+  // шапка с нависанием
+  box(ctx,css(mix(mix([240,178,112],pal[1],.18),[255,255,255],.1)),x-w/2-5,top,w+10,10,4);
+  box(ctx,rockCol(.35),x-w/2-2,top+9,w+4,3);
+}
+function barrel(x,top,w){
+  const h=52,y=top;
+  box(ctx,'#5c2f12',x-w/2,y,w,h,10);box(ctx,'#a8642e',x-w/2+3,y+2,w-6,h-4,9);box(ctx,'#c98a4e',x-w/2+8,y+5,6,h-10,3);
+  box(ctx,'#454d5e',x-w/2,y+9,w,5,2);box(ctx,'#454d5e',x-w/2,y+h-14,w,5,2);
+}
+function drawPlat(p){
+  const x=px(p)-cam,w=p.w;if(x+w<-80||x-w>W+80)return;
+  const bob=Math.sin(p.bob*Math.PI)*4*(p.bob>0?1:0);
+  const top=p.top+p.press*7+bob,oh=OH[p.type];
+  if(p.type==='tower'){
+    // водонапорная башня: бак на сваях
+    const legs=[-w*.38,-w*.13,w*.13,w*.38];
+    for(const l of legs)box(ctx,'#5a3a22',x+l-4,top+oh-6,8,FLOOR+40-top-oh);
+    for(let y=top+oh+30;y<FLOOR;y+=70){ctx.strokeStyle='#5a3a22';ctx.lineWidth=4;ctx.beginPath();ctx.moveTo(x-w*.38,y);ctx.lineTo(x+w*.38,y+50);ctx.moveTo(x+w*.38,y);ctx.lineTo(x-w*.38,y+50);ctx.stroke();}
+    box(ctx,'#7a4a26',x-w/2,top+6,w,oh-6,8);box(ctx,'#a8642e',x-w/2+4,top+8,w-8,oh-12,7);
+    for(let i=1;i<6;i++)box(ctx,'#8a5a30',x-w/2+i*w/6,top+8,3,oh-12);
+    box(ctx,'#454d5e',x-w/2,top+20,w,5);box(ctx,'#454d5e',x-w/2,top+oh-18,w,5);
+    poly(ctx,'#6b3f1d',[x-w/2-6,top+8,x,top-12,x+w/2+6,top+8]);
+    return;
+  }
+  if(p.type==='cactus'){
+    const g='#3f9a4a',d='#2c7536',l='#6fd06b';
+    box(ctx,g,x-w/2,top,w,FLOOR+40-top,w/2);box(ctx,d,x+w*.12,top+8,w*.22,FLOOR-top);box(ctx,l,x-w*.32,top+10,5,FLOOR-top-20,2);
+    box(ctx,g,x-w/2-26,top+90,30,16,8);box(ctx,g,x-w/2-26,top+50,16,56,8);
+    box(ctx,g,x+w/2-4,top+140,30,16,8);box(ctx,g,x+w/2+10,top+100,16,56,8);
+    for(let y=top+14;y<top+220;y+=22){box(ctx,'#e8f5c8',x-w/2-3,y,4,2);box(ctx,'#e8f5c8',x+w/2-1,y+10,4,2);}
+    disc(ctx,'#ff6fa5',x-6,top-3,6);disc(ctx,'#ff6fa5',x+6,top-3,6);disc(ctx,'#ffd93d',x,top-4,4);
+    return;
+  }
+  const pw=p.type==='rock'||p.type==='gold'?w:Math.max(40,w*.72);
+  if(p.type==='cart'){
+    // вагонетка катается по рельсу; столб стоит на месте
+    const bx=p.x-cam;
+    pillar(bx,60,top+oh+10,p.i*7.3);
+    box(ctx,'#3a3446',bx-p.amp-w/2-10,top+oh,p.amp*2+w+20,8,3);box(ctx,'#9aa3b8',bx-p.amp-w/2-10,top+oh,p.amp*2+w+20,3);
+    box(ctx,'#6b7488',x-w/2,top+4,w,oh-8,6);box(ctx,'#454d5e',x-w/2,top,w,8,3);box(ctx,'#8792a8',x-w/2+6,top+10,w-12,4,2);
+    disc(ctx,'#1b1b28',x-w*.28,top+oh-4,8);disc(ctx,'#1b1b28',x+w*.28,top+oh-4,8);disc(ctx,'#9aa3b8',x-w*.28,top+oh-4,3);disc(ctx,'#9aa3b8',x+w*.28,top+oh-4,3);
+    return;
+  }
+  pillar(x,pw,top+oh,p.i*7.3);
+  if(p.type==='gold'){
+    const tw=Math.sin(time*4+p.i)*.5+.5;
+    poly(ctx,'#ffc233',[x-w*.3,top+30,x-w*.1,top+22,x,top+46,x-w*.22,top+52]);
+    poly(ctx,'#ffd24a',[x+w*.1,top+70,x+w*.32,top+64,x+w*.26,top+86,x+w*.06,top+84]);
+    poly(ctx,'#ffc233',[x-w*.2,top+110,x,top+104,x-w*.06,top+124]);
+    ctx.globalAlpha=tw;poly(ctx,'#fff',[x-w*.12,top+24,x-w*.1,top+30,x-w*.04,top+32,x-w*.1,top+34,x-w*.12,top+40,x-w*.14,top+34,x-w*.2,top+32,x-w*.14,top+30]);ctx.globalAlpha=1;
+  }else if(p.type==='barrel')barrel(x,top,w);
+  else if(p.type==='crate'){
+    box(ctx,'#a8642e',x-w/2,top,w,oh,3);box(ctx,'#6e3d18',x-w/2+4,top+4,w-8,oh-8,2);box(ctx,'#a8642e',x-w/2+8,top+8,w-16,oh-16,2);
+    ctx.save();ctx.translate(x,top+oh/2);ctx.rotate(Math.atan2(oh-16,w-16));box(ctx,'#6e3d18',-w*.55,-3,w*1.1,6);ctx.restore();
+  }else if(p.type==='tnt'&&!p.gone){
+    const blink=p.lit&&Math.floor(time*(p.fuse<.6?16:7))%2===0;
+    box(ctx,'#8a1c2c',x-w/2,top,w,oh,4);box(ctx,blink?'#ff6b6b':'#d6334a',x-w/2+3,top+3,w-6,oh-6,3);
+    box(ctx,'#f3e2c0',x-w/2+3,top+oh/2-9,w-6,18);ctx.fillStyle='#8a1c2c';ctx.font='900 16px "Arial Black",sans-serif';ctx.textAlign='center';ctx.fillText('TNT',x,top+oh/2+6);
+    box(ctx,'#3a2a20',x+w*.3-1,top-12,3,12);
+    if(p.lit){
+      // кольцо-таймер над ящиком
+      const k=clamp(p.fuse/FUSE,0,1);ctx.strokeStyle='rgba(0,0,0,.35)';ctx.lineWidth=7;ctx.beginPath();ctx.arc(x,top-44,15,0,7);ctx.stroke();
+      ctx.strokeStyle=k<.35?'#ff3355':'#ffc233';ctx.beginPath();ctx.arc(x,top-44,15,-Math.PI/2,-Math.PI/2+k*Math.PI*2);ctx.stroke();
+    }
+  }else if(p.type==='tnt'&&p.gone){
+    box(ctx,'#2a2236',x-w/2,top+oh-10,w,10,3);
+  }
+}
+function drawJoeAt(){
+  if(!joe)return;
+  const x=joe.x-cam;let y=joe.y;
+  ctx.save();
+  if(joe.mode==='charge'||joe.mode==='stand'){
+    const k=joe.mode==='charge'?1-.34*Math.min(1,holdT/MAXT):1;
+    const sh=joe.mode==='charge'&&holdT>MAXT?rnd(-1.5,1.5):0;     // перебор — дрожит от напряжения
+    const la=landAnim>0?landAnim/.18:0;
+    ctx.translate(x+sh,y);ctx.scale((1+(1-k)*.5)*(1+la*.18),k*(1-la*.16));
+    drawDude(ctx,0,0,1,SC,cc=>drawJoe(cc,SKIN),-1,0,0,0);
+  }else if(joe.mode==='teeter'){
+    const a=Math.sin(joe.t*26)*.45*joe.dir;
+    ctx.translate(x,y);ctx.rotate(a);drawDude(ctx,0,0,joe.dir,SC,cc=>drawJoe(cc,SKIN),-1,0,0,0);
+    // машет руками
+    box(ctx,'#fff',-26,-50*SC+Math.sin(joe.t*30)*8,10,6,3);box(ctx,'#fff',16,-50*SC-Math.sin(joe.t*30)*8,10,6,3);
+  }else{
+    const st=joe.mode==='jump'&&joe.t<.08?1:0;
+    ctx.translate(x,y-34*SC);ctx.rotate(joe.rot);if(st)ctx.scale(.86,1.16);ctx.translate(0,34*SC);
+    drawDude(ctx,0,0,1,SC,cc=>drawJoe(cc,SKIN),-1,0,0,0);
+  }
+  ctx.restore();
+}
+function draw(){
+  const sx=shake?rnd(-shake,shake):0,sy=shake?rnd(-shake,shake):0;
+  const g=ctx.createLinearGradient(0,0,0,FLOOR);g.addColorStop(0,css(pal[0]));g.addColorStop(1,css(mix(pal[0],pal[1],.62)));
+  ctx.fillStyle=g;ctx.fillRect(0,0,W,H);
+  ctx.save();ctx.translate(sx,sy);
+  // солнце с ореолом
+  const sun=css(mix(pal[1],[255,232,170],.6));
+  ctx.globalAlpha=.18;disc(ctx,sun,W-140,300,110);ctx.globalAlpha=1;disc(ctx,sun,W-140,300,62);
+  // стервятники кружат вдали
+  for(let i=0;i<2;i++){const a=time*.6+i*3,bx=W*.3+i*170+Math.cos(a)*60,by=220+i*40+Math.sin(a)*18,f=Math.sin(time*6+i)*5;
+    ctx.strokeStyle=css(mix(pal[0],[0,0,0],.3));ctx.lineWidth=3;ctx.beginPath();ctx.moveTo(bx-14,by-f);ctx.lineTo(bx,by);ctx.lineTo(bx+14,by-f);ctx.stroke();}
+  // слои каньона (чем ближе, тем быстрее едут)
+  mesas(cam*.08,css(mix(pal[0],pal[1],.34)),520,150,3,150);
+  drawBiome(prevBiome,1-biomeT);drawBiome(biome,biomeT);
+  mesas(cam*.22,css(mix(mix(pal[0],[120,60,40],.35),pal[1],.22)),700,120,11,190);
+  // дно каньона: река
+  const rg=ctx.createLinearGradient(0,FLOOR,0,H);rg.addColorStop(0,css(mix([60,150,200],pal[1],.25)));rg.addColorStop(1,css(mix([20,60,110],pal[0],.4)));
+  ctx.fillStyle=rg;ctx.fillRect(-20,FLOOR,W+40,H-FLOOR+20);
+  ctx.globalAlpha=.35;for(let i=0;i<9;i++){const xx=((i*97-cam*.5-time*30)%(W+120)+W+120)%(W+120)-60;box(ctx,'#e6f7ff',xx,FLOOR+14+(i%3)*14,34,3,2);}ctx.globalAlpha=1;
+
+  for(let i=Math.max(0,cur-2);i<cur+5;i++)drawPlat(platAt(i));
+  // кольцо «идеально»
+  for(const r of rings){const k=r.t/.55;ctx.globalAlpha=(1-k)*.9;ctx.strokeStyle='#5cff5c';ctx.lineWidth=6*(1-k)+1;ctx.beginPath();ctx.ellipse(r.x-cam,r.y,20+k*90,6+k*24,0,0,7);ctx.stroke();}
+  ctx.globalAlpha=1;
+  // подсказка в первых забегах: куда приземлится Джо при текущей силе
+  if(state==='run'&&training&&joe.mode==='charge'&&jumps<8){
+    const lx=joe.x+Math.min(holdT,MAXT)*SPEED-cam,n=plats[cur+1],ty=n.top;
+    const ok=Math.abs(joe.x+Math.min(holdT,MAXT)*SPEED-px(n))<=n.w/2;
+    ctx.globalAlpha=.85;poly(ctx,ok?'#5cff5c':'#ffffff',[lx-9,ty-26,lx+9,ty-26,lx,ty-12]);ctx.globalAlpha=1;
+  }
+  // центр следующего столба — маленькая метка
+  if(state==='run'&&joe.mode!=='fall'){const n=plats[cur+1];if(n){ctx.globalAlpha=.5;box(ctx,'#fff',px(n)-cam-3,n.top-2,6,3,1);ctx.globalAlpha=1;}}
+  drawJoeAt();
+  for(const b of booms){const k=b.t/.5;ctx.globalAlpha=1-k;disc(ctx,'#ff9a3d',b.x-cam,b.y,24+k*80);disc(ctx,'#ffe066',b.x-cam,b.y,12+k*40);ctx.globalAlpha=1;}
+  for(const q of parts){ctx.globalAlpha=clamp((q.life-q.t)*2,0,1);ctx.fillStyle=q.col;ctx.fillRect(q.x-q.sz/2,q.y-q.sz/2,q.sz,q.sz);}
+  ctx.globalAlpha=1;
+  ctx.textAlign='center';
+  for(const t of texts){
+    const a=t.t<.7?1:1-(t.t-.7)/.3,sc=t.t<.12?.6+t.t/.12*.4:1;
+    ctx.globalAlpha=Math.max(0,a);ctx.font='900 '+Math.round(t.size*sc)+'px "Arial Black","Segoe UI",sans-serif';
+    ctx.fillStyle='rgba(0,0,0,.45)';ctx.fillText(t.txt,t.x,t.y+3);ctx.fillStyle=t.col;ctx.fillText(t.txt,t.x,t.y);
+  }
+  ctx.globalAlpha=1;ctx.restore();
+
+  if(flashT>0){ctx.globalAlpha=flashT/.08*.18;ctx.fillStyle='#5cff5c';ctx.fillRect(0,0,W,H);ctx.globalAlpha=1;}
+  // серия «идеально» — под полоской очков
+  if(state==='run'&&streak>1){ctx.textAlign='center';ctx.font='900 22px "Arial Black",sans-serif';ctx.fillStyle='rgba(0,0,0,.4)';ctx.fillText('СЕРИЯ ×'+streak,W/2,153);ctx.fillStyle='#5cff5c';ctx.fillText('СЕРИЯ ×'+streak,W/2,150);}
+  if(banner){
+    const full=banner.sub?2:1.6,pp=full-banner.t,s=pp<.18?pp/.18:1,a=banner.t<.4?banner.t/.4:1;
+    ctx.save();ctx.globalAlpha=a;ctx.translate(W/2,330);ctx.scale(s,s);ctx.rotate(-.05);
+    box(ctx,'#ffc233',-230,-44,460,banner.sub?110:84,18);ctx.fillStyle='#231700';ctx.textAlign='center';
+    ctx.font='900 34px "Arial Black","Segoe UI",sans-serif';ctx.fillText(banner.txt,0,banner.sub?4:12);
+    if(banner.sub){ctx.font='900 17px "Arial Black","Segoe UI",sans-serif';ctx.fillText(banner.sub,0,40);}
+    ctx.restore();
+  }
+  if(state==='run'&&training&&jumps<3){
+    ctx.globalAlpha=.8+Math.sin(time*5)*.15;ctx.fillStyle='#fff';ctx.textAlign='center';ctx.font='900 21px "Arial Black","Segoe UI",sans-serif';
+    ctx.fillText(joe.mode==='charge'?'ОТПУСТИ — ПРЫЖОК':'ДЕРЖИ ПАЛЕЦ — ДЖО ПРИСЕДАЕТ',W/2,H-110);
+    ctx.font='900 16px "Arial Black","Segoe UI",sans-serif';ctx.fillStyle='#5cff5c';ctx.fillText('ПОПАДИ В ЦЕНТР — ОЧКИ ×2',W/2,H-80);ctx.globalAlpha=1;
+  }
+  const vg=ctx.createRadialGradient(W/2,H*.5,H*.36,W/2,H*.5,H*.8);vg.addColorStop(0,'rgba(0,0,0,0)');vg.addColorStop(1,'rgba(0,0,0,.32)');ctx.fillStyle=vg;ctx.fillRect(0,0,W,H);
+  const v=ctx.createLinearGradient(0,0,0,150);v.addColorStop(0,'rgba(0,0,0,.4)');v.addColorStop(1,'rgba(0,0,0,0)');ctx.fillStyle=v;ctx.fillRect(0,0,W,150);
+}
+
+/* ================= ИНТЕРФЕЙС ================= */
+function hud(){
+  $('coinv').textContent=readJ().coins|0;
+  $('lvltxt').textContent='Очки '+score;
+  $('lvlfill').style.width=Math.round((score%STEP)/STEP*100)+'%';
+}
+
+/* ================= ЗВУК ================= */
+let AC=null,sfxG=null,nbuf=null,chg=null;
+function initAudio(){
+  try{
+    if(AC){if(AC.state==='suspended')AC.resume();return;}
+    const A=window.AudioContext||window.webkitAudioContext;if(!A)return;
+    AC=new A();sfxG=AC.createGain();sfxG.connect(AC.destination);sfxG.gain.value=.55;
+    nbuf=AC.createBuffer(1,AC.sampleRate*.4,AC.sampleRate);const d=nbuf.getChannelData(0);for(let i=0;i<d.length;i++)d[i]=Math.random()*2-1;
+  }catch(e){AC=null;}
+}
+function osc(t,f,d,type,v,slide){const o=AC.createOscillator(),g=AC.createGain();o.type=type;o.frequency.setValueAtTime(f,t);
+  if(slide)o.frequency.exponentialRampToValueAtTime(Math.max(25,f+slide),t+d);g.gain.setValueAtTime(v,t);g.gain.exponentialRampToValueAtTime(.001,t+d);o.connect(g);g.connect(sfxG);o.start(t);o.stop(t+d+.03);}
+function noise(t,d,v,fq,type){const s=AC.createBufferSource(),f=AC.createBiquadFilter(),g=AC.createGain();s.buffer=nbuf;f.type=type||'lowpass';f.frequency.value=fq;
+  g.gain.setValueAtTime(v,t);g.gain.exponentialRampToValueAtTime(.001,t+d);s.connect(f);f.connect(g);g.connect(sfxG);s.start(t);s.stop(t+d+.03);}
+// звук накопления силы: тон растёт, пока держишь
+function startCharge(){
+  if(!AC||!D.snd||AC.state!=='running')return;
+  try{const t=AC.currentTime,o=AC.createOscillator(),g=AC.createGain();o.type='triangle';o.frequency.setValueAtTime(180,t);o.frequency.linearRampToValueAtTime(720,t+MAXT);
+    g.gain.setValueAtTime(.0001,t);g.gain.exponentialRampToValueAtTime(.09,t+.05);o.connect(g);g.connect(sfxG);o.start(t);chg={o,g};}catch(e){chg=null;}
+}
+function updateCharge(){}
+function stopCharge(){if(!chg)return;try{const t=AC.currentTime;chg.g.gain.cancelScheduledValues(t);chg.g.gain.setValueAtTime(chg.g.gain.value,t);chg.g.gain.exponentialRampToValueAtTime(.0001,t+.05);chg.o.stop(t+.07);}catch(e){}chg=null;}
+function sfx(name,a){
+  if(!AC||!D.snd||AC.state!=='running')return;
+  try{
+    const t=AC.currentTime;a=a|0;
+    if(name==='jump'){osc(t,260,.16,'square',.12,520);noise(t,.06,.15,1800);}
+    else if(name==='land'){noise(t,.09,.3,500);osc(t,140,.08,'square',.12,-60);}
+    else if(name==='perfect'){const f=660*Math.pow(1.122,Math.min(a-1,12));osc(t,f,.09,'square',.13,0);osc(t+.07,f*1.5,.14,'square',.13,0);noise(t,.07,.2,500);}
+    else if(name==='teeter'){osc(t,500,.12,'sine',.14,200);osc(t+.15,450,.12,'sine',.14,-150);}
+    else if(name==='whistle'){osc(t,1100,.8,'sine',.16,-900);}
+    else if(name==='splash'){noise(t,.5,.5,1200,'bandpass');noise(t,.3,.3,400);}
+    else if(name==='brake'){noise(t,.35,.25,3500,'bandpass');osc(t,1400,.3,'sawtooth',.05,-700);}
+    else if(name==='fuse'){noise(t,.4,.12,3000,'highpass');}
+    else if(name==='boom'){noise(t,.5,.6,500);osc(t,90,.45,'sawtooth',.3,-60);}
+    else if(name==='bonus'){[523,659,784,1047].forEach((f,i)=>osc(t+i*.08,f,.16,'square',.14,0));}
+    else if(name==='click'){osc(t,620,.04,'square',.12,0);}
+  }catch(e){}
+}
+
+/* ================= ВВОД ================= */
+// Держи палец в любом месте — Джо копит силу; отпусти — прыжок. На компьютере — пробел.
+function press(){initAudio();if(state==='menu'){startRun();return;}startHold();}
+cv.addEventListener('pointerdown',ev=>{ev.preventDefault();press();});
+window.addEventListener('pointerup',()=>release());
+window.addEventListener('pointercancel',()=>release());
+window.addEventListener('keydown',ev=>{
+  if(!$('over').hidden)return;
+  if((ev.code==='Space'||ev.code==='Enter'||ev.code==='ArrowUp')&&!ev.repeat){ev.preventDefault();press();}
+});
+window.addEventListener('keyup',ev=>{if(ev.code==='Space'||ev.code==='Enter'||ev.code==='ArrowUp')release();});
+$('bSnd').addEventListener('click',()=>{initAudio();D.snd=D.snd?0:1;saveD();$('bSnd').className='mb half'+(D.snd?'':' off');sfx('click');});
+$('bRetry').addEventListener('click',()=>{sfx('click');startRun();});
+$('bMenu').addEventListener('click',()=>{sfx('click');showMenu();});
+$('bHome').addEventListener('click',()=>{sfx('click');if(EMBED&&state==='menu'){post({type:'exit'});return;}showMenu();});
+document.addEventListener('visibilitychange',()=>{if(!AC)return;try{if(document.hidden)AC.suspend();else AC.resume();}catch(e){}});
+
+/* ================= МАСШТАБ И ЦИКЛ ================= */
+function fit(){
+  const s=Math.min(window.innerWidth/W,window.innerHeight/H)||1;
+  $('stage').style.transform='translate(-50%,-50%) scale('+s+')';
+  const r=clamp(s*(window.devicePixelRatio||1),1,3);
+  cv.width=Math.round(W*r);cv.height=Math.round(H*r);ctx.setTransform(cv.width/W,0,0,cv.height/H,0,0);
+}
+window.addEventListener('resize',fit);
+let last=0,MANUAL=false; // MANUAL — для автотестов: время двигает тест, а не requestAnimationFrame
+function frame(ts){
+  if(MANUAL){requestAnimationFrame(frame);return;}
+  const dt=Math.min(.033,Math.max(0,(ts-last)/1000)||0);last=ts;
+  update(dt);draw();requestAnimationFrame(frame);
+}
+fit();showMenu();requestAnimationFrame(frame);
+window.__canyon={start:startRun,hold:startHold,release,manual:()=>{MANUAL=true;},step:(ms,noDraw)=>{update(Math.min(.033,ms/1000));if(!noDraw)draw();},
+  info:()=>{const n=platAt(cur+1),p=plats[cur];return {state,score,streak,mode:joe.mode,x:joe.x,cur,next:n?{x:px(n),w:n.w,type:n.type,amp:n.amp}:null,here:p?{type:p.type,lit:p.lit,fuse:p.fuse}:null,holdT};},
+  plat:i=>platAt(i),SPEED,MAXT,JT,PERF};
+</script>
+</body>
+</html>

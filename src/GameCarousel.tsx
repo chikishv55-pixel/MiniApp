@@ -10,7 +10,7 @@ export type Game = {
   color: string
   soon?: boolean
   fresh?: boolean // игра новая — показываем бейдж, пока её не открыли
-  art?: 'joe' | 'duel' | 'train' | 'gold' | 'tower' // вместо иконки — живая сцена из игры
+  art?: 'joe' | 'duel' | 'train' | 'gold' | 'tower' | 'canyon' | 'rodeo' // вместо иконки — живая сцена из игры
 }
 
 type Props = {
@@ -68,7 +68,7 @@ export default function GameCarousel({ games, index, onIndex, onPlay, best, look
               {!g.soon && (best[g.id] ?? 0) > 0 && (
                 <span className="slide-best">
                   РЕКОРД: {best[g.id]}
-                  {({ duel: ' ПОДРЯД', train: ' ВАГ.', gold: ' ЗОЛ.', tower: ' ЭТ.' } as Record<string, string>)[g.id] ?? ''}
+                  {({ duel: ' ПОДРЯД', train: ' ВАГ.', gold: ' ЗОЛ.', tower: ' ЭТ.', canyon: ' ОЧ.', rodeo: ' ОЧ.' } as Record<string, string>)[g.id] ?? ''}
                 </span>
               )}
             </button>

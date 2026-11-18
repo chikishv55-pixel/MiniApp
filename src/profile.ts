@@ -46,9 +46,9 @@ export function useProfile() {
   const [best, setBestState] = useState<Record<GameId, number>>(() => {
     const v = read<unknown>(BEST_KEY, {})
     const num = (x: unknown) => (typeof x === 'number' && x >= 0 ? Math.floor(x) : 0)
-    if (typeof v === 'number') return { joe: num(v), duel: 0, train: 0, gold: 0, tower: 0 }
+    if (typeof v === 'number') return { joe: num(v), duel: 0, train: 0, gold: 0, tower: 0, canyon: 0, rodeo: 0 }
     const o = (v && typeof v === 'object' ? v : {}) as Record<string, unknown>
-    return { joe: num(o.joe), duel: num(o.duel), train: num(o.train), gold: num(o.gold), tower: num(o.tower) }
+    return { joe: num(o.joe), duel: num(o.duel), train: num(o.train), gold: num(o.gold), tower: num(o.tower), canyon: num(o.canyon), rodeo: num(o.rodeo) }
   })
 
   const nick = stored.nick || tgNick
