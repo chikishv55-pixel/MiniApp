@@ -4,17 +4,21 @@ import { SKINS, WEAPONS, type Result, type Wallet } from './wallet'
 
 type Tab = 'skin' | 'weapon' | LookSlot
 
-const TABS: { id: Tab; title: string }[] = [
+const ALL_TABS: { id: Tab; title: string }[] = [
   { id: 'skin', title: 'СКИНЫ' },
+  { id: 'suit', title: 'ОБРАЗЫ' },
   { id: 'hat', title: 'ШЛЯПЫ' },
-  { id: 'glasses', title: 'ОЧКИ' },
-  { id: 'pants', title: 'ШТАНЫ' },
   { id: 'face', title: 'ЛИЦО' },
   { id: 'neck', title: 'ШЕЯ' },
   { id: 'back', title: 'СПИНА' },
-  { id: 'suit', title: 'КОСТЮМЫ' },
+  { id: 'glasses', title: 'ОЧКИ' },
+  { id: 'pants', title: 'ШТАНЫ' },
   { id: 'weapon', title: 'ОРУЖИЕ' },
 ]
+// вкладки только для тех слотов, где есть вещи
+const TABS = ALL_TABS.filter(
+  (t) => t.id === 'skin' || t.id === 'weapon' || (window.JoeLook?.ITEMS ?? []).some((it) => it.slot === t.id),
+)
 
 type Props = {
   wallet: Wallet
@@ -72,7 +76,7 @@ export default function Wardrobe({ wallet, onClose, toast, onOpenPass }: Props) 
               const on = joe.curS === i && !equip.suit
               return (
                 <button key={i} className={`wr-item ${on ? 'on' : ''}`} onClick={() => run(wallet.pickSkin(i))}>
-                  <JoePreview skin={i} gun={joe.curW} look={{ ...equip, suit: undefined }} width={64} height={78} />
+                  <JoePreview skin={i} gun={joe.curW} look={{ ...equip, suit: undefined }} width={80} height={98} />
                   <b>{s.n}</b>
                   <small>{on ? 'НАДЕТО' : own ? 'НАДЕТЬ' : <Price v={s.price} coins={coins} />}</small>
                 </button>
@@ -106,7 +110,7 @@ export default function Wardrobe({ wallet, onClose, toast, onOpenPass }: Props) 
                   onClick={() => (locked ? onOpenPass() : run(wallet.pickItem(it.id)))}
                 >
                   {it.pass && <span className="wr-pass">ПРОПУСК</span>}
-                  <JoePreview skin={joe.curS} gun={joe.curW} look={{ ...equip, [it.slot]: it.id }} width={64} height={78} />
+                  <JoePreview skin={joe.curS} gun={joe.curW} look={{ ...equip, [it.slot]: it.id }} width={80} height={98} />
                   <b>{it.n}</b>
                   <small>
                     {on ? 'СНЯТЬ' : own ? 'НАДЕТЬ' : it.pass ? `УР. ${it.pass}` : <Price v={it.price ?? 0} coins={coins} />}
@@ -116,7 +120,8 @@ export default function Wardrobe({ wallet, onClose, toast, onOpenPass }: Props) 
             })}
         </div>
 
-        {tab === 'suit' && <p className="hint">Костюмы — эксклюзив пропуска. Открывай уровни за монеты.</p>}
+        {tab === 'suit' && <p className="hint">Образ надевается целиком — вместо скина. Самые редкие — в пропуске.</p>}
+        {tab === 'back' && <p className="hint">Плащ, гитара и орёл — эксклюзивы пропуска.</p>}
 
         <div className="wr-actions">
           <button className="btn btn-pink" onClick={onOpenPass}>

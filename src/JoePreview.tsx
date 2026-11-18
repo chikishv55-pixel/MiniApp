@@ -46,7 +46,7 @@ export default function JoePreview({ skin, gun, look, mode = 'joe', width, heigh
         return
       }
       // Джо: ступни внизу, запас сверху под высокие шляпы
-      const s = Math.min(width / 70, height / 100)
+      const s = Math.min(width / 74, height / 116) // запас сверху под высокие шляпы
       const sway = animate ? Math.sin(t / 500) * 0.04 : 0
       drawDude(ctx, width / 2 - 2 * s, height - 6 * s, 1, s, (c) => drawLookJoe(c, skin, lk), gun, 0.15 + sway, 0, 0)
     }
