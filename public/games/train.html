@@ -6,11 +6,12 @@
 <title>Побег на поезде</title>
 <style>
 /* стили — как в «Меткий Джо» (public/games/joe.html), чтобы игры выглядели одной семьёй */
+@import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap');
 *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent;user-select:none;-webkit-user-select:none}
 [hidden]{display:none!important}
 html,body{height:100%;background:#05060c;overflow:hidden;touch-action:none;color:#fff;
   font-family:"Arial Black","Segoe UI Black","Trebuchet MS","Segoe UI",system-ui,sans-serif;font-weight:900}
-#stage{position:absolute;left:50%;top:50%;width:540px;height:960px;transform-origin:center;overflow:hidden;background:#000}
+#stage{position:absolute;left:50%;top:50%;width:540px;height:960px;transform-origin:center;overflow:hidden;background:#000;visibility:hidden}
 #c{position:absolute;left:0;top:0;width:540px;height:960px;display:block}
 button{font:inherit;color:inherit;border:0;background:none;cursor:pointer}
 
@@ -81,6 +82,38 @@ button{font:inherit;color:inherit;border:0;background:none;cursor:pointer}
 #toast{position:absolute;left:50%;bottom:190px;transform:translateX(-50%);background:#ff4d6d;padding:10px 22px;border-radius:14px;font-size:16px;white-space:nowrap;
   opacity:0;transition:opacity .2s;pointer-events:none}
 #toast.on{opacity:1}
+/* ===== пиксельный стиль окон и кнопок — как в главном меню «Игр Джо» (Press Start 2P, двойная рамка, жёсткая тень) ===== */
+#over{background:rgba(5,6,14,.8)}
+#over .box{width:440px;border-radius:0;background:#14141f;border:0;padding:38px 32px 34px;box-shadow:0 0 0 6px #f2f2f7,10px 10px 0 6px #000}
+#over h2{font-family:'Press Start 2P',monospace;font-weight:400;font-size:28px;line-height:1.4;letter-spacing:0;text-shadow:5px 5px 0 #000}
+#over p{font-family:'Press Start 2P',monospace;font-weight:400;font-size:13px;line-height:2.1;color:#b4b4c8;margin:18px 0 32px}
+#over p b{color:#ffd93d;font-weight:400}
+.big,.ghost{font-family:'Press Start 2P',monospace;font-weight:400;letter-spacing:0;border-radius:0;transition:transform .05s steps(1)}
+.big{height:66px;font-size:17px;color:#000;background:#5cff5c;margin-bottom:30px;box-shadow:0 0 0 5px #000,0 0 0 10px #5cff5c,10px 10px 0 10px #000}
+.big:active{transform:translate(6px,6px);box-shadow:0 0 0 5px #000,0 0 0 10px #5cff5c}
+.big.chal{background:#ff3d9a;color:#000;box-shadow:0 0 0 5px #000,0 0 0 10px #ff3d9a,10px 10px 0 10px #000}
+.big.chal:active{box-shadow:0 0 0 5px #000,0 0 0 10px #ff3d9a}
+.ghost{height:58px;font-size:15px;color:#f2f2f7;background:#14141f;border:0;margin-top:4px;box-shadow:0 0 0 6px #f2f2f7,8px 8px 0 6px #000}
+.ghost:active{transform:translate(6px,6px);box-shadow:0 0 0 6px #f2f2f7}
+.mb{border-radius:0;border:0;background:#14141f;box-shadow:0 0 0 5px #f2f2f7,7px 7px 0 5px #000;font-family:'Press Start 2P',monospace;font-weight:400;font-size:11px;letter-spacing:0}
+.mb:active{transform:translate(5px,5px);box-shadow:0 0 0 5px #f2f2f7}
+.mb.half{border-radius:0;font-size:18px}
+#bHome{border-radius:0;border:0;background:#14141f;box-shadow:0 0 0 4px #f2f2f7,5px 5px 0 4px #000;font-family:'Press Start 2P',monospace;font-weight:400;font-size:16px;line-height:44px}
+#bHome:active{transform:translate(4px,4px);box-shadow:0 0 0 4px #f2f2f7}
+#hint{font-family:'Press Start 2P',monospace;font-weight:400;font-size:16px;letter-spacing:0;text-shadow:4px 4px 0 #000;animation:blink 1s steps(2) infinite}
+@keyframes blink{50%{opacity:.25}}
+#best{font-family:'Press Start 2P',monospace;font-weight:400;font-size:12px;opacity:.8;text-shadow:3px 3px 0 #000}
+#best.ch{font-family:'Press Start 2P',monospace;font-weight:400;font-size:13px;line-height:1.8;letter-spacing:0;color:#ff3d9a}
+#lvl{border-radius:0;box-shadow:0 0 0 4px rgba(0,0,0,.45)}
+#lvltxt{font-family:'Press Start 2P',monospace;font-weight:400;font-size:12px}
+#lvlfill{background:repeating-linear-gradient(90deg,#ff3d9a 0 12px,#ff6fb5 12px 15px)}
+#toast{border-radius:0;font-family:'Press Start 2P',monospace;font-weight:400;font-size:12px;box-shadow:5px 5px 0 #000}
+.card{border-radius:0;border:0;box-shadow:0 0 0 5px #56607a,6px 6px 0 5px #000}
+.card.own{box-shadow:0 0 0 5px #c9d2e6,6px 6px 0 5px #000}
+.card.sel{box-shadow:0 0 0 5px #ffc233,6px 6px 0 5px #000}
+.card b{font-family:'Press Start 2P',monospace;font-weight:400;font-size:11px;line-height:1.5}
+#shoptitle{font-family:'Press Start 2P',monospace;font-weight:400;font-size:18px;letter-spacing:0}
+#bBack{border-radius:0;border:0;box-shadow:0 0 0 4px #f2f2f7,5px 5px 0 4px #000}
 #title .l2.train{font-size:92px}
 #title .l1.train{font-size:50px}
 #note{display:none}
@@ -854,7 +887,7 @@ document.addEventListener('visibilitychange',()=>{if(!AC)return;try{if(document.
 /* ================= МАСШТАБ И ЦИКЛ ================= */
 function fit(){
   const s=Math.min(window.innerWidth/W,window.innerHeight/H)||1;
-  $('stage').style.transform='translate(-50%,-50%) scale('+s+')';
+  $('stage').style.transform='translate(-50%,-50%) scale('+s+')';$('stage').style.visibility='visible';
   const r=clamp(s*(window.devicePixelRatio||1),1,3);
   cv.width=Math.round(W*r);cv.height=Math.round(H*r);ctx.setTransform(cv.width/W,0,0,cv.height/H,0,0);
 }

@@ -499,7 +499,7 @@ document.addEventListener('visibilitychange',()=>{if(!AC)return;try{if(document.
 /* ================= МАСШТАБ И ЦИКЛ ================= */
 function fit(){
   const s=Math.min(window.innerWidth/W,window.innerHeight/H)||1;
-  $('stage').style.transform='translate(-50%,-50%) scale('+s+')';
+  $('stage').style.transform='translate(-50%,-50%) scale('+s+')';$('stage').style.visibility='visible';
   const r=clamp(s*(window.devicePixelRatio||1),1,3);
   cv.width=Math.round(W*r);cv.height=Math.round(H*r);ctx.setTransform(cv.width/W,0,0,cv.height/H,0,0);
 }
