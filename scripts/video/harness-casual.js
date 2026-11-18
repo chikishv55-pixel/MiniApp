@@ -249,7 +249,7 @@ async function run(kind, o) {
   snap.height = OH
   const sc = snap.getContext('2d')
 
-  let i = 0
+  let i = o.startIndex || 0 // продолжаем нумерацию кадров после записи меню
   const push = async () => {
     await pushFrame(out, i, o.sink)
     i++
@@ -269,7 +269,7 @@ async function run(kind, o) {
       }
       const s = g.info()
       // перед плашкой автопилот перестаёт играть: число на плашке должно совпасть со счётчиком
-      if (f >= frames - plateF && K.ready(s)) {
+      if (!o.noPlate && f >= frames - plateF && K.ready(s)) {
         freeze = true
         frozen = { n: K.score(s), s }
         ;(0, eval)('banner=null') // игровой баннер («ДАЛЬШЕ: …») не должен просвечивать из-под плашки
@@ -287,7 +287,7 @@ async function run(kind, o) {
     text(c, label, OW / 2, 372, 30, 'rgba(255,255,255,.8)', '#14141f', 7)
     text(c, `${K.label} ${K.score(s)}`, OW / 2, 458, 72, '#fff', '#14141f', 16)
     if (K.draw) K.draw(c, s)
-    plate(c, K.hook, f, 54, '#ffc233', '#231700', -0.07, 1000)
+    if (!o.noPlate) plate(c, K.hook, f, 54, '#ffc233', '#231700', -0.07, 1000)
     if (freeze) plate(c, K.after(frozen.n, frozen.s), f - (frames - plateF), 999, K.color[0], K.color[1], 0.05, K.plateY || 1040)
     await push()
   }
