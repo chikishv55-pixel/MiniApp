@@ -8,12 +8,74 @@ import { box, drawDude, drawEnemy } from './joeArt.js'
 // Скин и оружие — те, что игрок выбрал в магазине Джо.
 
 const W = 220
-const H = 110
+const H = 110 // высота самой сцены; сверху над ней рисуем небо
+const CH = 220 // полная высота постера
+const OFF = CH - H
 const GUN_LEN = [32, 27, 30, 48, 38, 32, 52, 66, 58] // длина ствола каждого оружия, как в игре
 const ENEMY = { col: '#ff4d6d', col2: '#22283a', hat: 1 }
 const BANDIT = { col: '#35d6c9', col2: '#22283a', hat: 2 }
 
 type Ctx = CanvasRenderingContext2D
+type Variant = 'joe' | 'duel' | 'train' | 'gold' | 'tower'
+
+// небо каждой игры: верх и низ градиента
+const SKY: Record<Variant, [string, string]> = {
+  joe: ['#120b3a', '#6f5cff'],
+  duel: ['#062a22', '#2fd08c'],
+  train: ['#04222b', '#1fb6c9'],
+  gold: ['#2a1206', '#ffa531'],
+  tower: ['#2b0d1c', '#ff6b5e'],
+}
+
+function backdrop(ctx: Ctx, variant: Variant, t: number) {
+  const [top, bot] = SKY[variant]
+  const g = ctx.createLinearGradient(0, 0, 0, CH)
+  g.addColorStop(0, top)
+  g.addColorStop(1, bot)
+  ctx.fillStyle = g
+  ctx.fillRect(0, 0, W, CH)
+  // звёзды (мерцают)
+  ctx.fillStyle = '#fff'
+  for (let i = 0; i < 14; i++) {
+    ctx.globalAlpha = 0.25 + 0.5 * Math.abs(Math.sin(t * 1.4 + i * 1.7))
+    ctx.fillRect(((i * 53 + 17) % 200) + 8, ((i * 37 + 9) % 70) + 6, i % 4 ? 1.5 : 2.5, i % 4 ? 1.5 : 2.5)
+  }
+  // солнце / луна с ореолом
+  ctx.globalAlpha = 0.12
+  ctx.fillStyle = '#fff3c4'
+  ctx.beginPath()
+  ctx.arc(166, 54, 36, 0, Math.PI * 2)
+  ctx.fill()
+  ctx.globalAlpha = 0.9
+  ctx.fillStyle = '#fff3c4'
+  ctx.beginPath()
+  ctx.arc(166, 54, 21, 0, Math.PI * 2)
+  ctx.fill()
+  ctx.globalAlpha = 1
+  // облака плывут
+  for (let i = 0; i < 3; i++) {
+    const x = ((t * (6 + i * 3) + i * 90) % (W + 80)) - 50
+    const y = 34 + i * 22
+    ctx.globalAlpha = 0.16
+    ctx.fillStyle = '#fff'
+    ctx.fillRect(x, y, 46, 9)
+    ctx.fillRect(x + 10, y - 6, 26, 9)
+  }
+  ctx.globalAlpha = 1
+  // два слоя гор
+  for (const [base, amp, ph, a] of [
+    [132, 20, 1.3, 0.2],
+    [152, 16, 4.1, 0.26],
+  ] as const) {
+    ctx.fillStyle = `rgba(0,0,0,${a})`
+    ctx.beginPath()
+    ctx.moveTo(0, CH)
+    for (let x = 0; x <= W; x += 8) ctx.lineTo(x, base - (Math.sin(x * 0.045 + ph) * 0.6 + Math.sin(x * 0.11 + ph * 2) * 0.4 + 1) * (amp / 2))
+    ctx.lineTo(W, CH)
+    ctx.closePath()
+    ctx.fill()
+  }
+}
 
 // игра хранит сейв в localStorage того же сайта — читаем выбранный скин и оружие
 function readLoadout(): { skin: number; gun: number } {
@@ -254,7 +316,7 @@ function makeTower(skin: number) {
   }
 }
 
-export default function JoeScene({ variant = 'joe' }: { variant?: 'joe' | 'duel' | 'train' | 'gold' | 'tower' }) {
+export default function JoeScene({ variant = 'joe' }: { variant?: Variant }) {
   const ref = useRef<HTMLCanvasElement>(null)
 
   useEffect(() => {
@@ -285,14 +347,20 @@ export default function JoeScene({ variant = 'joe' }: { variant?: 'joe' | 'duel'
 
     let last = performance.now()
     let raf = 0
+    let t = 0
     const frame = (now: number) => {
       raf = requestAnimationFrame(frame)
       const dt = Math.min(0.05, (now - last) / 1000)
       last = now
       if (document.hidden) return
-      ctx.setTransform(cv.width / W, 0, 0, cv.height / H, 0, 0)
-      ctx.clearRect(0, 0, W, H)
+      t += dt
+      ctx.setTransform(cv.width / W, 0, 0, cv.height / CH, 0, 0)
+      ctx.clearRect(0, 0, W, CH)
+      backdrop(ctx, variant, t)
+      ctx.save()
+      ctx.translate(0, OFF)
       scene(ctx, dt)
+      ctx.restore()
     }
     raf = requestAnimationFrame(frame)
 

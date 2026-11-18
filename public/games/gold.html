@@ -81,9 +81,9 @@ button{font:inherit;color:inherit;border:0;background:none;cursor:pointer}
 #toast{position:absolute;left:50%;bottom:190px;transform:translateX(-50%);background:#ff4d6d;padding:10px 22px;border-radius:14px;font-size:16px;white-space:nowrap;
   opacity:0;transition:opacity .2s;pointer-events:none}
 #toast.on{opacity:1}
-#title .l2.gold{font-size:84px}
-#title .l1.gold{font-size:58px}
-#note{position:absolute;left:0;right:0;bottom:178px;text-align:center;font-size:13px;opacity:.5;pointer-events:none;font-family:"Segoe UI",system-ui,sans-serif;font-weight:700}
+#title .l2.gold{font-size:66px;letter-spacing:2px}
+#title .l1.gold{font-size:50px}
+#note{display:none}
 </style>
 </head>
 <body>
@@ -375,6 +375,7 @@ function update(dt){
   }
   for(let i=items.length-1;i>=0;i--){
     const it=items[i],py=it.y;it.y+=it.vy*dt;it.rot+=it.spin*dt;
+    if(it.type==='dyn'&&Math.random()<.5)parts.push({x:it.x,y:it.y-27,vx:rnd(-40,40),vy:rnd(-90,-20),col:Math.random()<.5?'#ffb347':'#fff3b0',sz:rnd(2,4),t:0,life:.3});
     if(state==='run'&&py<CATCH&&it.y>=CATCH&&Math.abs(it.x-p.x)<HW+R[it.type]*.6){items.splice(i,1);catchItem(it);continue;}
     if(it.y>GROUND+10){
       items.splice(i,1);
@@ -405,11 +406,14 @@ function drawBiome(n,alpha){
 function drawItem(it){
   const x=it.x,y=it.y;
   ctx.save();ctx.translate(x,y);
+  if(it.type==='nugget'||it.type==='bag'){ctx.globalAlpha=.2+Math.sin(time*6+x)*.05;disc(ctx,'#ffd24a',0,0,it.type==='bag'?36:29);ctx.globalAlpha=1;}
   if(it.type==='nugget'){
     ctx.rotate(it.rot);
     poly(ctx,'#a45f00',[-17,4,-10,-12,4,-16,16,-6,15,9,2,16,-12,13]);
     poly(ctx,'#ffc233',[-15,1,-9,-13,4,-15,14,-6,12,7,1,12,-11,10]);
     poly(ctx,'#fff1a8',[-8,-8,-2,-11,3,-6,-4,-3]);
+    const sp=Math.max(0,Math.sin(time*5+x*.1));
+    if(sp>.55){ctx.save();ctx.rotate(-it.rot);ctx.translate(9,-9);const r=11*sp;poly(ctx,'#fff',[0,-r,2,-2,r,0,2,2,0,r,-2,2,-r,0,-2,-2]);ctx.restore();}
   }else if(it.type==='bag'){
     ctx.rotate(Math.sin(it.rot)*.25);
     box(ctx,'#6e3d18',-21,-6,42,30,12);box(ctx,'#a8642e',-19,-4,38,26,11);
@@ -445,6 +449,10 @@ function draw(){
   box(ctx,css(mix(pal[0],pal[1],.62)),-20,GROUND,W+40,H-GROUND);
   box(ctx,'#2a2236',-20,GROUND,W+40,8);
   for(let x=10;x<W;x+=58)box(ctx,css(mix(pal[0],pal[1],.5)),x+(hsh(x)*20|0),GROUND+30+(hsh(x+3)*60|0),18,6,3);
+  box(ctx,css(mix(mix(pal[0],pal[1],.62),[255,255,255],.14)),-20,GROUND+8,W+40,5);
+  for(const it of items){const k=clamp(it.y/GROUND,0,1);ctx.globalAlpha=.1+k*.22;ctx.fillStyle='#000';ctx.beginPath();ctx.ellipse(it.x,GROUND+6,6+k*14,2+k*3,0,0,7);ctx.fill();}
+  ctx.globalAlpha=1;
+  if(p&&!p.dead){ctx.globalAlpha=.32;ctx.fillStyle='#000';ctx.beginPath();ctx.ellipse(p.x,GROUND+5,46,8,0,0,7);ctx.fill();ctx.globalAlpha=1;}
 
   // тени под падающим динамитом — видно, куда упадёт
   for(const it of items)if(it.type==='dyn'){const k=clamp(it.y/GROUND,0,1);ctx.globalAlpha=.25+k*.45;box(ctx,'#ff3355',it.x-14*k-6,GROUND-4,28*k+12,5,3);ctx.globalAlpha=1;}
@@ -497,6 +505,7 @@ function draw(){
     ctx.globalAlpha=.75+Math.sin(time*5)*.2;ctx.fillStyle='#fff';ctx.textAlign='center';ctx.font='900 20px "Arial Black","Segoe UI",sans-serif';
     ctx.fillText('ВОДИ ПАЛЬЦЕМ — ЛОВИ ЗОЛОТО',W/2,H-60);ctx.fillStyle='#ff8a9e';ctx.fillText('ДИНАМИТ НЕ ЛОВИ!',W/2,H-30);ctx.globalAlpha=1;
   }
+  const vg=ctx.createRadialGradient(W/2,H*.5,H*.34,W/2,H*.5,H*.8);vg.addColorStop(0,'rgba(0,0,0,0)');vg.addColorStop(1,'rgba(0,0,0,.34)');ctx.fillStyle=vg;ctx.fillRect(0,0,W,H);
   const v=ctx.createLinearGradient(0,0,0,150);v.addColorStop(0,'rgba(0,0,0,.45)');v.addColorStop(1,'rgba(0,0,0,0)');ctx.fillStyle=v;ctx.fillRect(0,0,W,150);
 }
 

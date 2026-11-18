@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import AdBanner from './AdBanner'
 import AdminModal from './AdminModal'
 import Avatar from './Avatar'
@@ -24,11 +24,11 @@ import { track } from './track'
 import { useWallet } from './wallet'
 
 const GAMES: Game[] = [
-  { id: 'joe', title: 'МЕТКИЙ ДЖО', desc: 'Лови момент и стреляй в голову', icon: 'target', color: '#ffd93d', art: 'joe' },
+  { id: 'joe', title: 'МЕТКИЙ ДЖО', desc: 'Лови момент и бей точно в цель', icon: 'target', color: '#ffd93d', art: 'joe' },
   { id: 'duel', title: 'ДУЭЛЬ', desc: 'Жди сигнала и стреляй первым', icon: 'bolt', color: '#5cff5c', art: 'duel' },
   { id: 'train', title: 'ПОБЕГ НА ПОЕЗДЕ', desc: 'Прыгай, стреляй, пригибайся', icon: 'cursor', color: '#3dffe0', art: 'train' },
-  { id: 'gold', title: 'ЗОЛОТАЯ ЛИХОРАДКА', desc: 'Лови золото, не лови динамит', icon: 'target', color: '#ffc233', art: 'gold' },
-  { id: 'tower', title: 'БАШНЯ ИЗ БОЧЕК', desc: 'Ставь ровно — и выше неба', icon: 'trophy', color: '#ff9a3d', art: 'tower' },
+  { id: 'gold', title: 'ЗОЛОТАЯ ЛИХОРАДКА', desc: 'Лови золото, не лови динамит', icon: 'target', color: '#ffc233', art: 'gold', fresh: true },
+  { id: 'tower', title: 'БАШНЯ ИЗ БОЧЕК', desc: 'Ставь ровно — и выше неба', icon: 'trophy', color: '#ff9a3d', art: 'tower', fresh: true },
 ]
 
 const SHARE_TOAST: Record<string, string | null> = {
@@ -59,6 +59,27 @@ export default function App() {
   const [passOpen, setPassOpen] = useState(false)
   const wallet = useWallet()
   const [slide, setSlide] = useState(0)
+  // новинки с бейджем «НОВОЕ» — пока игрок не открыл игру (хранится на устройстве)
+  const [seen, setSeen] = useState<string[]>(() => {
+    try {
+      const v = JSON.parse(localStorage.getItem('joe-seen') || '[]')
+      return Array.isArray(v) ? v.filter((x): x is string => typeof x === 'string') : []
+    } catch {
+      return []
+    }
+  })
+  const games = useMemo(() => GAMES.map((g) => (g.fresh && seen.includes(g.id) ? { ...g, fresh: false } : g)), [seen])
+  const markSeen = (id: string) =>
+    setSeen((prev) => {
+      if (prev.includes(id)) return prev
+      const next = [...prev, id]
+      try {
+        localStorage.setItem('joe-seen', JSON.stringify(next))
+      } catch {
+        /* без хранилища бейдж просто покажется снова */
+      }
+      return next
+    })
   const [game, setGame] = useState<GameLaunch | null>(null)
   const [incoming, setIncoming] = useState<Challenge | null>(null)
   const [toast, setToast] = useState<string | null>(null)
@@ -182,6 +203,7 @@ export default function App() {
       return
     }
     haptic('medium')
+    if (g.fresh) markSeen(g.id)
     track({ e: 'play', g: g.id })
     setGame({ game: g.id as GameId, mode: 'free' })
   }
@@ -250,7 +272,7 @@ export default function App() {
         <p className="tagline">Бросай вызовы. Бей рекорды.</p>
       </section>
 
-      <GameCarousel games={GAMES} index={slide} onIndex={changeSlide} onPlay={play} best={best} lookKey={wallet.version} />
+      <GameCarousel games={games} index={slide} onIndex={changeSlide} onPlay={play} best={best} lookKey={wallet.version} />
 
       <div className="actions">
         <button className="btn btn-main" onClick={() => play(current)} disabled={current.soon}>

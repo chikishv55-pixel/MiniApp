@@ -1167,3 +1167,38 @@ button {
 .ad-row.off .ad-meta small:not(.ad-left) {
   opacity: 0.5;
 }
+
+/* ===== постеры игр в карусели ===== */
+.slide-art {
+  width: min(300px, 84vw);
+  box-shadow:
+    0 0 0 4px var(--accent),
+    6px 6px 0 4px #000;
+}
+
+.joe-scene {
+  aspect-ratio: 1 / 1;
+  filter: none;
+}
+
+.slide-card {
+  gap: 18px;
+}
+
+.slide-title {
+  font-size: 17px;
+  line-height: 1.4;
+}
+
+.slide-desc {
+  max-width: 280px;
+  font-size: 9px;
+  line-height: 1.9;
+  color: #d6d7ea;
+}
+
+.badge {
+  z-index: 2;
+  font-size: 8px;
+  padding: 6px 7px;
+}

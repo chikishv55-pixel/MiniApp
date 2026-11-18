@@ -9,6 +9,7 @@ export type Game = {
   icon: IconName
   color: string
   soon?: boolean
+  fresh?: boolean // игра новая — показываем бейдж, пока её не открыли
   art?: 'joe' | 'duel' | 'train' | 'gold' | 'tower' // вместо иконки — живая сцена из игры
 }
 
@@ -52,6 +53,7 @@ export default function GameCarousel({ games, index, onIndex, onPlay, best, look
               onClick={() => onPlay(g)}
             >
               {g.soon && <span className="badge">СКОРО</span>}
+              {!g.soon && g.fresh && <span className="badge">НОВОЕ</span>}
               {g.art ? (
                 <span className="slide-art">
                   <JoeScene key={lookKey} variant={g.art} />
