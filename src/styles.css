@@ -1225,3 +1225,9 @@ button {
     }
   }
 }
+
+/* пока открыта игра — анимации меню на паузе (под игрой их всё равно не видно) */
+body.playing .screen,
+body.playing .screen * {
+  animation-play-state: paused !important;
+}

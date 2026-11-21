@@ -466,13 +466,17 @@ export default function JoeScene({ variant = 'joe' }: { variant?: Variant }) {
 
     const fit = () => {
       const r = cv.getBoundingClientRect()
-      const dpr = Math.min(3, window.devicePixelRatio || 1)
+      const dpr = Math.min(2, window.devicePixelRatio || 1) // ×3 не видно глазу, а рисовать в 2,25 раза дороже
       cv.width = Math.max(1, Math.round(r.width * dpr))
       cv.height = Math.max(1, Math.round(r.height * dpr))
     }
     fit()
     const ro = new ResizeObserver(fit)
     ro.observe(cv)
+    // рисуем только видимый постер: в карусели на экране один из пяти
+    let visible = true
+    const io = new IntersectionObserver(([e]) => (visible = e.isIntersecting))
+    io.observe(cv)
 
     let last = performance.now()
     let raf = 0
@@ -481,7 +485,8 @@ export default function JoeScene({ variant = 'joe' }: { variant?: Variant }) {
       raf = requestAnimationFrame(frame)
       const dt = Math.min(0.05, (now - last) / 1000)
       last = now
-      if (document.hidden) return
+      // пока открыта игра, меню под ней не рисуем (раньше телефон рисовал две картинки сразу)
+      if (document.hidden || !visible || document.body.classList.contains('playing')) return
       t += dt
       ctx.setTransform(cv.width / W, 0, 0, cv.height / CH, 0, 0)
       ctx.clearRect(0, 0, W, CH)
@@ -496,6 +501,7 @@ export default function JoeScene({ variant = 'joe' }: { variant?: Variant }) {
     return () => {
       cancelAnimationFrame(raf)
       ro.disconnect()
+      io.disconnect()
     }
   }, [variant])
 

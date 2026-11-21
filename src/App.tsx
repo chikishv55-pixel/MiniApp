@@ -100,6 +100,11 @@ export default function App() {
     toastTimer.current = window.setTimeout(() => setToast(null), 2200)
   }, [])
 
+  // пока открыта игра: меню не рисует постеры и не крутит CSS-анимации
+  useEffect(() => {
+    document.body.classList.toggle('playing', !!game)
+  }, [game])
+
   useEffect(() => {
     track({ e: 'open' })
   }, [])
