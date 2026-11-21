@@ -9,6 +9,7 @@
 @@CSS@@
 #title .l2.duel{font-size:106px}
 #note{display:none}
+.mb.ctl{width:170px;font-size:11px}
 </style>
 </head>
 <body>
@@ -30,6 +31,7 @@
 
   <div id="menu">
     <button id="bSnd" class="mb half" aria-label="Звук">&#9668;))</button>
+    <button id="bCtl" class="mb half ctl" aria-label="Управление: зоны или кнопки">УПР: ЗОНЫ</button>
   </div>
 
   <div id="over" hidden>
@@ -44,6 +46,7 @@
 </div>
 
 <script src="look.js"></script>
+<script src="controls.js"></script>
 <script src="scenery.js"></script>
 <script>
 'use strict';
@@ -289,6 +292,7 @@ function draw(){
     ctx.fillText('СТРЕЛЯЙ, КОГДА ПОЯВИТСЯ «ОГОНЬ!»',W/2,H-120);ctx.fillText('РАНЬШЕ — ФАЛЬСТАРТ',W/2,H-92);ctx.globalAlpha=1;
   }
   const v=ctx.createLinearGradient(0,0,0,150);v.addColorStop(0,'rgba(0,0,0,.45)');v.addColorStop(1,'rgba(0,0,0,0)');ctx.fillStyle=v;ctx.fillRect(0,0,W,150);
+  if(state!=='menu'&&JoeControls.mode()==='buttons')JoeControls.draw(ctx,FIRE_BTN,performance.now()-fireDown<120);
 }
 
 /* ================= ИНТЕРФЕЙС ================= */
@@ -339,9 +343,15 @@ function onTap(ev){
     if(t<enemyAt)playerFire(t);else enemyFire();
   }
 }
-cv.addEventListener('pointerdown',ev=>{ev.preventDefault();onTap(ev);});
+const FIRE_BTN={x:270,y:856,w:250,h:120,col:'#ff3d9a',icon:'✸',label:'ОГОНЬ'};   // режим «кнопки»
+let fireDown=0;
+cv.addEventListener('pointerdown',ev=>{ev.preventDefault();if(state!=='menu'&&JoeControls.mode()==='buttons'){const q=JoeControls.toStage(cv,ev);if(!JoeControls.hit(FIRE_BTN,q.x,q.y))return;fireDown=performance.now();}onTap(ev);});
 window.addEventListener('keydown',ev=>{if((ev.code==='Space'||ev.code==='Enter')&&$('over').hidden){ev.preventDefault();onTap(ev);}});
 $('bSnd').addEventListener('click',()=>{initAudio();D.snd=D.snd?0:1;saveD();$('bSnd').className='mb half'+(D.snd?'':' off');sfx('click');});
+
+// управление: зоны или кнопки (общая настройка для всех игр и меню)
+const ctlLabel=()=>{$('bCtl').textContent=JoeControls.mode()==='buttons'?'УПР: КНОПКИ':'УПР: ЗОНЫ';};ctlLabel();
+$('bCtl').addEventListener('click',()=>{initAudio();JoeControls.set(JoeControls.mode()==='buttons'?'zones':'buttons');ctlLabel();sfx('click');});
 $('bRetry').addEventListener('click',()=>{sfx('click');startRun();});
 $('bMenu').addEventListener('click',()=>{sfx('click');showMenu();});
 $('bHome').addEventListener('click',()=>{sfx('click');if(EMBED&&state==='menu'){post({type:'exit'});return;}showMenu();});

@@ -10,9 +10,28 @@ type Props = {
   onClose: () => void
 }
 
+// управление в играх: общая настройка (её читает public/games/controls.js в каждой игре)
+const CTL_KEY = 'joe-controls'
+const readCtl = (): 'zones' | 'buttons' => {
+  try {
+    return localStorage.getItem(CTL_KEY) === 'buttons' ? 'buttons' : 'zones'
+  } catch {
+    return 'zones'
+  }
+}
+
 export default function ProfileModal({ nick, avatar, tgNick, onSave, onClose }: Props) {
   const [draftNick, setDraftNick] = useState(nick)
   const [draftAvatar, setDraftAvatar] = useState(avatar)
+  const [ctl, setCtl] = useState(readCtl)
+  const pickCtl = (m: 'zones' | 'buttons') => {
+    setCtl(m)
+    try {
+      localStorage.setItem(CTL_KEY, m)
+    } catch {
+      /* приватный режим — останется по умолчанию */
+    }
+  }
 
   const options = [...(tgPhoto ? ['tg'] : []), ...AVATAR_SEEDS.map((s) => `px:${s}`)]
 
@@ -49,6 +68,20 @@ export default function ProfileModal({ nick, avatar, tgNick, onSave, onClose }: 
                 <Avatar value={o} size={48} />
               </button>
             ))}
+          </div>
+        </div>
+
+        <div className="field">
+          <span>УПРАВЛЕНИЕ В ИГРАХ</span>
+          <div className="ctl-pick">
+            <button type="button" className={`ctl-opt ${ctl === 'zones' ? 'on' : ''}`} onClick={() => pickCtl('zones')}>
+              ЗОНЫ
+              <small>тап по экрану</small>
+            </button>
+            <button type="button" className={`ctl-opt ${ctl === 'buttons' ? 'on' : ''}`} onClick={() => pickCtl('buttons')}>
+              КНОПКИ
+              <small>кнопки и джойстик</small>
+            </button>
           </div>
         </div>
 

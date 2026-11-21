@@ -1231,3 +1231,41 @@ body.playing .screen,
 body.playing .screen * {
   animation-play-state: paused !important;
 }
+
+/* профиль: выбор управления в играх */
+.ctl-pick {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  padding: 4px 6px 8px 4px;
+}
+
+.ctl-opt {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 6px;
+  font-size: 10px;
+  background: var(--panel);
+  box-shadow:
+    0 0 0 var(--px) var(--line),
+    var(--px) var(--px) 0 var(--px) #000;
+}
+
+.ctl-opt small {
+  font-size: 7px;
+  color: #9a9ab5;
+}
+
+.ctl-opt.on {
+  color: #000;
+  background: var(--cyan);
+  box-shadow:
+    0 0 0 var(--px) #000,
+    var(--px) var(--px) 0 var(--px) #000;
+}
+
+.ctl-opt.on small {
+  color: #0d3b36;
+}

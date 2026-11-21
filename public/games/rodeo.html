@@ -117,6 +117,7 @@ button{font:inherit;color:inherit;border:0;background:none;cursor:pointer}
 #title .l1.rodeo{font-size:56px;letter-spacing:6px}
 #title .l2.rodeo{font-size:104px;letter-spacing:3px}
 #note{display:none}
+.mb.ctl{width:170px;font-size:11px}
 </style>
 </head>
 <body>
@@ -138,6 +139,7 @@ button{font:inherit;color:inherit;border:0;background:none;cursor:pointer}
 
   <div id="menu">
     <button id="bSnd" class="mb half" aria-label="Звук">&#9668;))</button>
+    <button id="bCtl" class="mb half ctl" aria-label="Управление: зоны или кнопки">УПР: ЗОНЫ</button>
   </div>
 
   <div id="over" hidden>
@@ -152,6 +154,7 @@ button{font:inherit;color:inherit;border:0;background:none;cursor:pointer}
 </div>
 
 <script src="look.js"></script>
+<script src="controls.js"></script>
 <script src="scenery.js"></script>
 <script>
 'use strict';
@@ -307,6 +310,9 @@ let lasso=null,aim=null,spin=0,throwT=0,joeKick=0;
 let parts=[],texts=[],timers=[],banner=null,clouds=[];
 let shake=0,time=0,flashT=0,hurtT=0;
 let biome=0,prevBiome=0,biomeT=1;
+// режим «кнопки»: джойстик — куда толкнул, туда и полетит петля; насколько далеко — такая и сила
+const JOY={x:410,y:880,r:72};let joy=null;
+function moveJoy(p){let dx=p.x-JOY.x,dy=p.y-JOY.y;const L=Math.hypot(dx,dy);if(L>JOY.r){dx*=JOY.r/L;dy*=JOY.r/L;}joy.jx=dx;joy.jy=dy;const k=PULL/JOY.r;moveAim(-dx*k,-dy*k);}
 let pal=[PALS[3][0].slice(),PALS[3][1].slice()];
 const after=(t,fn)=>timers.push({t,fn});
 const palFor=n=>PALS[(3+Math.floor(n/STEP))%PALS.length];
@@ -636,12 +642,23 @@ function draw(){
     ctx.font='900 32px "Arial Black","Segoe UI",sans-serif';ctx.fillText(banner.txt,0,4);ctx.font='900 16px "Arial Black","Segoe UI",sans-serif';ctx.fillText(banner.sub,0,36);
     ctx.restore();
   }
-  if(state==='run'&&(D.runs|0)<2&&runT<7){
+  if(state==='run'&&(D.runs|0)<2&&runT<7&&JoeControls.mode()==='buttons'){
+    ctx.globalAlpha=.85;ctx.fillStyle='#fff';ctx.textAlign='center';ctx.font='13px "Press Start 2P",monospace';
+    ctx.fillText('ТОЛКНИ ДЖОЙСТИК — ОТПУСТИ',W/2,240);ctx.fillStyle='#d6ff9a';ctx.font='11px "Press Start 2P",monospace';ctx.fillText('СКУНСА НЕ ЛОВИ!',W/2,268);ctx.globalAlpha=1;
+  }else if(state==='run'&&(D.runs|0)<2&&runT<7){
     ctx.globalAlpha=.8+Math.sin(time*5)*.15;ctx.fillStyle='#fff';ctx.textAlign='center';ctx.font='900 20px "Arial Black","Segoe UI",sans-serif';
     ctx.fillText('ТЯНИ ПАЛЕЦ НАЗАД — ОТПУСКАЙ',W/2,H-90);ctx.font='900 16px "Arial Black","Segoe UI",sans-serif';ctx.fillStyle='#d6ff9a';ctx.fillText('СКУНСА (С ПОЛОСКОЙ) НЕ ЛОВИ!',W/2,H-60);ctx.globalAlpha=1;
   }
   const vg=ctx.createRadialGradient(W/2,H*.5,H*.36,W/2,H*.5,H*.8);vg.addColorStop(0,'rgba(0,0,0,0)');vg.addColorStop(1,'rgba(0,0,0,.3)');ctx.fillStyle=vg;ctx.fillRect(0,0,W,H);
   const v=ctx.createLinearGradient(0,0,0,150);v.addColorStop(0,'rgba(0,0,0,.4)');v.addColorStop(1,'rgba(0,0,0,0)');ctx.fillStyle=v;ctx.fillRect(0,0,W,150);
+  if(state==='run'&&JoeControls.mode()==='buttons'){
+    ctx.save();ctx.globalAlpha=.9;ctx.fillStyle='rgba(0,0,0,.35)';ctx.beginPath();ctx.arc(JOY.x,JOY.y,JOY.r,0,7);ctx.fill();
+    ctx.strokeStyle='#f2f2f7';ctx.lineWidth=5;ctx.stroke();
+    const jx=joy?joy.jx:0,jy=joy?joy.jy:0;
+    ctx.fillStyle='#000';ctx.beginPath();ctx.arc(JOY.x+jx+5,JOY.y+jy+5,30,0,7);ctx.fill();
+    ctx.fillStyle=joy?'#ffd93d':'#f2f2f7';ctx.beginPath();ctx.arc(JOY.x+jx,JOY.y+jy,30,0,7);ctx.fill();ctx.strokeStyle='#000';ctx.lineWidth=4;ctx.stroke();
+    ctx.globalAlpha=1;ctx.fillStyle='#fff';ctx.textAlign='center';ctx.font='11px "Press Start 2P",monospace';ctx.fillText('ЛАССО',JOY.x,JOY.y-JOY.r-14);ctx.restore();
+  }
 }
 
 /* ================= ИНТЕРФЕЙС ================= */
@@ -682,12 +699,18 @@ function sfx(name,a){
 /* ================= ВВОД ================= */
 // Палец в любом месте → тяни назад (влево-вниз) → отпускай. Направление и сила — как у рогатки.
 function toGame(ev){const r=cv.getBoundingClientRect();return {x:(ev.clientX-r.left)/r.width*W,y:(ev.clientY-r.top)/r.height*H};}
-cv.addEventListener('pointerdown',ev=>{ev.preventDefault();initAudio();if(state==='menu'){startRun();return;}const p=toGame(ev);beginAim(p.x,p.y);});
-cv.addEventListener('pointermove',ev=>{if(!aim)return;const p=toGame(ev);moveAim(p.x,p.y);});
-window.addEventListener('pointerup',()=>endAim());
-window.addEventListener('pointercancel',()=>{aim=null;});
+cv.addEventListener('pointerdown',ev=>{ev.preventDefault();initAudio();if(state==='menu'){startRun();return;}const p=toGame(ev);
+  if(JoeControls.mode()==='buttons'){if(Math.hypot(p.x-JOY.x,p.y-JOY.y)>JOY.r*1.4||state!=='run'||lasso)return;joy={jx:0,jy:0};beginAim(0,0);moveJoy(p);return;}
+  beginAim(p.x,p.y);});
+cv.addEventListener('pointermove',ev=>{if(!aim)return;const p=toGame(ev);if(joy){moveJoy(p);return;}moveAim(p.x,p.y);});
+window.addEventListener('pointerup',()=>{endAim();joy=null;});
+window.addEventListener('pointercancel',()=>{aim=null;joy=null;});
 window.addEventListener('keydown',ev=>{if(!$('over').hidden)return;if((ev.code==='Space'||ev.code==='Enter')&&state==='menu'){ev.preventDefault();initAudio();startRun();}});
 $('bSnd').addEventListener('click',()=>{initAudio();D.snd=D.snd?0:1;saveD();$('bSnd').className='mb half'+(D.snd?'':' off');sfx('click');});
+
+// управление: зоны или кнопки (общая настройка для всех игр и меню)
+const ctlLabel=()=>{$('bCtl').textContent=JoeControls.mode()==='buttons'?'УПР: КНОПКИ':'УПР: ЗОНЫ';};ctlLabel();
+$('bCtl').addEventListener('click',()=>{initAudio();JoeControls.set(JoeControls.mode()==='buttons'?'zones':'buttons');ctlLabel();sfx('click');});
 $('bRetry').addEventListener('click',()=>{sfx('click');startRun();});
 $('bMenu').addEventListener('click',()=>{sfx('click');showMenu();});
 $('bHome').addEventListener('click',()=>{sfx('click');if(EMBED&&state==='menu'){post({type:'exit'});return;}showMenu();});

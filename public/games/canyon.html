@@ -117,6 +117,7 @@ button{font:inherit;color:inherit;border:0;background:none;cursor:pointer}
 #title .l1.canyon{font-size:40px;letter-spacing:5px}
 #title .l2.canyon{font-size:96px;letter-spacing:3px}
 #note{display:none}
+.mb.ctl{width:170px;font-size:11px}
 </style>
 </head>
 <body>
@@ -138,6 +139,7 @@ button{font:inherit;color:inherit;border:0;background:none;cursor:pointer}
 
   <div id="menu">
     <button id="bSnd" class="mb half" aria-label="Звук">&#9668;))</button>
+    <button id="bCtl" class="mb half ctl" aria-label="Управление: зоны или кнопки">УПР: ЗОНЫ</button>
   </div>
 
   <div id="over" hidden>
@@ -152,6 +154,7 @@ button{font:inherit;color:inherit;border:0;background:none;cursor:pointer}
 </div>
 
 <script src="look.js"></script>
+<script src="controls.js"></script>
 <script src="scenery.js"></script>
 <script>
 'use strict';
@@ -299,6 +302,7 @@ let joe=null,holdT=0,holding=false,landAnim=0,training=false;
 let parts=[],texts=[],rings=[],timers=[],banner=null,booms=[];
 let shake=0,time=0,flashT=0;
 let biome=0,prevBiome=0,biomeT=1;
+const BTN_HOLD={x:270,y:856,w:250,h:120,col:'#5cff5c',icon:'▲',label:'ДЕРЖИ'};   // режим «кнопки»
 let pal=[PALS[0][0].slice(),PALS[0][1].slice()];
 const after=(t,fn)=>timers.push({t,fn});
 const palFor=n=>PALS[Math.floor(n/STEP)%PALS.length];
@@ -694,13 +698,14 @@ function draw(){
     if(banner.sub){ctx.font='900 17px "Arial Black","Segoe UI",sans-serif';ctx.fillText(banner.sub,0,40);}
     ctx.restore();
   }
-  if(state==='run'&&training&&jumps<3){
+  if(state==='run'&&training&&jumps<3&&JoeControls.mode()==='zones'){
     ctx.globalAlpha=.8+Math.sin(time*5)*.15;ctx.fillStyle='#fff';ctx.textAlign='center';ctx.font='900 21px "Arial Black","Segoe UI",sans-serif';
     ctx.fillText(joe.mode==='charge'?'ОТПУСТИ — ПРЫЖОК':'ДЕРЖИ ПАЛЕЦ — ДЖО ПРИСЕДАЕТ',W/2,H-110);
     ctx.font='900 16px "Arial Black","Segoe UI",sans-serif';ctx.fillStyle='#5cff5c';ctx.fillText('ПОПАДИ В ЦЕНТР — ОЧКИ ×2',W/2,H-80);ctx.globalAlpha=1;
   }
   const vg=ctx.createRadialGradient(W/2,H*.5,H*.36,W/2,H*.5,H*.8);vg.addColorStop(0,'rgba(0,0,0,0)');vg.addColorStop(1,'rgba(0,0,0,.32)');ctx.fillStyle=vg;ctx.fillRect(0,0,W,H);
   const v=ctx.createLinearGradient(0,0,0,150);v.addColorStop(0,'rgba(0,0,0,.4)');v.addColorStop(1,'rgba(0,0,0,0)');ctx.fillStyle=v;ctx.fillRect(0,0,W,150);
+  if(state==='run'&&JoeControls.mode()==='buttons')JoeControls.draw(ctx,BTN_HOLD,joe.mode==='charge');
 }
 
 /* ================= ИНТЕРФЕЙС ================= */
@@ -752,7 +757,7 @@ function sfx(name,a){
 /* ================= ВВОД ================= */
 // Держи палец в любом месте — Джо копит силу; отпусти — прыжок. На компьютере — пробел.
 function press(){initAudio();if(state==='menu'){startRun();return;}startHold();}
-cv.addEventListener('pointerdown',ev=>{ev.preventDefault();press();});
+cv.addEventListener('pointerdown',ev=>{ev.preventDefault();if(state!=='menu'&&JoeControls.mode()==='buttons'){const q=JoeControls.toStage(cv,ev);if(!JoeControls.hit(BTN_HOLD,q.x,q.y))return;}press();});
 window.addEventListener('pointerup',()=>release());
 window.addEventListener('pointercancel',()=>release());
 window.addEventListener('keydown',ev=>{
@@ -761,6 +766,10 @@ window.addEventListener('keydown',ev=>{
 });
 window.addEventListener('keyup',ev=>{if(ev.code==='Space'||ev.code==='Enter'||ev.code==='ArrowUp')release();});
 $('bSnd').addEventListener('click',()=>{initAudio();D.snd=D.snd?0:1;saveD();$('bSnd').className='mb half'+(D.snd?'':' off');sfx('click');});
+
+// управление: зоны или кнопки (общая настройка для всех игр и меню)
+const ctlLabel=()=>{$('bCtl').textContent=JoeControls.mode()==='buttons'?'УПР: КНОПКИ':'УПР: ЗОНЫ';};ctlLabel();
+$('bCtl').addEventListener('click',()=>{initAudio();JoeControls.set(JoeControls.mode()==='buttons'?'zones':'buttons');ctlLabel();sfx('click');});
 $('bRetry').addEventListener('click',()=>{sfx('click');startRun();});
 $('bMenu').addEventListener('click',()=>{sfx('click');showMenu();});
 $('bHome').addEventListener('click',()=>{sfx('click');if(EMBED&&state==='menu'){post({type:'exit'});return;}showMenu();});

@@ -10,6 +10,7 @@
 #title .l2.train{font-size:92px}
 #title .l1.train{font-size:50px}
 #note{display:none}
+.mb.ctl{width:170px;font-size:11px}
 </style>
 </head>
 <body>
@@ -31,6 +32,7 @@
 
   <div id="menu">
     <button id="bSnd" class="mb half" aria-label="Звук">&#9668;))</button>
+    <button id="bCtl" class="mb half ctl" aria-label="Управление: зоны или кнопки">УПР: ЗОНЫ</button>
   </div>
 
   <div id="over" hidden>
@@ -45,6 +47,7 @@
 </div>
 
 <script src="look.js"></script>
+<script src="controls.js"></script>
 <script src="scenery.js"></script>
 <script>
 'use strict';
@@ -108,6 +111,10 @@ let p=null,cars=[],corpses=[],parts=[],texts=[],timers=[],banner=null,bullets=[]
 let shake=0,time=0,pressT=-9,holding=false,flashT=0;
 let fireCD=0,burstLeft=0,burstT=0,aimUntil=0,aimAng=0,heliOn=null,heli=null;
 let biome=0,prevBiome=0,biomeT=1;
+// экранные кнопки (режим «кнопки») и показ зон в первых забегах (режим «зоны»)
+const BTN={jump:{x:108,y:856,w:166,h:120,col:'#3dffe0',icon:'▲',label:'ПРЫЖОК'},duck:{x:270,y:872,w:124,h:92,col:'#ffd93d',icon:'▼',label:'ПРИСЕСТЬ',fs:26,ls:9},
+  fire:{x:432,y:856,w:166,h:120,col:'#ff3d9a',icon:'✸',label:'ОГОНЬ'}};
+const btnDown={};let tutT=0;
 let pal=[PALS[0][0].slice(),PALS[0][1].slice()];
 const after=(t,fn)=>timers.push({t,fn});
 const palFor=n=>PALS[Math.floor(n/10)%PALS.length];
@@ -188,6 +195,7 @@ function startRun(){
   $('title').hidden=$('hint').hidden=$('best').hidden=$('menu').hidden=$('note').hidden=true;
   $('over').hidden=true;$('bHome').hidden=false;
   resetRun();state='run';hud();
+  tutT=(D.tut|0)<3?4.5:0;D.tut=(D.tut|0)+1;saveD();   // первые три забега — показываем, где какая зона
 }
 function die(reason){
   if(state!=='run')return;
@@ -273,6 +281,7 @@ function addText(x,y,txt,col,size){texts.push({x:clamp(x,90,W-90),y,txt,col,size
 /* ================= ОБНОВЛЕНИЕ ================= */
 function update(dt){
   time+=dt;
+  if(tutT>0)tutT-=dt;
   for(let i=timers.length-1;i>=0;i--){const t=timers[i];t.t-=dt;if(t.t<=0){timers.splice(i,1);t.fn();}}
   const tp=palFor(carsDone),kk=Math.min(1,dt*1.2);pal=[mix(pal[0],tp[0],kk),mix(pal[1],tp[1],kk)];
   if(biomeT<1)biomeT=Math.min(1,biomeT+dt/1.2);
@@ -594,11 +603,21 @@ function draw(){
     if(banner.sub){ctx.font='900 17px "Arial Black","Segoe UI",sans-serif';ctx.fillText(banner.sub,0,40);}
     ctx.restore();
   }
-  if(state==='run'&&carsDone<3&&!D.best){
-    ctx.globalAlpha=.75+Math.sin(time*5)*.2;ctx.fillStyle='#fff';ctx.textAlign='center';ctx.font='900 20px "Arial Black","Segoe UI",sans-serif';
-    ctx.fillText('ЛЕВО — ПРЫЖОК (ДЕРЖИ — ВЫШЕ)',W/2,H-118);ctx.fillText('ПРАВО — ВЫСТРЕЛ · ВНИЗ — ПРИСЕСТЬ',W/2,H-88);ctx.globalAlpha=1;
+  if(state==='run'&&JoeControls.mode()==='zones'&&tutT>0){
+    // показ зон: левая половина — прыжок, правая — выстрел, свайп вниз — присесть
+    const a=Math.min(1,tutT/.6);ctx.save();ctx.globalAlpha=a;
+    ctx.fillStyle='rgba(61,255,224,.17)';ctx.fillRect(0,150,W/2,H-150);ctx.fillStyle='rgba(255,61,154,.17)';ctx.fillRect(W/2,150,W/2,H-150);
+    ctx.fillStyle='rgba(255,255,255,.65)';for(let y=170;y<H-20;y+=36)ctx.fillRect(W/2-2,y,4,18);
+    ctx.textAlign='center';ctx.textBaseline='alphabetic';
+    const tx=(s,x,y,sz,col)=>{ctx.font=sz+'px "Press Start 2P",monospace';ctx.fillStyle='rgba(0,0,0,.6)';ctx.fillText(s,x+3,y+3);ctx.fillStyle=col;ctx.fillText(s,x,y);};
+    tx('▲',W/4,420,64,'#3dffe0');tx('ПРЫЖОК',W/4,480,20,'#fff');tx('держи — выше',W/4,512,11,'#cdeee9');
+    tx('✸',W*3/4,420,64,'#ff6fb5');tx('ОГОНЬ',W*3/4,480,20,'#fff');tx('тап справа',W*3/4,512,11,'#ffd0e6');
+    const bob=Math.sin(time*6)*8;tx('▼',W/2,812+bob,44,'#ffd93d');tx('СВАЙП ВНИЗ — ПРИСЕСТЬ',W/2,868,14,'#fff');
+    ctx.restore();
   }
+
   const v=ctx.createLinearGradient(0,0,0,150);v.addColorStop(0,'rgba(0,0,0,.45)');v.addColorStop(1,'rgba(0,0,0,0)');ctx.fillStyle=v;ctx.fillRect(0,0,W,150);
+  if(state==='run'&&JoeControls.mode()==='buttons')for(const k in BTN)JoeControls.draw(ctx,BTN[k],!!btnDown[k]);
 }
 
 /* ================= ИНТЕРФЕЙС ================= */
@@ -663,6 +682,13 @@ cv.addEventListener('pointerdown',ev=>{
   ev.preventDefault();
   const r=cv.getBoundingClientRect(),right=(ev.clientX-r.left)>r.width/2;
   if(state==='menu'){press();return;}
+  if(JoeControls.mode()==='buttons'){
+    const q=JoeControls.toStage(cv,ev),b=Object.keys(BTN).find(k=>JoeControls.hit(BTN[k],q.x,q.y));
+    if(!b)return;
+    touches[ev.pointerId]={btn:b,swiped:true};btnDown[b]=true;
+    if(b==='jump')press();else if(b==='duck')duck();else shoot();
+    return;
+  }
   touches[ev.pointerId]={y:ev.clientY,cx:ev.clientX,t:performance.now(),right,swiped:false};
   if(right)shoot();else press();
 });
@@ -671,7 +697,7 @@ cv.addEventListener('pointermove',ev=>{
   const dy=ev.clientY-t.y,dx=ev.clientX-t.cx,r=cv.getBoundingClientRect(),k=r.height/H;
   if(dy>38*k&&dy>Math.abs(dx)&&performance.now()-t.t<400){t.swiped=true;duck();}
 });
-const endTouch=ev=>{const t=touches[ev.pointerId];if(t&&!t.right)release();delete touches[ev.pointerId];};
+const endTouch=ev=>{const t=touches[ev.pointerId];if(t&&(t.btn?t.btn==='jump':!t.right))release();if(t&&t.btn)btnDown[t.btn]=false;delete touches[ev.pointerId];};
 window.addEventListener('pointerup',endTouch);
 window.addEventListener('pointercancel',endTouch);
 window.addEventListener('keydown',ev=>{
@@ -682,6 +708,10 @@ window.addEventListener('keydown',ev=>{
 });
 window.addEventListener('keyup',ev=>{if(ev.code==='Space'||ev.code==='ArrowUp'||ev.code==='KeyW')release();});
 $('bSnd').addEventListener('click',()=>{initAudio();D.snd=D.snd?0:1;saveD();$('bSnd').className='mb half'+(D.snd?'':' off');sfx('click');});
+
+// управление: зоны или кнопки (общая настройка для всех игр и меню)
+const ctlLabel=()=>{$('bCtl').textContent=JoeControls.mode()==='buttons'?'УПР: КНОПКИ':'УПР: ЗОНЫ';};ctlLabel();
+$('bCtl').addEventListener('click',()=>{initAudio();JoeControls.set(JoeControls.mode()==='buttons'?'zones':'buttons');ctlLabel();sfx('click');});
 $('bRetry').addEventListener('click',()=>{sfx('click');startRun();});
 $('bMenu').addEventListener('click',()=>{sfx('click');showMenu();});
 $('bHome').addEventListener('click',()=>{sfx('click');if(EMBED&&state==='menu'){post({type:'exit'});return;}showMenu();});
