@@ -5,7 +5,7 @@ import Avatar from './Avatar'
 import GameCarousel, { type Game } from './GameCarousel'
 import PassModal from './PassModal'
 import Wardrobe from './Wardrobe'
-import GameFrame, { type GameLaunch } from './GameFrame'
+import GameFrame, { type GameAd, type GameLaunch } from './GameFrame'
 import PixelIcon from './PixelIcon'
 import ProfileModal from './ProfileModal'
 import SubscribeGate from './SubscribeGate'
@@ -197,6 +197,19 @@ export default function App() {
     }
   }, [checkSub])
 
+  // баннеры для игры (в режиме одной игры меню с баннером нет — реклама живёт внутри «Перекупа»)
+  const [gameAds, setGameAds] = useState<GameAd[]>([])
+  useEffect(() => {
+    if (!SOLO) return
+    let alive = true
+    api<{ ads?: GameAd[] }>(isAdmin ? 'ad?fresh=1' : 'ad')
+      .then((r) => alive && setGameAds(Array.isArray(r.ads) ? r.ads : []))
+      .catch(() => alive && setGameAds([]))
+    return () => {
+      alive = false
+    }
+  }, [isAdmin, adKey])
+
   // админ ли я: сервер отдаёт список баннеров только аккаунтам из ADMIN_IDS
   useEffect(() => {
     if (!hasAuth) return
@@ -262,7 +275,20 @@ export default function App() {
             reportRun(SOLO, r.kills)
             track({ e: 'result', g: SOLO, v: r.kills })
           }}
+          ads={gameAds}
+          admin={isAdmin}
+          onAdminAds={() => setAdminOpen(true)}
         />
+        {adminOpen && (
+          <AdminModal
+            onClose={() => {
+              setAdminOpen(false)
+              setAdKey((k) => k + 1)
+            }}
+            toast={showToast}
+          />
+        )}
+        {toast && <div className="toast">{toast}</div>}
         {(sub.state === 'need' || (sub.state === 'checking' && gateSeen.current) || (import.meta.env.DEV && location.search.includes('gate'))) && (
           <PaperGate channel={sub.channel || 'JoesGames'} checking={sub.state === 'checking'} miss={subMiss} onCheck={() => checkSub(true)} />
         )}

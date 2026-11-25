@@ -1,12 +1,15 @@
-// POST /api/track { ev: [{ e, g?, v?, ad?, item?, n?, src? }, …] } — пачка событий для статистики (нужен initData).
+// POST /api/track { ev: [{ e, g?, v?, ad?, item?, n?, src?, p?, m? }, …] } — пачка событий для статистики (нужен initData).
 // Если база не подключена или недоступна — отвечаем ok:false, игра от этого не страдает.
 import { authUser, fail, isInt, json, readJson } from './_lib/http.js'
-import { GAMES, SRC_RE, anon, day, redis, statsReady, type Cmd } from './_lib/stats.js'
+import { FLIP_STEPS, GAMES, SRC_RE, anon, day, flipBucket, redis, statsReady, type Cmd } from './_lib/stats.js'
 
 const GAME_SET = new Set<string>(GAMES)
 const AD_RE = /^[a-f0-9]{12}$/
 const ITEM_RE = /^[a-z0-9_]{1,24}$/
 const MAX_EVENTS = 40
+const STEP_SET = new Set<string>(FLIP_STEPS)
+const CAR_RE = /^[a-z0-9]{1,16}$/
+const MONEY = 1_000_000 // потолок сумм в долларах игры — защита от мусора
 
 // корзины результатов — чтобы видеть, докуда обычно доходят
 const bucket = (v: number) => (v < 5 ? '0-4' : v < 10 ? '5-9' : v < 20 ? '10-19' : v < 30 ? '20-29' : v < 50 ? '30-49' : '50+')
@@ -77,11 +80,12 @@ export async function POST(req: Request): Promise<Response> {
         inc(`play:${g}`, n)
         break
       case 'result': {
-        if (!g || !isInt(ev.v, 0, 1000)) break
+        // у Перекупа результат — навар в долларах, у аркад — очки
+        if (!g || !isInt(ev.v, 0, g === 'flip' ? MONEY : 1000)) break
         const v = ev.v as number
         inc(`res:${g}`)
         inc(`sum:${g}`, v)
-        cmds.push(['HINCRBY', `hist:${g}`, bucket(v), 1], ['ZADD', `best:${g}`, 'GT', v, 'all'])
+        cmds.push(['HINCRBY', `hist:${g}`, g === 'flip' ? flipBucket(v) : bucket(v), 1], ['ZADD', `best:${g}`, 'GT', v, 'all'])
         break
       }
       case 'ch_create':
@@ -103,6 +107,37 @@ export async function POST(req: Request): Promise<Response> {
         if (typeof ev.item !== 'string' || !ITEM_RE.test(ev.item)) break
         inc('buys')
         cmds.push(['HINCRBY', 'shop', ev.item, 1])
+        break
+      // Перекуп: шаг новичка (уникальные люди за день и за всё время)
+      case 'f_step':
+        if (typeof ev.item !== 'string' || !STEP_SET.has(ev.item)) break
+        cmds.push(['PFADD', `fs:${ev.item}:${d}`, u], ['PFADD', `fs:${ev.item}:all`, u])
+        inc(`f_step:${ev.item}`)
+        break
+      // купил машину: item — модель, v — цена
+      case 'f_car':
+        if (typeof ev.item !== 'string' || !CAR_RE.test(ev.item) || !isInt(ev.v, 0, MONEY)) break
+        inc('f_buys')
+        inc('f_spent', ev.v as number)
+        cmds.push(['HINCRBY', 'f:buy', ev.item, 1])
+        break
+      // продал: v — цена продажи, p — навар (может быть минус), m — минут от покупки до продажи
+      case 'f_sale': {
+        if (typeof ev.item !== 'string' || !CAR_RE.test(ev.item) || !isInt(ev.v, 0, MONEY) || !isInt(ev.p, -MONEY, MONEY)) break
+        const p = ev.p as number
+        inc('f_sales')
+        inc('f_revenue', ev.v as number)
+        inc('f_profit', p)
+        if (isInt(ev.m, 0, 525_600)) { inc('f_minutes', ev.m as number); inc('f_timed') }
+        cmds.push(['HINCRBY', 'f:sell', ev.item, 1], ['HINCRBY', 'f:hist', flipBucket(p), 1], ['ZADD', 'f:best', 'GT', p, 'all'])
+        break
+      }
+      // покупка в игре: краска, инструмент, тюнинг; v — сколько потратил
+      case 'f_shop':
+        if (typeof ev.item !== 'string' || !ITEM_RE.test(ev.item) || !isInt(ev.v, 0, MONEY)) break
+        inc('f_shop')
+        inc('f_shop_spent', ev.v as number)
+        cmds.push(['HINCRBY', 'f:shop', ev.item, 1])
         break
       case 'pass':
         if (!isInt(ev.v, 1, 99)) break

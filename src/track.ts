@@ -3,7 +3,7 @@ import { hasAuth, initData } from './api'
 // Статистика: события копятся и уходят пачкой (экономит бесплатный лимит базы).
 // Ни имён, ни ников, ни ID мы не шлём — сервер сам берёт псевдоним из подписи Telegram,
 // и в базе остаются только общие счётчики. Если не в Telegram или сервер недоступен — молча ничего не делаем.
-export type TrackEvent = { e: string; g?: string; v?: number; ad?: string; item?: string; n?: number; src?: string }
+export type TrackEvent = { e: string; g?: string; v?: number; ad?: string; item?: string; n?: number; src?: string; p?: number; m?: number }
 
 // Откуда пришёл человек: рекламная ссылка t.me/бот?start=ad_метка открывает игру с ?src=метка
 // (или t.me/бот/приложение?startapp=ad_метка). Запоминаем метку первого захода на устройстве — это не личные данные.

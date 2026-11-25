@@ -99,6 +99,13 @@ button{font:inherit;color:inherit;border:0;background:none;cursor:pointer}
 .gsite b{display:block;font-size:14px;font-weight:700;line-height:1.2}
 .gsite small{display:block;margin-top:3px;font-size:12px;line-height:1.3;color:#6a6c78}
 .gsite em{display:inline-block;margin-top:7px;padding:2px 8px;border-radius:999px;background:#ffe9c7;color:#9a5b00;font-size:10.5px;font-style:normal;font-weight:600}
+.gad{display:block;width:100%;margin-top:8px;padding:0;border-radius:14px;overflow:hidden;background:#f6f7fa;text-align:left;box-shadow:0 0 0 1px #eceef3}
+.gad img{display:block;width:100%;aspect-ratio:3/1;object-fit:cover;background:#e3e5ea}
+.gad span{display:flex;align-items:center;gap:8px;padding:8px 12px;font-size:13px;font-weight:600;color:#1f1f24}
+.gad i{flex:none;font-style:normal;font-size:10.5px;font-weight:700;letter-spacing:.4px;padding:2px 7px;border-radius:6px;background:#1f1f24;color:#fff}
+.card.promo img{aspect-ratio:3/1}
+.card.promo .tag{background:#1f1f24;color:#fff}
+.gsite.admin{background:#fff4d6;box-shadow:inset 0 0 0 1.5px #e0b04a}
 .gempty{margin-top:22px;font-size:14px;color:#6a6c78}
 .gfoot{margin-top:18px;font-size:11px;color:#a0a2ad}
 #hint{position:absolute;left:16px;right:16px;bottom:136px;text-align:center;font:600 27px/1.05 Caveat,cursive;color:#f3e6c8;text-shadow:0 2px 0 rgba(0,0,0,.55);transition:opacity .6s;pointer-events:none}
@@ -339,6 +346,18 @@ import { RoomEnvironment } from './vendor/three/RoomEnvironment.js'
 import { bodyTris, forEachSample } from './flip/vis.js'
 import { CARS, STAGES, GEAR, STAGE_VALUE, VALUE_START, DONE_AT, PAINTS, PAINT_PRICE, TUNING, SELLERS, ADTEXT, HEADS, COND } from './flip/cars.js'
 
+// Съёмка роликов (scripts/video/harness-flip.js): ?manual=1 — время игры крутит скрипт, кадр за кадром,
+// картинка в 2x. Игрокам этот режим не попадается: параметр есть только в ссылке для съёмки.
+const MANUAL = new URLSearchParams(location.search).has('manual')
+if (MANUAL) {
+  let clock = 0
+  const queue = []
+  window.requestAnimationFrame = (f) => queue.push(f)
+  performance.now = () => clock
+  Object.defineProperty(window, 'devicePixelRatio', { get: () => 2 })
+  window.__flipStep = (ms) => { clock += ms; for (const f of queue.splice(0)) f(clock) }
+}
+
 // внутри меню «Игр Джо» (iframe) Telegram живёт у родителя
 const EMBED = new URLSearchParams(location.search).has('embed')
 let TG = window.Telegram?.WebApp
@@ -347,6 +366,9 @@ try { TG = TG || window.parent.Telegram?.WebApp } catch {}
 if (EMBED && !new URLSearchParams(location.search).has('solo')) document.body.classList.add('embed')
 // сообщения меню: выход и результат (навар со сделки — рекорд на карточке игры)
 function post(m) { if (EMBED) try { window.parent.postMessage({ src: 'flip', ...m }, location.origin) } catch {} }
+// статистика (src/GameFrame.tsx → /api/track): шаги новичка, сделки, покупки. Без имён и ID — только счётчики.
+const stat = (e, item, extra = {}) => post({ type: 'stat', e, item, ...extra })
+const step = (item) => stat('f_step', item)
 const exitToMenu = () => { saveJob(); post({ type: 'exit' }) }
 const $ = (id) => document.getElementById(id)
 const S = 512 // размер масок кузова, как в scripts/flip/bake-vis.mjs
@@ -794,6 +816,7 @@ function openTune() {
       if (save.cash < o.price) return
       save.cash -= o.price
       bankOp(`Тюнинг: ${TUNING[kind].title.toLowerCase()} · ${o.name}`, -o.price)
+      stat('f_shop', kind + '_' + i, { v: o.price })
       persist()
       sfx(kind === 'tint' ? 'spray' : 'door', 0.5)
       try { TG?.HapticFeedback?.impactOccurred('medium') } catch {}
@@ -1001,6 +1024,7 @@ function finishStep() {
   try { TG?.HapticFeedback?.notificationOccurred('success') } catch {}
   toast(st.done)
   sfx('coins', 0.35)
+  step(st.id)
   job.stage++
   if (job.stage >= STAGES.length) { job.done = true; job.stage = STAGES.length - 1 }
   saveJob()
@@ -1177,6 +1201,7 @@ canvas.addEventListener('pointerdown', (e) => {
     pinch0 = Math.hypot(a.x - b.x, a.y - b.y); dist0 = view.dist
     return
   }
+  tap = ptrs.size === 1 ? { x: e.clientX, y: e.clientY, t: performance.now() } : null
   if (ptrs.size > 2 || !car) return
   const h = pick(e.clientX, e.clientY)
   mode = h && !UNTOUCH.has(h.object.userData.kind) ? 'rub' : 'orbit' // за колесо — значит крутим машину
@@ -1203,7 +1228,14 @@ canvas.addEventListener('pointermove', (e) => {
   }
   last = { x: e.clientX, y: e.clientY }
 })
+let tap = null
 const up = (e) => {
+  // короткое касание без сдвига по плакату — открыть рекламу
+  if (tap && e.type === 'pointerup' && Math.hypot(e.clientX - tap.x, e.clientY - tap.y) < 10 && performance.now() - tap.t < 400 && posterHit(e.clientX, e.clientY)) {
+    hideTool()
+    promoClick(promo[promoIdx % Math.max(1, promo.length)])
+  }
+  tap = null
   ptrs.delete(e.pointerId)
   if (ptrs.size === 0) { mode = null; last = null; hideTool() }
   else if (mode === 'pinch') { mode = 'none'; last = null }
@@ -1318,11 +1350,14 @@ function buy(ad) {
   save.cash -= ad.price
   bankOp(`Покупка: ${CARS[ad.id].name}`, -ad.price)
   persist()
-  job = { id: ad.id, paid: ad.price, rust: ad.rust, seed: ad.seed, livery: ad.livery, stage: 0, color: null, v: 2, tint: 0, low: 0, done: false, photos: [], listing: null }
+  step('buy')
+  stat('f_car', ad.id, { v: ad.price })
+  job = { t0: Date.now(), id: ad.id, paid: ad.price, rust: ad.rust, seed: ad.seed, livery: ad.livery, stage: 0, color: null, v: 2, tint: 0, low: 0, done: false, photos: [], listing: null }
   enterGarage(null)
   coach()
 }
 function enterGarage(layers) {
+  setTimeout(drawPoster, 0)
   $('paper').hidden = true
   $('garage').hidden = false
   $('garage').classList.remove('empty')
@@ -1394,6 +1429,8 @@ function sell(v, who = 'покупатель') {
   if (save.best == null || profit > save.best) save.best = profit
   persist()
   post({ type: 'result', seed: save.issue, level: 0, kills: Math.max(0, Math.round(profit)) })
+  step('sell')
+  stat('f_sale', job.id, { v: Math.round(v), p: Math.round(profit), ...(job.t0 ? { m: Math.round((Date.now() - job.t0) / 60000) } : {}) })
   const name = CARS[job.id].name
   job = null
   try { localStorage.removeItem(JKEY) } catch {}
@@ -1545,7 +1582,8 @@ function carPhoto(ad, view = 0) {
 
 /* ================= ФОТО ИЗ ГАРАЖА (для «Джо Моторс») ================= */
 const SUMV = STAGE_VALUE.reduce((a, b) => a + b, 0)
-function carQuality() { return clamp((valueNow() / CARS[job.id].base - VALUE_START) / SUMV, 0, 1) } // 0 — как купил, 1 — всё сделано
+const tuneValue = () => TUNING.tint.opts[job.tint || 0].value + TUNING.low.opts[job.low || 0].value // доля базовой цены за тюнинг
+function carQuality() { return clamp((valueNow() / CARS[job.id].base - VALUE_START - tuneValue()) / SUMV, 0, 1) } // 0 — как купил, 1 — всё сделано
 $('cam').onclick = () => {
   if (!job) return
   audioInit()
@@ -1555,7 +1593,8 @@ $('cam').onclick = () => {
   tmp.width = 480; tmp.height = 300
   const g = tmp.getContext('2d'), sw = canvas.width, sh = canvas.height, k = Math.min(sw / 480, sh / 300) // по центру кадра, 16:10
   g.drawImage(canvas, (sw - 480 * k) / 2, (sh - 300 * k) / 2, 480 * k, 300 * k, 0, 0, 480, 300)
-  job.photos = [...(job.photos || []), { url: tmp.toDataURL('image/jpeg', 0.72), q: carQuality() }].slice(-4)
+  step('photo')
+  job.photos = [...(job.photos || []), { url: tmp.toDataURL('image/jpeg', 0.72), q: carQuality(), tune: tuneValue() }].slice(-4)
   saveJob()
   const f = $('flash'); f.classList.add('on'); requestAnimationFrame(() => requestAnimationFrame(() => f.classList.remove('on')))
   sfx('paper', 0.25)
@@ -1606,7 +1645,8 @@ function listingTick() {
   if (!L || !job) return
   if (Date.now() < L.next) return
   const best = Math.max(0, ...(job.photos || []).map((x) => x.q))
-  const fair = CARS[job.id].base * (VALUE_START + best * SUMV) // покупатели судят по фото
+  const tuned = Math.max(0, ...(job.photos || []).map((x) => x.tune || 0)) // тонировку и занижение тоже видно на фото
+  const fair = CARS[job.id].base * (VALUE_START + best * SUMV + tuned) // покупатели судят по фото
   const greedy = L.price > fair * 1.3
   L.next = Date.now() + (greedy ? 14000 : 6000) + Math.random() * 8000
   if (greedy && Math.random() > 0.3) return persistJob()
@@ -1630,6 +1670,100 @@ function pcBadge() {
   b.textContent = n
 }
 
+/* ================= РЕКЛАМА: плакат в гараже и Gagel ================= */
+// Баннеры присылает приложение (src/GameFrame.tsx): { type:'ads', ads:[{ id, image_url, link, title }], admin }.
+// Показ и клик игра только сообщает наверх; ссылку открывает и статистику пишет приложение.
+let promo = [], promoAdmin = false, promoIdx = 0
+const promoSeen = new Set()
+const esc = (t) => String(t ?? '').replace(/[&<>"']/g, (ch) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[ch])
+function promoView(ad) { if (ad && !promoSeen.has(ad.id)) { promoSeen.add(ad.id); post({ type: 'ad_view', id: ad.id }) } }
+function promoClick(ad) { if (ad?.link) { sfx('paper', 0.3); post({ type: 'ad_click', id: ad.id }) } }
+addEventListener('message', (e) => {
+  if (e.origin !== location.origin || e.source !== window.parent) return
+  const d = e.data
+  if (!d || d.type !== 'ads' || !Array.isArray(d.ads)) return
+  promo = d.ads.filter((a) => a && typeof a.id === 'string' && typeof a.image_url === 'string').slice(0, 10)
+  promoAdmin = !!d.admin
+  promoIdx = 0
+  drawPoster()
+  if (!$('gagel').hidden) { if (site) openSite(site, siteArg); else gagelHome() }
+})
+post({ type: 'hello' })
+
+// Плакат: висит поверх красного знамени на левой стене (как в garage.py: x −2.9…−1.7, высота 0.95…2.35).
+// Картинку грузим с CORS; не дали — на плакате остаётся подпись баннера.
+const POSTER = { x: -2.3, y: 1.65, z: -(2.9 - 0.05) + 0.022, w: 1.2, h: 1.4 }
+const posterTex = canvasTex(512, null)
+posterTex.t.flipY = true // обычная плоскость, не glTF — картинку не переворачиваем
+const poster = new THREE.Mesh(new THREE.PlaneGeometry(POSTER.w, POSTER.h), new THREE.MeshStandardMaterial({ map: posterTex.t, roughness: 0.85 }))
+poster.position.set(POSTER.x, POSTER.y, POSTER.z)
+poster.visible = false
+poster.userData.kind = 'Poster'
+scene.add(poster)
+garageWalls.L.push(poster) // прячется вместе с левой стеной, когда камера за ней
+const posterImgs = {}
+function posterImg(ad) {
+  if (!posterImgs[ad.id]) {
+    const im = new Image()
+    im.crossOrigin = 'anonymous'
+    im.onload = () => { im.ok = true; drawPoster() }
+    im.onerror = () => { im.bad = true; drawPoster() }
+    im.src = ad.image_url
+    posterImgs[ad.id] = im
+  }
+  return posterImgs[ad.id]
+}
+function drawPoster() {
+  const ad = promo[promoIdx % Math.max(1, promo.length)]
+  poster.visible = !!ad
+  if (!ad) return
+  const g = posterTex.g, W = 512, H = Math.round(512 * POSTER.h / POSTER.w)
+  if (posterTex.cv.height !== H) { posterTex.cv.height = H; posterTex.t.dispose() }
+  g.fillStyle = '#ece2ca'; g.fillRect(0, 0, W, H)
+  g.fillStyle = 'rgba(80,60,30,.10)'; for (let i = 0; i < 900; i++) g.fillRect(Math.random() * W, Math.random() * H, 2, 2)
+  g.strokeStyle = '#26211c'; g.lineWidth = 6; g.strokeRect(14, 14, W - 28, H - 28)
+  g.fillStyle = '#26211c'; g.font = '500 26px "PT Mono", monospace'; g.textAlign = 'center'; g.textBaseline = 'middle'
+  g.fillText('· Р Е К Л А М А ·', W / 2, 52)
+  const im = posterImg(ad)
+  const box = { x: 34, y: 86, w: W - 68, h: H - 230 }
+  if (im.ok) {
+    const k = Math.min(box.w / im.naturalWidth, box.h / im.naturalHeight)
+    const w = im.naturalWidth * k, h = im.naturalHeight * k
+    try { g.drawImage(im, box.x + (box.w - w) / 2, box.y + (box.h - h) / 2, w, h) } catch {}
+  } else {
+    g.fillStyle = '#a8231b'; g.fillRect(box.x, box.y, box.w, box.h)
+    g.fillStyle = '#ece2ca'; g.font = '700 54px Oswald, sans-serif'
+    g.fillText(im.bad ? 'ЗДЕСЬ МОГЛА' : '…', W / 2, box.y + box.h / 2 - 30)
+    if (im.bad) g.fillText('БЫТЬ РЕКЛАМА', W / 2, box.y + box.h / 2 + 34)
+  }
+  g.fillStyle = '#26211c'; g.font = '700 46px Oswald, sans-serif'
+  const title = (ad.title || 'Партнёр гаража').slice(0, 26)
+  g.fillText(title, W / 2, H - 112, W - 60)
+  if (ad.link) { g.font = '600 34px Caveat, cursive'; g.fillStyle = '#a8231b'; g.fillText('жми на плакат →', W / 2, H - 58) }
+  posterTex.t.needsUpdate = true
+  if (!$('garage').hidden) promoView(ad)
+}
+setInterval(() => { if (promo.length > 1 && !document.hidden) { promoIdx = (promoIdx + 1) % promo.length; drawPoster() } }, 9000)
+function posterHit(x, y) {
+  if (!poster.visible || !poster.parent) return false
+  ndc.set((x / innerWidth) * 2 - 1, -(y / innerHeight) * 2 + 1)
+  ray.setFromCamera(ndc, camera)
+  const p = ray.intersectObject(poster, false)[0]
+  if (!p) return false
+  const c = ray.intersectObjects(parts, false)[0] // машина перед плакатом — значит трём машину
+  return !c || c.distance > p.distance
+}
+// реклама в Gagel: строка в выдаче поиска и карточка на «Авто с рук»
+function promoCard(ad, where) {
+  if (!ad) return ''
+  promoView(ad)
+  if (where === 'search') return `<button class="gad" data-promo="${esc(ad.id)}"><img alt="" src="${esc(ad.image_url)}"><span><i>Реклама</i>${esc(ad.title || 'Партнёр')}</span></button>`
+  return `<div class="card promo" data-promo="${esc(ad.id)}"><img alt="" src="${esc(ad.image_url)}"><div class="cb"><div class="ct"><b>${esc(ad.title || 'Партнёр')}</b></div><span class="tag">реклама</span></div></div>`
+}
+function bindPromo() {
+  for (const el of $('gbody').querySelectorAll('[data-promo]')) el.onclick = () => promoClick(promo.find((a) => a.id === el.dataset.promo))
+}
+
 /* ================= КОМПЬЮТЕР: Gagel ================= */
 const SITES = [
   { id: 'avto', ico: 'А', col: '#e2572c', name: 'Авто с рук', desc: 'Объявления о продаже машин со всей округи', tags: 'машины купить объявления авто' },
@@ -1648,12 +1782,16 @@ function gagelHome(q = '') {
   $('gbody').className = 'gbody'
   $('gbody').innerHTML = `<div class="glogo">${LOGO.map(([ch, col]) => `<i style="color:${col}">${ch}</i>`).join('')}</div>
     <form class="gsearch" id="gform"><input id="gq" placeholder="Поиск в Gagel" autocomplete="off"><button>Найти</button></form>
-    ${found.length ? `<div class="gsites">${found.map((x) => `<div class="gsite" data-site="${x.id}"><span class="ico" style="background:${x.col}">${x.ico}</span><span><b>${x.name}</b><small>${x.desc}</small>${x.soon ? '<em>скоро</em>' : ''}</span></div>`).join('')}</div>`
+    ${found.length ? `<div class="gsites">${found.map((x, i) => `<div class="gsite" data-site="${x.id}"><span class="ico" style="background:${x.col}">${x.ico}</span><span><b>${x.name}</b><small>${x.desc}</small>${x.soon ? '<em>скоро</em>' : ''}</span></div>${i === 1 ? promoCard(promo[promoIdx % Math.max(1, promo.length)], 'search') : ''}`).join('')}${found.length < 2 ? promoCard(promo[0], 'search') : ''}</div>`
       : '<div class="gempty">По запросу ничего не найдено</div>'}
+    ${promoAdmin ? '<div class="gsites"><div class="gsite admin" data-admin><span class="ico" style="background:#1f1f24">★</span><span><b>Реклама · админка</b><small>Баннеры, сроки, ссылки (видят только админы)</small></span></div></div>' : ''}
     <div class="gfoot">Gagel · поиск по округе</div>`
   $('gq').value = q
   $('gform').onsubmit = (e) => { e.preventDefault(); sfx('paper', 0.3); gagelHome($('gq').value.trim()) }
-  for (const el of $('gbody').querySelectorAll('.gsite')) el.onclick = () => { const x = SITES.find((y) => y.id === el.dataset.site); if (!x.soon) openSite(x.id) }
+  for (const el of $('gbody').querySelectorAll('.gsite[data-site]')) el.onclick = () => { const x = SITES.find((y) => y.id === el.dataset.site); if (!x.soon) openSite(x.id) }
+  const adm = $('gbody').querySelector('[data-admin]')
+  if (adm) adm.onclick = () => post({ type: 'admin_ads' })
+  bindPromo()
   coach()
 }
 function head(title, sub, col) {
@@ -1671,7 +1809,7 @@ function openSite(id, arg = null) {
       <div class="card" data-ad="${i}"><img alt="" src="${carPhoto(ad, 0)}"><div class="cb">
         <div class="ct"><b>${CARS[ad.id].name}</b><span class="pr">${ad.sold ? 'продано' : money(ad.ask)}</span></div>
         <div class="meta">${CARS[ad.id].kind} · ${ad.cond.replace(/^[^,]*, /, '')}</div>
-        ${ad.ask < ad.price ? '<span class="tag">цена снижена</span>' : ''}</div></div>`).join('')}</div></div>`
+        ${ad.ask < ad.price ? '<span class="tag">цена снижена</span>' : ''}</div></div>${i === 1 ? promoCard(promo[(promoIdx + 1) % Math.max(1, promo.length)], 'list') : ''}`).join('')}</div></div>`
   } else if (id === 'ad') {
     const ad = currentAds()[arg], spec = CARS[ad.id]
     const canBuy = !ad.sold && !job && save.bank?.open && save.cash >= ad.ask
@@ -1740,6 +1878,7 @@ function openSite(id, arg = null) {
     html += `</div>`
   }
   $('gbody').innerHTML = html
+  bindPromo()
   $('gscroll').scrollTop = 0
   const q = (sel) => $('gbody').querySelector(sel)
   q('[data-back]').onclick = () => (id === 'ad' ? openSite('avto') : gagelHome())
@@ -1757,6 +1896,7 @@ function openSite(id, arg = null) {
     if (!g || (save.gear || []).includes(g.id) || save.cash < g.price) return
     save.cash -= g.price
     save.gear = [...(save.gear || []), g.id]
+    stat('f_shop', 'gear_' + g.id, { v: g.price })
     bankOp(`ЗапчастиТут: ${g.name}`, -g.price)
     persist()
     sfx('door', 0.5)
@@ -1770,6 +1910,7 @@ function openSite(id, arg = null) {
     const top = $('gscroll').scrollTop
     save.cash -= PAINT_PRICE
     save.paints = { ...(save.paints || {}), [c]: (save.paints?.[c] || 0) + 1 }
+    stat('f_shop', 'paint_' + c.slice(1), { v: PAINT_PRICE })
     bankOp(`ЗапчастиТут: краска «${paintName(c)}»`, -PAINT_PRICE)
     persist()
     sfx('door', 0.5)
@@ -1779,6 +1920,7 @@ function openSite(id, arg = null) {
     $('gscroll').scrollTop = top
   }
   if (q('#bankOpen')) q('#bankOpen').onclick = () => {
+    step('bank')
     const r = () => String(1000 + ((Math.random() * 9000) | 0))
     save.bank = { open: true, num: `4081 ${r()} ${r()} ${r()}`, hist: [] }
     bankOp('Открытие счёта · стартовые', save.cash)
@@ -1786,6 +1928,7 @@ function openSite(id, arg = null) {
     openSite('bank')
   }
   if (q('#jmList')) q('#jmList').onclick = () => {
+    step('list')
     const price = Math.max(10, Math.round(+q('#jmPrice').value || 0))
     job.listing = { price, offers: [], next: Date.now() + 4000, unread: 0 }
     saveJob()
@@ -1813,6 +1956,7 @@ $('sell').onclick = () => { audioInit(); hideTool(); openSite('jm'); $('gagel').
 
 /* ================= ПУСТОЙ ГАРАЖ ================= */
 function enterEmpty() {
+  setTimeout(drawPoster, 0)
   closeTune()
   $('paper').hidden = true
   $('garage').hidden = false
@@ -1864,6 +2008,7 @@ function coach() {
 }
 function tutDone() {
   if (!save.bank?.open) {
+    step('bank')
     const r = () => String(1000 + ((Math.random() * 9000) | 0))
     save.bank = { open: true, num: `4081 ${r()} ${r()} ${r()}`, hist: [] }
     bankOp('Открытие счёта · стартовые', save.cash)
@@ -1901,7 +2046,7 @@ ready.then(() => {
 
 // для отладки и автотестов
 window.flip = {
-  get job() { return job }, get car() { return car }, openTune, view, openSite, currentAds, coach, pct: () => lastPct, save, tools, camera, shot: () => { renderer.render(scene, camera); return canvas.toDataURL('image/jpeg', 0.8) },
+  get job() { return job }, get car() { return car }, openTune, applyTune, value: () => valueNow(), finish: () => { if (job && !job.done && !finishing) finishing = { id: stageInfo().id, n: 0 } }, stage: () => stageInfo().id, canvas, fx, view, openSite, currentAds, coach, pct: () => lastPct, save, tools, camera, shot: () => { renderer.render(scene, camera); return canvas.toDataURL('image/jpeg', 0.8) },
   rub: (x, y) => rub(x, y), lift: () => hideTool(), snd: () => ({ ctx: actx?.state, loop: toolLoop.name, level: toolLoop.level, bufs: Object.keys(buffers) }), kindAt: (x, y) => pick(x, y)?.object.userData.kind ?? null,
 }
 </script>

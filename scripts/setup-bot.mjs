@@ -64,6 +64,7 @@ for (const id of (env.ADMIN_IDS || '').split(',').map((s) => Number(s.replace(/[
     scope: { type: 'chat', chat_id: id },
     commands: [
       { command: 'stats', description: 'Статистика: сегодня, вчера, 7 дней' },
+      { command: 'flip', description: 'Перекуп: воронка, сделки, магазин' },
       { command: 'games', description: 'Результаты по играм' },
       { command: 'funnel', description: 'Воронка: открыли → подписались → сыграли' },
       { command: 'ads', description: 'Показы и клики баннеров' },

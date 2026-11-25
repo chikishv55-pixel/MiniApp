@@ -1,11 +1,12 @@
 // Тексты отчётов для админа (команды бота /stats, /games, /funnel, /ads, /shop и утренняя сводка).
 // Всё считается из счётчиков в Redis; уникальные люди — оценка HyperLogLog (погрешность около 1%).
 import { isExpired, isLive, leftText, readAds } from './ads.js'
-import { GAMES, GAME_NAMES, TTL_SECONDS, day, redis, toMap, type Cmd } from './stats.js'
+import { FLIP_BUCKETS, FLIP_STEPS, GAMES, GAME_NAMES, TTL_SECONDS, day, redis, toMap, type Cmd } from './stats.js'
 
 const fmt = (x: number) => Math.round(x).toString().replace(/\B(?=(\d{3})+(?!\d))/g, ' ')
 const pct = (a: number, b: number) => (b > 0 ? `${Math.round((a / b) * 100)}%` : '—')
 const days = (n: number, from = 0) => Array.from({ length: n }, (_, i) => day(from + i))
+const usd = (x: number) => (x < 0 ? '−$' : '$') + fmt(Math.abs(x))
 const sumBy = (m: Record<string, number>, prefix: string) =>
   Object.entries(m).reduce((s, [k, v]) => (k.startsWith(prefix) ? s + v : s), 0)
 
@@ -36,6 +37,7 @@ export async function reportStats(): Promise<string> {
     'Сегодня',
     `👥 зашли: ${fmt(uT)} · новых: ${fmt(m[0].new || 0)}`,
     `🎮 играли: ${fmt(pT)} (${pct(pT, uT)} от зашедших) · забегов: ${fmt(results(m[0]))}`,
+    `🔧 куплено машин: ${fmt(m[0].f_buys || 0)} · продано: ${fmt(m[0].f_sales || 0)} · навар: ${usd(m[0].f_profit || 0)}`,
     '',
     'Вчера',
     `👥 зашли: ${fmt(uY)} · новых: ${fmt(m[1].new || 0)}`,
@@ -46,6 +48,7 @@ export async function reportStats(): Promise<string> {
     `👥 уникальных: ${fmt(u7)} · играли: ${fmt(p7)}`,
     `🎮 запусков игр: ${fmt(m.reduce((s, x) => s + plays(x), 0))} · забегов: ${fmt(m.reduce((s, x) => s + results(x), 0))}`,
     `⚔ вызовы: создано ${fmt(week('ch_create:'))} · открыто ${fmt(week('ch_open:'))} · сыграно ${fmt(week('ch_play:'))}`,
+    `🔧 Перекуп: куплено машин ${fmt(m.reduce((s, x) => s + (x.f_buys || 0), 0))} · продано ${fmt(m.reduce((s, x) => s + (x.f_sales || 0), 0))} · навар ${usd(m.reduce((s, x) => s + (x.f_profit || 0), 0))}`,
     '',
     `Всего людей за всё время: ${fmt(uAll)}`,
     'Уникальные считаются приблизительно (±1%). Твои заходы тоже учитываются.',
@@ -70,7 +73,8 @@ export async function reportGames(): Promise<string> {
     lines.push(`  запусков: ${fmt(plays)} · забегов: ${fmt(res)}`)
     lines.push(`  средний результат: ${avg.toFixed(1)} ${unit} · рекорд: ${best == null ? '—' : fmt(Number(best))}`)
     const total = Object.values(hist).reduce((s, v) => s + v, 0)
-    if (total) lines.push('  докуда доходят: ' + order.map((k) => `${k}: ${pct(hist[k] || 0, total)}`).join(' · '))
+    const keys: readonly string[] = g === 'flip' ? FLIP_BUCKETS : order
+    if (total) lines.push((g === 'flip' ? '  навар за сделку: ' : '  докуда доходят: ') + keys.map((k) => `${k}: ${pct(hist[k] || 0, total)}`).join(' · '))
     lines.push('')
   })
   return lines.join('\n').trim()
@@ -143,6 +147,79 @@ export async function reportShop(): Promise<string> {
     .trim()
 }
 
+// Перекуп: воронка новичка, экономика, машины и магазин
+const STEP_NAMES: Record<string, string> = {
+  bank: 'открыли счёт', buy: 'купили машину', wash: 'домыли', rust: 'убрали ржавчину', paint: 'покрасили',
+  polish: 'отполировали', photo: 'сфотографировали', list: 'выставили', sell: 'продали',
+}
+const CAR_NAMES: Record<string, string> = {
+  shiva: 'Shiva', torollah: 'Torolla хэтч', torolla: 'Torolla', iaz: 'IaZ', vazel: 'Vazel', coupe: 'Купе',
+  dmw3: 'DMW 3', sheroki: 'Sheroki', ranger: 'Ranger', dmw5: 'DMW 5',
+}
+const PAINT_NAMES: Record<string, string> = {
+  b3261e: 'Вишня', d9641e: 'Апельсин', e0a21b: 'Горчица', '2f6b3a': 'Хаки', '1f4e8c': 'Синяя ночь',
+  a9adb3: 'Серебро', '4a4f55': 'Мокрый асфальт', ece6d6: 'Белая ночь', '1b1b1d': 'Чёрный',
+}
+const GEAR_NAMES: Record<string, string> = { washer: 'мойка', drill: 'дрель', gun: 'краскопульт', polisher: 'полировальная машинка' }
+function shopName(k: string): string {
+  const [kind, v] = [k.slice(0, k.indexOf('_')), k.slice(k.indexOf('_') + 1)]
+  if (kind === 'paint') return 'краска ' + (PAINT_NAMES[v] || v)
+  if (kind === 'gear') return GEAR_NAMES[v] || v
+  if (kind === 'tint') return v === '2' ? 'тонировка в ноль' : 'тонировка лёгкая'
+  if (kind === 'low') return v === '2' ? 'занижение −8 см' : 'занижение −4 см'
+  return k
+}
+const top = (m: Record<string, number>, n: number, name: (k: string) => string) =>
+  Object.entries(m).sort((a, b) => b[1] - a[1]).slice(0, n).map(([k, v]) => `${name(k)} ${fmt(v)}`).join(' · ')
+
+export async function reportFlip(): Promise<string> {
+  const d7 = days(7)
+  const cmds: Cmd[] = [
+    ...d7.map((x): Cmd => ['HGETALL', `s:${x}`]), // 0..6
+    ['HGETALL', 's:all'], // 7
+    ['HGETALL', 'f:buy'], ['HGETALL', 'f:sell'], ['HGETALL', 'f:hist'], ['HGETALL', 'f:shop'], // 8..11
+    ['ZSCORE', 'f:best', 'all'], // 12
+    ['PFCOUNT', ...d7.map((x) => `u:${x}`)], // 13
+  ]
+  for (const st of FLIP_STEPS) cmds.push(['PFCOUNT', `fs:${st}:${d7[0]}`], ['PFCOUNT', ...d7.map((x) => `fs:${st}:${x}`)], ['PFCOUNT', `fs:${st}:all`])
+  const r = await redis(cmds)
+  const m7 = r.slice(0, 7).map(toMap)
+  const all = toMap(r[7])
+  const [buy, sell, hist, shop] = r.slice(8, 12).map(toMap)
+  const best = r[12]
+  const u7 = Number(r[13]) || 0
+  const step = (i: number) => ({ t: Number(r[14 + i * 3]) || 0, w: Number(r[15 + i * 3]) || 0, a: Number(r[16 + i * 3]) || 0 })
+  const week = (k: string) => m7.reduce((s, x) => s + (x[k] || 0), 0)
+  const sales7 = week('f_sales')
+  const total = Object.values(hist).reduce((s, v) => s + v, 0)
+
+  const lines = ['🔧 Перекуп Джо', '', `Воронка новичка, людей (сегодня / 7 дней / всё время). Открыли игру за 7 дней: ${fmt(u7)}`]
+  let prev = u7
+  FLIP_STEPS.forEach((st, i) => {
+    const s = step(i)
+    lines.push(`  ${STEP_NAMES[st]}: ${fmt(s.t)} / ${fmt(s.w)} / ${fmt(s.a)}${prev ? `  (${pct(s.w, prev)} от прошлого шага)` : ''}`)
+    prev = s.w
+  })
+  lines.push(
+    '',
+    'Экономика за 7 дней',
+    `  куплено машин: ${fmt(week('f_buys'))} на ${usd(week('f_spent'))}`,
+    `  продано: ${fmt(sales7)} на ${usd(week('f_revenue'))} · навар ${usd(week('f_profit'))}` + (sales7 ? ` (в среднем ${usd(week('f_profit') / sales7)})` : ''),
+    `  сделка от покупки до продажи: ${week('f_timed') ? fmt(week('f_minutes') / week('f_timed')) + ' мин в среднем' : '—'}`,
+    `  в магазине потрачено: ${usd(week('f_shop_spent'))} (${fmt(week('f_shop'))} покупок)`,
+    '',
+    'За всё время',
+    `  продано машин: ${fmt(all.f_sales || 0)} · лучший навар: ${best == null ? '—' : usd(Number(best))}`,
+    total ? '  навар за сделку: ' + FLIP_BUCKETS.map((k) => `${k}: ${pct(hist[k] || 0, total)}`).join(' · ') : '  продаж пока нет',
+    Object.keys(buy).length ? '  покупают: ' + top(buy, 6, (k) => CAR_NAMES[k] || k) : '',
+    Object.keys(sell).length ? '  продают: ' + top(sell, 6, (k) => CAR_NAMES[k] || k) : '',
+    Object.keys(shop).length ? '  магазин: ' + top(shop, 10, shopName) : '',
+    '',
+    'Шаги считаются по людям: «покрасили» — сколько разных людей хоть раз докрасили машину.',
+  )
+  return lines.filter((l, i, a) => l !== '' || a[i - 1] !== '').join('\n').trim()
+}
+
 // утренняя сводка за вчера
 export async function digestText(): Promise<string> {
   const y = day(1)
@@ -162,17 +239,18 @@ export async function digestText(): Promise<string> {
     `🎮 забегов: ${fmt(sumBy(m, 'res:'))} · запусков: ${fmt(sumBy(m, 'play:'))}`,
     `🔻 подписка: увидели ${fmt(gs)} → прошли ${fmt(go)} (${pct(go, gs)})`,
     `⚔ вызовы: создано ${fmt(sumBy(m, 'ch_create:'))} · открыто ${fmt(sumBy(m, 'ch_open:'))}`,
-    `🛒 покупок: ${fmt(m.buys || 0)}`,
+    `🔧 Перекуп: куплено ${fmt(m.f_buys || 0)} · продано ${fmt(m.f_sales || 0)} · навар ${usd(m.f_profit || 0)} · в магазине потрачено ${usd(m.f_shop_spent || 0)}`,
+    `🛒 покупок в гардеробе: ${fmt(m.buys || 0)}`,
     `Всего людей: ${fmt(all)}`,
     '',
-    'Подробнее: /stats /games /funnel /ads /shop',
+    'Подробнее: /flip /stats /funnel /ads /src'
   ].join('\n')
 }
 
 // срок жизни дневных ключей: чтобы старые данные удалялись сами
 export async function setTtls(): Promise<void> {
   const y = day(1)
-  const keys = [`s:${y}`, `u:${y}`, `p:${y}`, `gs:${y}`, `go:${y}`]
+  const keys = [`s:${y}`, `u:${y}`, `p:${y}`, `gs:${y}`, `go:${y}`, ...FLIP_STEPS.map((st) => `fs:${st}:${y}`)]
   try {
     const ads = await readAds(true)
     for (const a of ads) keys.push(`adu:${a.id}:${y}`)

@@ -1,7 +1,7 @@
 // Вебхук Telegram-бота (Vercel Function). Telegram присылает сюда апдейты.
 // Всем: /start (приветствие с кнопкой «Играть», вызовы по старым ссылкам), /help, /privacy, /id.
-// Админам из ADMIN_IDS: /stats, /games, /funnel, /ads, /shop — отчёты по статистике.
-import { reportAds, reportFunnel, reportGames, reportShop, reportSources, reportStats } from './_lib/report.js'
+// Админам из ADMIN_IDS: /stats, /flip, /games, /funnel, /ads, /shop, /src — отчёты по статистике.
+import { reportAds, reportFlip, reportFunnel, reportGames, reportShop, reportSources, reportStats } from './_lib/report.js'
 import { noteStart, registerSrc, statsReady } from './_lib/stats.js'
 import { adminIds, sendPhoto, sendText } from './_lib/tgbot.js'
 
@@ -61,6 +61,7 @@ const WELCOME = [
 async function adminReport(cmd: string): Promise<string | null> {
   const reports: Record<string, () => Promise<string>> = {
     '/stats': reportStats,
+    '/flip': reportFlip,
     '/games': reportGames,
     '/funnel': reportFunnel,
     '/ads': reportAds,

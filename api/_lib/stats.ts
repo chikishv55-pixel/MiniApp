@@ -14,6 +14,10 @@
 //   srcs — множество рекламных меток, заведённых админом (/link метка); src:s:<метка> / src:o:<метка> / src:p:<метка> —
 //          HLL тех, кто нажал «Старт» по ссылке, открыл игру, сыграл. Метки заводит только админ (чужие метки не считаются).
 //   shop — сколько раз купили каждую вещь; passlvl — сколько раз открывали уровни пропуска
+//   Перекуп: fs:<шаг>:<день> / fs:<шаг>:all — HLL людей, сделавших шаг новичка (FLIP_STEPS);
+//            f:buy / f:sell — модели купленных и проданных машин; f:hist — корзины навара; f:best — лучший навар;
+//            f:shop — покупки в игре (paint_<цвет>, gear_<инструмент>, tint_N, low_N); в s:* — f_buys, f_spent, f_sales,
+//            f_revenue, f_profit, f_minutes/f_timed, f_shop, f_shop_spent
 // Дневные ключи живут 120 дней: срок ставит ежедневный cron (api/cron/digest.ts).
 import { createHmac } from 'node:crypto'
 
@@ -25,6 +29,13 @@ export const TTL_SECONDS = 120 * 86400
 export const GAMES = ['joe', 'duel', 'train', 'gold', 'tower', 'canyon', 'rodeo', 'flip'] as const
 export const GAME_NAMES: Record<string, string> = { joe: 'Меткий Джо', duel: 'Дуэль', train: 'Побег на поезде', gold: 'Золотая лихорадка', tower: 'Башня из бочек', canyon: 'Каньон', rodeo: 'Дикое родео', flip: 'Перекуп Джо' }
 export const statsReady = () => Boolean(BASE && TOKEN)
+
+// шаги новичка в Перекупе — по порядку игры
+export const FLIP_STEPS = ['bank', 'buy', 'wash', 'rust', 'paint', 'polish', 'photo', 'list', 'sell'] as const
+// корзины навара в долларах
+export const FLIP_BUCKETS = ['минус', '0–499', '500–999', '1000–1999', '2000–3999', '4000+'] as const
+export const flipBucket = (v: number) =>
+  v < 0 ? 'минус' : v < 500 ? '0–499' : v < 1000 ? '500–999' : v < 2000 ? '1000–1999' : v < 4000 ? '2000–3999' : '4000+'
 
 // рекламная метка: ссылка t.me/бот?start=ad_<метка>
 export const SRC_RE = /^[a-z0-9]{1,16}$/

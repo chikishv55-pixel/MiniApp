@@ -263,6 +263,31 @@ check('приватность: ни одного Telegram ID в базе и в �
 check('приватность: людей считают HLL-множества без имён', [...sets.keys()].every((k) => /^(u|p|gs|go|adu|src:[sop]):/.test(k)))
 check('приватность: в списке меток только метки', [...(plain.get('srcs') || [])].every((t) => /^[a-z0-9]{1,16}$/.test(t)))
 
+/* ---------- Перекуп Джо: шаги новичка, сделки, магазин ---------- */
+const F = [777002001, 777002002, 777002003]
+for (const id of F) await post(id, [{ e: 'open' }, { e: 'f_step', item: 'bank' }])
+for (const id of F.slice(0, 2)) await post(id, [{ e: 'f_step', item: 'buy' }, { e: 'f_car', item: 'sheroki', v: 2140 }, { e: 'f_step', item: 'wash' }])
+await post(F[0], [{ e: 'f_step', item: 'rust' }, { e: 'f_step', item: 'paint' }, { e: 'f_step', item: 'polish' }, { e: 'f_step', item: 'photo' }, { e: 'f_step', item: 'list' },
+  { e: 'f_step', item: 'sell' }, { e: 'f_sale', item: 'sheroki', v: 5600, p: 3460, m: 42 }, { e: 'result', g: 'flip', v: 3460 }])
+await post(F[1], [{ e: 'f_step', item: 'sell' }, { e: 'f_sale', item: 'sheroki', v: 2000, p: -140, m: 8 }])
+await post(F[0], [{ e: 'f_shop', item: 'paint_b3261e', v: 150 }, { e: 'f_shop', item: 'gear_washer', v: 900 }, { e: 'f_shop', item: 'low_2', v: 400 }])
+const fjunk = await post(F[2], [{ e: 'f_step', item: 'hack' }, { e: 'f_car', item: 'BAD CAR', v: 1 }, { e: 'f_sale', item: 'x', v: 1, p: 9e9 }, { e: 'f_shop', item: 'paint_x', v: -5 }])
+check('Перекуп: мусорные события отброшены (400)', fjunk.status === 400)
+check('Перекуп: навар больше $1000 больше не теряется', /res:flip/.test(JSON.stringify([...(hashes.get('s:all') || new Map()).keys()])) && (hashes.get('s:all').get('sum:flip') === 3460))
+const fl = (await say(U[0], '/flip')).out[0]?.text || ''
+check('/flip: открыли счёт 3, купили 2, продали 2 (сегодня)', /открыли счёт: 3 \//.test(fl) && /купили машину: 2 \//.test(fl) && /продали: 2 \//.test(fl), fl.split('\n').slice(3, 6).join(' | '))
+check('/flip: куплено 2 машины на $4 280', /куплено машин: 2 на \$4 280/.test(fl))
+check('/flip: продано 2 на $7 600, навар $3 320 (в среднем $1 660)', /продано: 2 на \$7 600 · навар \$3 320 \(в среднем \$1 660\)/.test(fl), fl.split('\n').find((l) => l.includes('продано:')))
+check('/flip: сделка в среднем 25 мин', /25 мин в среднем/.test(fl))
+check('/flip: лучший навар $3 460 и корзина «минус»', /лучший навар: \$3 460/.test(fl) && /минус: 50%/.test(fl))
+check('/flip: магазин по-русски (краска Вишня, мойка, занижение −8 см)', /краска Вишня 1/.test(fl) && /мойка 1/.test(fl) && /занижение −8 см 1/.test(fl), fl.split('\n').find((l) => l.includes('магазин:')))
+check('/flip: в магазине потрачено $1 450', /в магазине потрачено: \$1 450/.test(fl))
+check('/flip: чужой не видит', (await say(F[1], '/flip')).out.length === 0)
+const st2 = (await say(U[0], '/stats')).out[0]?.text || ''
+check('/stats: строка Перекупа за сегодня', /куплено машин: 2 · продано: 2 · навар: \$3 320/.test(st2))
+check('приватность: в шагах Перекупа только псевдонимы', [...sets.keys()].filter((k) => k.startsWith('fs:')).every((k) => [...sets.get(k)].every((m) => !F.some((id) => m.includes(String(id))))))
+if (process.env.SHOW_FLIP) console.log('\n' + fl) // посмотреть отчёт целиком: SHOW_FLIP=1 node scripts/stats-test.mjs
+
 console.log(failed ? `\nПРОВАЛЕНО проверок: ${failed}` : '\nВсе проверки пройдены')
 srv.close()
 process.exit(failed ? 1 : 0)

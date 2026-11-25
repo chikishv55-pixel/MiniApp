@@ -42,7 +42,8 @@ API (`/api/*`) работает только на Vercel или в `vercel dev`.
 | `VITE_APP_SHORTNAME` | клиент | короткое имя мини-аппа из `/newapp` (необязательно) |
 
 ## Статистика (для админа)
-Команды бота только для `ADMIN_IDS`: `/stats`, `/games`, `/funnel`, `/ads`, `/shop`; каждое утро приходит сводка за вчера.
+Команды бота только для `ADMIN_IDS`: `/stats`, `/flip` (Перекуп: воронка новичка, сделки, магазин), `/games`, `/funnel`, `/ads`, `/shop`, `/src`; каждое утро приходит сводка за вчера.
+Реклама в режиме одной игры: плакат на стене гаража и строки «Реклама» в Gagel; админ управляет баннерами через «Реклама · админка» в игровом компьютере.
 Счёт ведётся в бесплатном Upstash Redis без хранения Telegram ID: уникальные люди считаются HyperLogLog'ом, в базе только счётчики.
 Клиент копит события и шлёт пачкой (`src/track.ts` → `api/track.ts`), отчёты — `api/_lib/report.ts`.
 Проверка без интернета: собрать API (`npx tsc -p tsconfig.json --noEmit false --allowImportingTsExtensions false --outDir content/api-build --declaration false`),
