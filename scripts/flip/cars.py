@@ -14,6 +14,9 @@
 #   Body  — кузов одним объектом с одной UV-развёрткой: по ней игра рисует грязь, ржавчину, краску, блеск
 #   Glass — стёкла с UV (на них тоже бывает грязь)
 #   Tire, Rim, Well — колёса и ниши за ними: трогать нельзя
+#   Hood  — капот: отдельный объект на петле (origin = ось петли у лобового), развёртка общая с Body —
+#           игра красит его теми же слоями и открывает поворотом
+#   Bay   — стенки моторного отсека; Engine, Orange, Plastic, Accent, Blue — двигатель и навесное
 #   Chrome, Headlight, Tail, Dark, Seat, Dash — остальное
 import bpy, bmesh, os
 from math import pi, radians, cos, sin
@@ -30,7 +33,8 @@ T = 0.05  # толщина стенок кабины
 # endc — (скругление носа, скругление кормы) в плане, м.
 # split — участки боковых окон по X (стойки между ними).
 CARS = {
-    "shiva": dict(  # 3740 / база 2200 / свесы 705+835 / высота 1640
+    "shiva": dict(engine="i4c", battery='fr',
+          # 3740 / база 2200 / свесы 705+835 / высота 1640
         lower=[(-1.87, 0.40), (1.80, 0.40), (1.87, 0.50), (1.87, 0.80), (1.80, 0.90), (0.75, 1.02), (-1.87, 1.02)],
         W=0.84, endc=(0.10, 0.05), wheels=(1.165, -1.035), r=0.36, tw=0.22, arch=0.45, rim="steel", tread=True,
         cab=[(-1.85, 1.00), (0.78, 1.00), (0.22, 1.62), (-1.80, 1.64)], CW=0.80, tumble=0.10, floor=1.02,
@@ -38,7 +42,8 @@ CARS = {
         front=1.87, rear=-1.87, bumper=("dark", 0.40, 0.56), lights=[("round", 0.74, 0.58, 0.085)],
         grille=("bars", 0.62, 0.86, 0.45), tail=("vert", 0.70, 1.00, 0.74), flares=("Body", 0.05),
         handles=[-0.30], seats="bucket", rear_seat=True),
-    "vazel": dict(  # развозной фургон с будкой: ~5600 / база 3145 / высота 2750
+    "vazel": dict(engine="i4c", battery='fr',
+          # развозной фургон с будкой: ~5600 / база 3145 / высота 2750
         lower=[(0.55, 0.45), (2.92, 0.45), (3.00, 0.55), (3.00, 0.95), (2.90, 1.12), (2.12, 1.25), (0.55, 1.25)],
         W=0.98, endc=(0.10, 0.0), wheels=(2.05, -1.10), r=0.36, tw=0.22, arch=0.45, rim="steel", dual_rear=True,
         cab=[(0.55, 1.22), (2.15, 1.22), (1.55, 2.30), (0.60, 2.32)], CW=0.96, tumble=0.08, floor=1.25,
@@ -46,7 +51,8 @@ CARS = {
         box=(-2.80, 0.48, 1.04, 0.95, 2.75),
         front=3.00, rear=-2.80, bumper=("dark", 0.45, 0.62), lights=[("plate", 0.80, 0.68, (0.19, 0.075, 0.08, "proj"))],
         grille=("bars", 0.64, 0.92, 0.46), tail=("rect", 1.00, 1.22, 0.86), handles=[0.70], seats="bench", rear_seat=False),
-    "iaz": dict(  # рамный пикап с двойной кабиной: 5125 / база 3000 / высота 1915
+    "iaz": dict(engine="i4c", battery='fl',
+          # рамный пикап с двойной кабиной: 5125 / база 3000 / высота 1915
         lower=[(-2.56, 0.50), (2.48, 0.50), (2.56, 0.62), (2.56, 1.00), (2.45, 1.12), (0.95, 1.20), (-2.56, 1.22)],
         W=0.95, endc=(0.10, 0.03), wheels=(1.66, -1.34), r=0.385, tw=0.26, arch=0.48, rim="off", tread=True,
         cab=[(-1.00, 1.18), (0.98, 1.18), (0.32, 1.88), (-0.98, 1.90)], CW=0.90, tumble=0.08, floor=1.20,
@@ -54,7 +60,8 @@ CARS = {
         front=2.56, rear=-2.56, bumper=("dark", 0.50, 0.72), lights=[("plate", 0.90, 0.63, (0.17, 0.075, 0.03, "round2"))],
         fog=(0.60, 0.66, 0.05), grille=("mesh", 0.74, 1.05, 0.40), tail=("vert", 0.86, 1.18, 0.82),
         flares=("Dark", 0.07), steps=True, roofrails=True, handles=[0.30, -0.68], seats="bucket", rear_seat=True),
-    "torolla": dict(  # седан: 4530 / база 2600 / высота 1490
+    "torolla": dict(engine="i4t", battery='fl',
+          # седан: 4530 / база 2600 / высота 1490
         lower=[(-2.22, 0.32), (2.18, 0.30), (2.265, 0.42), (2.26, 0.66), (2.10, 0.78), (0.95, 0.90), (-1.55, 0.96),
                (-2.18, 0.94), (-2.265, 0.80), (-2.26, 0.50)],
         W=0.85, endc=(0.13, 0.08), endl=0.9, wheels=(1.385, -1.215), r=0.315, tw=0.21, arch=0.38, rim="alloy5",
@@ -63,7 +70,8 @@ CARS = {
         front=2.265, rear=-2.265, lip=(0.32, 0.46, 0.50), lights=[("plate", 0.56, 0.52, (0.17, 0.06, 0.05, "proj"))],
         grille=("bars", 0.55, 0.70, 0.30), tail=("wrap", 0.72, 0.88, 0.66), handles=[0.25, -0.62],
         seats="bucket", rear_seat=True, antenna=True),
-    "torollah": dict(  # хэтчбек 5-дверный: 4180 / база 2600 / высота 1470
+    "torollah": dict(engine="i4t", battery='fl',
+          # хэтчбек 5-дверный: 4180 / база 2600 / высота 1470
         lower=[(-2.05, 0.32), (2.02, 0.30), (2.09, 0.42), (2.08, 0.66), (1.94, 0.78), (0.80, 0.90), (-2.05, 0.96),
                (-2.09, 0.70), (-2.08, 0.45)],
         W=0.85, endc=(0.13, 0.08), endl=0.9, wheels=(1.21, -1.39), r=0.315, tw=0.21, arch=0.38, rim="alloy5",
@@ -72,7 +80,8 @@ CARS = {
         front=2.09, rear=-2.09, lip=(0.32, 0.46, 0.50), lights=[("plate", 0.56, 0.52, (0.17, 0.06, 0.05, "proj"))],
         grille=("bars", 0.55, 0.68, 0.30), tail=("vert", 0.80, 1.02, 0.66), handles=[0.10, -0.80],
         seats="bucket", rear_seat=True),
-    "dmw3": dict(  # лифтбек «гран туризмо»: 4824 / база 2920 / высота 1508
+    "dmw3": dict(engine="i6", battery=None,
+          # лифтбек «гран туризмо»: 4824 / база 2920 / высота 1508
         lower=[(-2.38, 0.32), (2.34, 0.30), (2.41, 0.42), (2.40, 0.64), (2.25, 0.76), (1.00, 0.90), (-1.90, 0.98),
                (-2.36, 0.96), (-2.41, 0.78), (-2.40, 0.48)],
         W=0.91, endc=(0.13, 0.10), endl=1.0, wheels=(1.59, -1.33), r=0.335, tw=0.23, arch=0.40, rim="multi",
@@ -81,7 +90,8 @@ CARS = {
         front=2.41, rear=-2.41, lip=(0.32, 0.48, 0.62), lights=[("plate", 0.56, 0.58, (0.17, 0.05, 0.025, "angel"))],
         grille=("kidney", 0.50, 0.78, 0.34), tail=("wrap", 0.80, 0.93, 0.70), handles=[0.30, -0.70],
         seats="bucket", rear_seat=True),
-    "dmw5": dict(  # бизнес-седан: 4936 / база 2975 / высота 1479
+    "dmw5": dict(engine="i6", battery=None,
+          # бизнес-седан: 4936 / база 2975 / высота 1479
         lower=[(-2.44, 0.32), (2.40, 0.30), (2.47, 0.42), (2.46, 0.64), (2.30, 0.76), (1.05, 0.89), (-1.70, 0.98),
                (-2.40, 0.97), (-2.47, 0.80), (-2.46, 0.48)],
         W=0.93, endc=(0.13, 0.10), endl=1.0, wheels=(1.61, -1.365), r=0.34, tw=0.24, arch=0.41, rim="multi",
@@ -90,7 +100,8 @@ CARS = {
         front=2.47, rear=-2.47, lip=(0.32, 0.48, 0.66), lights=[("plate", 0.555, 0.61, (0.17, 0.052, 0.02, "angel"))],
         grille=("kidney", 0.49, 0.80, 0.38), tail=("wrap", 0.80, 0.94, 0.70), handles=[0.35, -0.68],
         seats="bucket", rear_seat=True),
-    "sheroki": dict(  # большой SUV: 4828 / база 2915 / высота 1792
+    "sheroki": dict(engine="i6", battery='fr',
+          # большой SUV: 4828 / база 2915 / высота 1792
         lower=[(-2.38, 0.48), (2.34, 0.46), (2.415, 0.58), (2.40, 0.92), (2.25, 1.04), (1.05, 1.12), (-2.38, 1.16),
                (-2.415, 0.95), (-2.40, 0.62)],
         W=0.95, endc=(0.13, 0.08), endl=0.9, wheels=(1.495, -1.42), r=0.375, tw=0.25, arch=0.46, rim="alloy5",
@@ -99,7 +110,8 @@ CARS = {
         front=2.415, rear=-2.415, lip=(0.46, 0.62, 0.70), lights=[("plate", 0.86, 0.62, (0.17, 0.05, 0.0, "proj"))],
         grille=("slots7", 0.78, 1.02, 0.40), tail=("wrap", 0.95, 1.12, 0.74), cladding=True, roofrails=True,
         handles=[0.35, -0.75], seats="bucket", rear_seat=True),
-    "ranger": dict(  # рамный внедорожник 4 двери: 4785 / база 3008 / высота 1840
+    "ranger": dict(engine="i6", battery='fl',
+          # рамный внедорожник 4 двери: 4785 / база 3008 / высота 1840
         lower=[(-2.30, 0.55), (2.20, 0.55), (2.30, 0.65), (2.30, 1.05), (2.25, 1.15), (0.90, 1.18), (-2.30, 1.18)],
         W=0.90, endc=(0.05, 0.03), wheels=(1.59, -1.42), r=0.40, tw=0.28, arch=0.50, rim="off", tread=True,
         cab=[(-2.30, 1.16), (0.92, 1.16), (0.55, 1.84), (-2.28, 1.86)], CW=0.88, tumble=0.04, floor=1.18,
@@ -107,7 +119,8 @@ CARS = {
         front=2.30, rear=-2.30, bumper=("dark", 0.48, 0.72), lights=[("round", 0.98, 0.60, 0.11)],
         grille=("slots7", 0.80, 1.12, 0.44), tail=("vert", 0.92, 1.12, 0.82), flares=("Dark", 0.11), steps=True,
         spare=True, handles=[0.25, -0.85], seats="bucket", rear_seat=True),
-    "coupe": dict(  # маслкар
+    "coupe": dict(engine="v8", battery='fr',
+          # маслкар
         lower=[(-2.40, 0.34), (2.35, 0.34), (2.50, 0.46), (2.52, 0.78), (2.38, 0.90), (0.70, 0.96), (-2.30, 0.96), (-2.45, 0.75)],
         W=0.95, endc=(0.10, 0.06), wheels=(1.55, -1.55), r=0.37, tw=0.26, arch=0.45, rim="alloy5",
         cab=[(-1.90, 0.94), (0.75, 0.94), (0.15, 1.42), (-0.70, 1.44)], CW=0.84, tumble=0.12, floor=0.96,
@@ -147,6 +160,13 @@ def make_materials():
         "Dark": mat("Dark", (0.06, 0.06, 0.07), 0.3, 0.5),
         "Seat": mat("Seat", (0.35, 0.18, 0.08), 0.0, 0.7),
         "Dash": mat("Dash", (0.12, 0.10, 0.09), 0.0, 0.6),
+        "Hood": mat("Hood", (0.55, 0.12, 0.08), 0.1, 0.5),
+        "Bay": mat("Bay", (0.16, 0.16, 0.17), 0.2, 0.7),
+        "Engine": mat("Engine", (0.45, 0.46, 0.48), 0.6, 0.4),
+        "Orange": mat("Orange", (0.80, 0.30, 0.06), 0.2, 0.5),
+        "Plastic": mat("Plastic", (0.86, 0.84, 0.78), 0.0, 0.6),
+        "Accent": mat("Accent", (0.95, 0.70, 0.10), 0.0, 0.5),
+        "Blue": mat("Blue", (0.15, 0.35, 0.85), 0.0, 0.5),
     }
 
 
@@ -334,6 +354,288 @@ def side_box(name, x0, x1, y, out, z0, z1, s, material, bevel=0.0):
     return box(name, x0, x1, -y - out, -y + 0.01, z0, z1, material, bevel)
 
 
+def intersect(o, c):
+    mod = o.modifiers.new("keep", "BOOLEAN")
+    mod.operation = "INTERSECT"
+    mod.object = c
+    sel(o)
+    bpy.ops.object.modifier_apply(modifier=mod.name)
+    bpy.data.objects.remove(c, do_unlink=True)
+
+
+def rod(name, p0, p1, r, material, verts=8):
+    """Цилиндр от точки до точки (патрубки, провода, коллекторы)."""
+    p0, p1 = Vector(p0), Vector(p1)
+    d = p1 - p0
+    bm = bmesh.new()
+    bmesh.ops.create_cone(bm, cap_ends=True, segments=verts, radius1=r, radius2=r, depth=d.length)
+    q = Vector((0, 0, 1)).rotation_difference(d.normalized())
+    bmesh.ops.rotate(bm, verts=bm.verts, cent=(0, 0, 0), matrix=q.to_matrix())
+    bmesh.ops.translate(bm, vec=(p0 + p1) / 2, verts=bm.verts)
+    return obj_from_bm(name, bm, material)
+
+
+def top_z(pts, x):
+    """Высота верхней кромки профиля (x, z) в точке x."""
+    zs = []
+    for i in range(len(pts)):
+        (x0, z0), (x1, z1) = pts[i], pts[(i + 1) % len(pts)]
+        if x0 != x1 and (x0 - x) * (x1 - x) <= 0:
+            zs.append(z0 + (z1 - z0) * (x - x0) / (x1 - x0))
+    return max(zs) if zs else None
+
+
+# ---------------------------------------------------------------- моторный отсек
+def engine_bay(c, lower, lw, zlow):
+    """Вырезает в низе кузова моторный отсек и отделяет капот (тонкая плита по верхней кромке).
+    Капот — от основания лобового до носа; между капотом и крыльями остаются щели, как у настоящей машины."""
+    pts = c["lower"]
+    hx0 = c["cab"][1][0] + 0.07
+    cz = top_z(pts, hx0)
+    if cz is None:
+        return None, None
+    cand = [x for x, z in pts if x > hx0 + 0.3 and z >= cz - 0.14]
+    if not cand:
+        return None, None
+    hx1 = max(cand) - 0.03
+    if hx1 - hx0 < 0.45:
+        return None, None
+    th, hw = 0.04, c["W"] - 0.085
+    xs = sorted({hx0, hx1, *[x for x, _ in pts if hx0 < x < hx1]})
+
+    def slab():
+        return prism("hoodcut", [(x, top_z(pts, x) - th) for x in xs] + [(hx1, 3.0), (hx0, 3.0)], (-hw, hw), "Body")
+
+    hood = lower.copy()
+    hood.data = lower.data.copy()
+    col.objects.link(hood)
+    intersect(hood, slab())
+    cutter(lower, slab())
+    zf = max(zlow + 0.06, c["r"] - 0.06)
+    x1b = hx1 - 0.05
+    samp = [hx0 + (x1b - hx0) * k / 8 for k in range(9)]
+    bw = min([hw - 0.035] + [lw(x, z) - 0.05 for x in samp for z in (zf, top_z(pts, x) - th)])
+    cutter(lower, box("bay", hx0, x1b, -bw, bw, zf, 3.0, "Body"))
+    # стенки выреза — тёмный «Bay»: в развёртку кузова не идут, тереть их нельзя
+    lower.data.materials.append(M["Bay"])
+    bi = len(lower.data.materials) - 1
+    for poly_ in lower.data.polygons:
+        q = poly_.center
+        if hx0 - 0.01 < q.x < hx1 + 0.01 and abs(q.y) <= hw + 0.004 and zf - 0.004 <= q.z <= top_z(pts, q.x) + 0.004:
+            poly_.material_index = bi
+    hood.data.materials.clear()
+    hood.data.materials.append(M["Hood"])
+    for poly_ in hood.data.polygons:
+        poly_.material_index = 0
+    bay = dict(x0=hx0, x1=x1b, xh=hx1, bw=bw, hw=hw, zf=zf, th=th, hinge=(hx0, 0.0, cz),
+               top=lambda x: top_z(pts, x))
+    return hood, bay
+
+
+def engine(G, c, b, fx, ydrv):
+    """Двигатель и всё, что под капотом. Оси: x вперёд, y влево (руль слева, +y — сторона водителя), z вверх."""
+    x0, x1, bw, zf = b["x0"], b["x1"], b["bw"], b["zf"]
+    under = lambda x: b["top"](x) - b["th"] - 0.015  # низ капота
+    kind = c.get("engine", "i4c")
+    xs = [x0 + (x1 - x0) * k / 6 for k in range(7)]
+
+    # --- обшивка: пол, брызговики, моторный щит, передняя панель, жабо
+    G["Bay"].append(box("bfloor", x0, x1, -bw, bw, zf - 0.015, zf + 0.004, "Bay"))
+    prof = [(x0, zf), (x1, zf)] + [(x, under(x) + 0.01) for x in reversed(xs)]
+    for s in (1, -1):
+        G["Bay"].append(prism("apron", prof, (s * bw - 0.012, s * bw + 0.012), "Bay"))
+    G["Bay"].append(box("firewall", x0 - 0.015, x0 + 0.012, -bw, bw, zf, under(x0) + 0.01, "Bay"))
+    G["Bay"].append(box("core", x1 - 0.012, x1 + 0.015, -bw, bw, zf, under(x1) + 0.01, "Bay"))
+    G["Dark"].append(box("cowl", x0 + 0.012, x0 + 0.12, -bw + 0.02, bw - 0.02, under(x0) - 0.06, under(x0) - 0.012, "Dark"))
+    for k in range(9):  # прорези жабо
+        y = -bw + 0.1 + (2 * bw - 0.2) * k / 8
+        G["Bay"].append(box("slot", x0 + 0.03, x0 + 0.1, y - 0.012, y + 0.012, under(x0) - 0.013, under(x0) - 0.008, "Bay"))
+
+    # --- чашки стоек над передними колёсами
+    if x0 + 0.12 < fx < x1 - 0.12:
+        for s in (1, -1):
+            y = s * (bw - 0.075)
+            top = under(fx) - 0.07
+            G["Bay"].append(cyl("tower", (fx, y, (zf + top) / 2), 0.095, top - zf, "Z", "Bay", 14))
+            G["Engine"].append(cyl("mount", (fx, y, top + 0.01), 0.05, 0.022, "Z", "Engine", 10))
+            for k in range(3):
+                a = k * 2 * pi / 3
+                G["Chrome"].append(cyl("nut", (fx + cos(a) * 0.062, y + sin(a) * 0.062, top + 0.006), 0.011, 0.016, "Z", "Chrome", 6))
+
+    # --- радиатор с сотами, пробка, вентилятор в кожухе
+    rx1, rw = x1 - 0.02, bw - 0.08
+    rx0 = rx1 - 0.05
+    rz0, rz1 = zf + 0.05, under(rx1) - 0.04
+    G["Dark"].append(box("rad", rx0, rx1, -rw, rw, rz0, rz1, "Dark"))
+    for k in range(7):
+        z = rz0 + (rz1 - rz0) * (k + 0.5) / 7
+        G["Engine"].append(box("fin", rx0 - 0.004, rx0 + 0.003, -rw + 0.04, rw - 0.04, z - 0.005, z + 0.005, "Engine"))
+    G["Chrome"].append(cyl("radcap", (rx0 + 0.025, -rw * 0.6, rz1 + 0.015), 0.028, 0.03, "Z", "Chrome", 12))
+    fz = (rz0 + rz1) / 2
+    fr = max(0.08, min(0.2, (rz1 - rz0) / 2 - 0.015, rw * 0.5))
+    fy = -rw * 0.45 if kind == "i4t" else 0.0
+    fxx = rx0 - 0.05
+    if kind == "i4t":  # электровентилятор в коробе
+        G["Dark"].append(box("shroud", rx0 - 0.03, rx0 - 0.005, fy - fr - 0.03, fy + fr + 0.03, fz - fr - 0.03, fz + fr + 0.03, "Dark"))
+    G["Dark"].append(torus("ring", (fxx, fy, fz), fr + 0.01, 0.014, (0, pi / 2, 0), "Dark", 20))
+    for k in range(5):
+        a = k * 2 * pi / 5
+        cy_, cz_ = fy + cos(a) * fr * 0.5, fz + sin(a) * fr * 0.5
+        G["Dark"].append(box("blade", fxx - 0.006, fxx + 0.006, cy_ - 0.035, cy_ + 0.035, cz_ - fr * 0.42, cz_ + fr * 0.42, "Dark",
+                             rot=Matrix.Rotation(a - pi / 2, 3, "X") @ Matrix.Rotation(0.45, 3, "Z")))
+    G["Engine"].append(cyl("hub", (fxx, fy, fz), 0.04, 0.05, "X", "Engine", 10))
+
+    # --- двигатель
+    if kind == "i4t":
+        # поперечный: блок вдоль y справа (−y), коробка передач слева (+y)
+        ecx = (x0 + rx0) / 2 - 0.03
+        H = min(under(ecx - 0.2), under(ecx + 0.2)) - 0.02 - zf
+        zb0 = zf + 0.07
+        zb1 = zb0 + H * 0.45
+        zh1 = zb1 + H * 0.12
+        zc1 = zh1 + H * 0.14
+        G["Dark"].append(box("pan", ecx - 0.13, ecx + 0.13, -0.40, 0.08, zf + 0.01, zb0, "Dark"))
+        G["Engine"].append(box("block", ecx - 0.16, ecx + 0.16, -0.42, 0.10, zb0, zb1, "Engine", bevel=0.01))
+        G["Engine"].append(box("head", ecx - 0.14, ecx + 0.14, -0.41, 0.09, zb1, zh1, "Engine", bevel=0.01))
+        G["Dark"].append(box("cover", ecx - 0.12, ecx + 0.10, -0.39, 0.07, zh1, zc1, "Dark", bevel=0.02))
+        for k in range(4):
+            y = -0.34 + 0.13 * k
+            G["Dark"].append(cyl("coil", (ecx - 0.01, y, zc1 + 0.012), 0.022, 0.03, "Z", "Dark", 8))
+        G["Accent"].append(cyl("oil", (ecx + 0.06, -0.05, zc1 + 0.008), 0.026, 0.02, "Z", "Accent", 10))
+        G["Engine"].append(cyl("gearbox", (ecx - 0.02, 0.27, zb0 + 0.12), 0.14, 0.32, "Y", "Engine", 12))
+        G["Engine"].append(box("bell", ecx - 0.14, ecx + 0.12, 0.08, 0.14, zb0, zb1 - 0.02, "Engine"))
+        for k in range(4):  # впуск к щиту
+            y = -0.34 + 0.13 * k
+            G["Dark"].append(rod("runner", (ecx - 0.13, y, zh1 - 0.01), (ecx - 0.25, y, zb1 - 0.02), 0.022, "Dark"))
+        G["Dark"].append(rod("plenum", (ecx - 0.27, -0.40, zb1 - 0.03), (ecx - 0.27, 0.02, zb1 - 0.03), 0.045, "Dark", 10))
+        G["Engine"].append(box("shield", ecx + 0.16, ecx + 0.22, -0.38, 0.04, zb0 + 0.02, zh1, "Engine", bevel=0.01))  # теплозащита выпуска
+        G["Engine"].append(cyl("alt", (ecx + 0.05, -0.47, zb0 + 0.1), 0.065, 0.1, "Y", "Engine", 12))
+        G["Dark"].append(cyl("pulley", (ecx, -0.45, zb0 + 0.02), 0.07, 0.03, "Y", "Dark", 14))
+        ab = (ecx - 0.15, ecx + 0.12, 0.26, min(0.56, bw - 0.12), zb1, min(zb1 + 0.15, under(ecx) - 0.03))
+        G["Dark"].append(box("airbox", ab[0], ab[1], ab[2], ab[3], ab[4], ab[5], "Dark", bevel=0.02))
+        G["Dark"].append(rod("intake", (ab[0] + 0.05, ab[2], (ab[4] + ab[5]) / 2), (ecx - 0.27, 0.02, zb1 - 0.03), 0.04, "Dark", 10))
+        G["Accent"].append(rod("dip", (ecx + 0.12, -0.15, zb0 + 0.05), (ecx + 0.13, -0.15, zc1 + 0.03), 0.006, "Accent", 6))
+        G["Accent"].append(torus("diph", (ecx + 0.13, -0.15, zc1 + 0.05), 0.018, 0.005, (pi / 2, 0, 0), "Accent", 10))
+        G["Dark"].append(rod("hose", (ecx + 0.15, -0.30, zh1), (rx0, -rw * 0.55, rz1 - 0.05), 0.025, "Dark", 8))
+    else:
+        L = {"i4c": 0.58, "i6": 0.80, "v8": 0.66}[kind]
+        ex1 = rx0 - 0.17
+        L = min(max(L, ex1 - x0 - 0.2), L * 1.3)  # в длинном отсеке мотор крупнее — не теряется
+        ex0 = max(x0 + 0.04, ex1 - L)
+        L = ex1 - ex0
+        exm = (ex0 + ex1) / 2
+        H = min(under(ex0), under(ex1), under(exm)) - 0.02 - zf
+        zb0 = zf + 0.07
+        hwb = 0.22 if kind == "v8" else (0.17 if kind == "i6" else 0.16)
+        zb1 = zb0 + H * (0.36 if kind == "v8" else 0.42)
+        blockm = "Orange" if kind == "v8" else "Engine"
+        G["Dark"].append(box("pan", ex0 + 0.03, ex1 - 0.03, -hwb + 0.03, hwb - 0.03, zf + 0.01, zb0, "Dark"))
+        G[blockm].append(box("block", ex0, ex1, -hwb, hwb, zb0, zb1, blockm, bevel=0.012))
+        # шкивы и ремень спереди, генератор
+        G["Dark"].append(cyl("crank", (ex1 + 0.02, 0, zb0 + 0.06), 0.075, 0.03, "X", "Dark", 14))
+        G["Dark"].append(cyl("pump", (ex1 + 0.02, 0, zb1 - 0.03), 0.06, 0.03, "X", "Dark", 14))
+        ay = -(hwb + 0.06)
+        G["Engine"].append(cyl("alt", (ex1 - 0.04, ay, zb1 - 0.02), 0.07, 0.11, "X", "Engine", 12))
+        G["Dark"].append(cyl("altp", (ex1 + 0.025, ay, zb1 - 0.02), 0.035, 0.025, "X", "Dark", 10))
+        for a_, b_ in (((ex1 + 0.035, 0, zb0 + 0.13), (ex1 + 0.035, ay * 0.55, zb1 - 0.02)), ((ex1 + 0.035, 0, zb0 + 0.06), (ex1 + 0.035, ay, zb1 - 0.05))):
+            G["Dark"].append(rod("belt", a_, b_, 0.01, "Dark", 6))
+        if kind == "v8":
+            for s in (1, -1):
+                rot = Matrix.Rotation(s * 0.55, 3, "X")
+                G["Orange"].append(box("head", ex0 + 0.02, ex1 - 0.02, s * 0.24 - 0.08, s * 0.24 + 0.08, zb1 - 0.02, zb1 + 0.08, "Orange", rot=rot))
+                G["Chrome"].append(box("vcover", ex0 + 0.04, ex1 - 0.05, s * 0.27 - 0.07, s * 0.27 + 0.07, zb1 + 0.06, zb1 + 0.13, "Chrome", bevel=0.02, rot=rot))
+                for k in range(4):
+                    xk = ex0 + 0.08 + (L - 0.16) * k / 3
+                    G["Engine"].append(rod("header", (xk, s * 0.31, zb1 + 0.0), (xk + 0.04, s * 0.38, zb0 + 0.04), 0.022, "Engine"))
+                    G["Dark"].append(rod("wire", (xk, s * 0.33, zb1 + 0.05), (exm - 0.12, s * 0.08, zb1 + 0.17), 0.006, "Dark", 6))
+                G["Engine"].append(rod("collector", (ex0 + 0.06, s * 0.39, zb0 + 0.03), (ex1 - 0.02, s * 0.39, zb0 + 0.03), 0.03, "Engine"))
+            G["Orange"].append(box("intake", ex0 + 0.06, ex1 - 0.06, -0.12, 0.12, zb1, zb1 + 0.1, "Orange", bevel=0.015))
+            G["Engine"].append(box("carb", exm - 0.07, exm + 0.07, -0.07, 0.07, zb1 + 0.1, zb1 + 0.16, "Engine"))
+            G["Dark"].append(cyl("distr", (ex0 + 0.07, 0, zb1 + 0.14), 0.045, 0.08, "Z", "Dark", 10))
+            ztop = min(H + zf, zb1 + 0.28)
+            ar = min(0.2, bw - 0.25)
+            G["Dark"].append(cyl("acbase", (exm, 0, ztop - 0.07), ar, 0.02, "Z", "Dark", 24))
+            G["Chrome"].append(cyl("aclid", (exm, 0, ztop - 0.035), ar - 0.005, 0.05, "Z", "Chrome", 24))
+            G["Chrome"].append(cyl("acnut", (exm, 0, ztop), 0.025, 0.02, "Z", "Chrome", 6))
+            G["Accent"].append(rod("dip", (ex1 - 0.12, 0.2, zb0 + 0.08), (ex1 - 0.1, 0.25, zb1 + 0.12), 0.006, "Accent", 6))
+        else:
+            zh1 = zb1 + H * 0.11
+            zc1 = zh1 + H * (0.13 if kind == "i6" else 0.11)
+            G["Engine"].append(box("head", ex0 + 0.02, ex1 - 0.02, -hwb + 0.02, hwb - 0.02, zb1, zh1, "Engine", bevel=0.01))
+            vm = "Dark" if kind == "i6" else "Engine"
+            G[vm].append(box("vcover", ex0 + 0.03, ex1 - 0.04, -hwb + 0.035, hwb - 0.035, zh1, zc1, vm, bevel=0.025))
+            n = 6 if kind == "i6" else 4
+            for k in range(n):
+                xk = ex0 + 0.07 + (L - 0.15) * (k + 0.5) / n
+                if kind == "i6":  # катушки на свечах
+                    G["Dark"].append(box("coil", xk - 0.028, xk + 0.028, -0.035, 0.035, zc1, zc1 + 0.03, "Dark", bevel=0.006))
+                # выпускной коллектор справа (−y), впуск слева (+y)
+                G["Engine"].append(rod("exh", (xk, -hwb, zh1 - 0.03), (xk + 0.02, -hwb - 0.09, zb1 - 0.06), 0.022, "Engine"))
+                if kind == "i6":
+                    G["Dark"].append(rod("runner", (xk, hwb, zh1 - 0.02), (xk, hwb + 0.12, zb1 + 0.0), 0.024, "Dark"))
+            G["Engine"].append(rod("collector", (ex0 + 0.05, -hwb - 0.1, zb1 - 0.08), (ex1 - 0.04, -hwb - 0.1, zb1 - 0.08), 0.03, "Engine"))
+            G["Accent"].append(cyl("oil", (ex0 + 0.12, 0.04, zc1 + 0.01), 0.027, 0.022, "Z", "Accent", 10))
+            G["Accent"].append(rod("dip", (ex0 + 0.2, -hwb - 0.02, zb0 + 0.06), (ex0 + 0.22, -hwb - 0.05, zc1 + 0.02), 0.006, "Accent", 6))
+            G["Accent"].append(torus("diph", (ex0 + 0.22, -hwb - 0.05, zc1 + 0.04), 0.018, 0.005, (pi / 2, 0, 0), "Accent", 10))
+            if kind == "i6":
+                G["Dark"].append(rod("plenum", (ex0 + 0.04, hwb + 0.13, zb1 + 0.02), (ex1 - 0.04, hwb + 0.13, zb1 + 0.02), 0.05, "Dark", 10))
+                ab = (rx0 - 0.42, rx0 - 0.12, hwb + 0.2, min(hwb + 0.45, bw - 0.1), zb1 - 0.02, min(zb1 + 0.14, under(rx0 - 0.27) - 0.03))
+                G["Dark"].append(box("airbox", ab[0], ab[1], ab[2], ab[3], ab[4], ab[5], "Dark", bevel=0.02))
+                G["Dark"].append(rod("intake", (ab[0], (ab[2] + ab[3]) / 2, (ab[4] + ab[5]) / 2), (ex1 - 0.08, hwb + 0.13, zb1 + 0.04), 0.045, "Dark", 10))
+            else:  # карбюратор на впуске слева и круглый фильтр-«кастрюля» над мотором, провода от трамблёра
+                G["Engine"].append(box("intake", ex0 + 0.1, ex1 - 0.12, hwb - 0.01, hwb + 0.07, zb1 - 0.02, zh1 + 0.02, "Engine"))
+                G["Engine"].append(box("carb", exm - 0.06, exm + 0.06, hwb - 0.03, hwb + 0.09, zh1 + 0.02, zh1 + 0.09, "Engine"))
+                ztop = min(H + zf, zc1 + 0.16)
+                ar = min(0.17, bw - hwb - 0.12)
+                G["Dark"].append(cyl("filter", (exm, hwb * 0.6, ztop - 0.045), ar, 0.08, "Z", "Dark", 22))
+                G["Engine"].append(cyl("flid", (exm, hwb * 0.6, ztop - 0.002), ar * 0.55, 0.01, "Z", "Engine", 18))
+                G["Dark"].append(box("snorkel", exm + ar - 0.02, exm + ar + 0.14, hwb * 0.6 - 0.05, hwb * 0.6 + 0.05, ztop - 0.08, ztop - 0.02, "Dark"))
+                dx, dy, dz = ex0 + 0.1, -0.06, zc1 + 0.04
+                G["Dark"].append(cyl("distr", (dx, dy, dz - 0.02), 0.045, 0.07, "Z", "Dark", 10))
+                for k in range(4):
+                    xk = ex0 + 0.07 + (L - 0.15) * (k + 0.5) / 4
+                    G["Dark"].append(rod("wire", (dx, dy, dz + 0.01), (xk, -0.02, zc1 + 0.01), 0.006, "Dark", 6))
+            G["Dark"].append(rod("hose", (ex1 - 0.02, 0.05, zh1 - 0.03), (rx0, rw * 0.45, rz1 - 0.06), 0.025, "Dark", 8))
+
+    # --- по краям отсека: аккумулятор, воздушный фильтр (если сбоку), усилитель тормозов, бачки, предохранители
+    bat = c.get("battery")
+    if bat:
+        s = 1 if bat == "fl" else -1
+        bx1 = rx0 - 0.07
+        bx0 = bx1 - 0.25
+        y0, y1 = sorted((s * (bw - 0.22), s * (bw - 0.05)))
+        bz0 = zf + max(0.06, min(0.14, under(bx0) - zf - 0.26))
+        bz1 = bz0 + 0.19
+        G["Bay"].append(box("tray", bx0 - 0.01, bx1 + 0.01, y0 - 0.01, y1 + 0.01, zf, bz0, "Bay"))
+        G["Dark"].append(box("battery", bx0, bx1, y0, y1, bz0, bz1, "Dark", bevel=0.008))
+        G["Accent"].append(box("label", bx0 + 0.05, bx1 - 0.05, y0 + 0.02, y1 - 0.02, bz1, bz1 + 0.004, "Accent"))
+        G["Tail"].append(cyl("plus", (bx1 - 0.035, (y0 + y1) / 2 + 0.04, bz1 + 0.015), 0.016, 0.03, "Z", "Tail", 8))
+        G["Dark"].append(cyl("minus", (bx0 + 0.035, (y0 + y1) / 2 + 0.04, bz1 + 0.015), 0.016, 0.03, "Z", "Dark", 8))
+        G["Dark"].append(box("fuses", bx0 - 0.17, bx0 - 0.03, y0 + 0.01, y1 - 0.01, zf + 0.1, zf + 0.2, "Dark", bevel=0.01))
+    else:  # аккумулятор в багажнике: под капотом только клемма для прикуривания
+        G["Tail"].append(cyl("jump", (fx if x0 < fx < x1 else (x0 + x1) / 2, -(bw - 0.075), under(fx if x0 < fx < x1 else x0) - 0.02), 0.022, 0.04, "Z", "Tail", 10))
+        G["Dark"].append(box("fuses", x0 + 0.15, x0 + 0.3, -(bw - 0.03), -(bw - 0.17), zf + 0.15, zf + 0.25, "Dark", bevel=0.01))
+    # вакуумный усилитель на щите со стороны водителя и главный тормозной цилиндр с бачком
+    yb = min(bw - 0.15, 0.42)
+    zbst = zf + max(0.16, (under(x0) - zf) * 0.45)
+    rb = min(0.11, (under(x0) - zf) * 0.28)
+    G["Dark"].append(cyl("booster", (x0 + 0.065, yb, zbst), rb, 0.1, "X", "Dark", 20))
+    G["Engine"].append(box("master", x0 + 0.115, x0 + 0.22, yb - 0.03, yb + 0.03, zbst - 0.03, zbst + 0.03, "Engine"))
+    G["Plastic"].append(box("brres", x0 + 0.13, x0 + 0.2, yb - 0.04, yb + 0.04, zbst + 0.03, zbst + 0.09, "Plastic", bevel=0.008))
+    G["Accent"].append(cyl("brcap", (x0 + 0.165, yb, zbst + 0.1), 0.022, 0.018, "Z", "Accent", 10))
+    # расширительный бачок (у DMW — на радиаторе, как у прототипа) и бачок омывателя с синей крышкой
+    if kind == "i6" and not bat:
+        ex = (rx0 - 0.13, rx0 - 0.02, -rw * 0.75 - 0.05, -rw * 0.75 + 0.05, rz1 - 0.1, rz1 + 0.02)
+    else:
+        ex = (x0 + 0.1, x0 + 0.24, -(bw - 0.06), -(bw - 0.18), zf + (under(x0) - zf) * 0.45, zf + (under(x0) - zf) * 0.45 + 0.15)
+    G["Plastic"].append(box("coolant", *ex[:6], "Plastic", bevel=0.01))
+    G["Dark"].append(cyl("ccap", ((ex[0] + ex[1]) / 2, (ex[2] + ex[3]) / 2, ex[5] + 0.012), 0.028, 0.024, "Z", "Dark", 10))
+    ws = -1 if bat == "fl" else 1  # на свободной стороне спереди, низко
+    wy0, wy1 = sorted((ws * (bw - 0.2), ws * (bw - 0.05)))
+    G["Plastic"].append(box("washer", rx0 - 0.3, rx0 - 0.1, wy0, wy1, zf + 0.01, zf + 0.15, "Plastic", bevel=0.01))
+    G["Blue"].append(cyl("wcap", (rx0 - 0.15, (wy0 + wy1) / 2, zf + 0.165), 0.026, 0.03, "Z", "Blue", 10))
+
+
 # ---------------------------------------------------------------- колесо
 
 
@@ -502,7 +804,7 @@ def attach(objs, c, is_inside, near_wheel):
     bmb = bmesh.new()
     bmb.from_mesh(body.data)
     tree = BVHTree.FromBMesh(bmb)
-    skip_mat = {"Glass", "Tire", "Rim", "Seat", "Dash", "Well"}
+    skip_mat = {"Glass", "Tire", "Rim", "Seat", "Dash", "Well", "Hood", "Bay", "Engine", "Orange", "Plastic", "Accent", "Blue"}
     isl = []  # (объект, bmesh, [вершины], центр)
     bms = []
     for o in objs[1:]:
@@ -623,6 +925,9 @@ def build(c):
         for x in c["wheels"]:
             if ((p.center.x - x) ** 2 + (p.center.z - c["r"]) ** 2) ** 0.5 < c["arch"] + 0.03:
                 p.material_index = 1
+
+    # --- моторный отсек и капот
+    hood, bay = engine_bay(c, lower, lw, zlow)
 
     # --- кабина: пустая коробка со стенками T, открытая снизу (пол — верх нижней части)
     cab = prism("Cab", c["cab"], lambda x, z: cw(z), "Body")
@@ -840,18 +1145,34 @@ def build(c):
                 G["Dark"].append(box("leg", lx - 0.03, lx + 0.03, s * yr - 0.02, s * yr + 0.02, zt - 0.01, zt + 0.07, "Dark"))
     if c.get("antenna"):
         G["Dark"].append(cyl("ant", (rt[0] + 0.2, -0.3, zt + 0.2), 0.006, 0.42, "Z", "Dark", 6))
+    hood_extra = []
     for m_, x0, x1, y0, y1, z0, z1 in c.get("extras", []):
-        G[m_].append(box("x", x0, x1, y0, y1, z0, z1, m_))
+        o_ = box("x", x0, x1, y0, y1, z0, z1, m_)
+        if bay and m_ == "Body" and bay["x0"] < x0 and x1 < bay["xh"]:  # воздухозаборник на капоте открывается с капотом
+            hood_extra.append(o_)
+        else:
+            G[m_].append(o_)
+    if hood and hood_extra:
+        hood = join([hood] + hood_extra, "Hood")
+        hood.data.materials.clear()
+        hood.data.materials.append(M["Hood"])
+        for p_ in hood.data.polygons:
+            p_.material_index = 0
+    if bay:
+        engine(G, c, bay, c["wheels"][0], ydrv)
 
     def is_inside(p):  # точка в салоне (рычаг, руль, сиденья) — к кузову не двигаем
         return zlow < p.z < zt and abs(p.y) < cw(min(max(p.z, zb), zt)) - 0.05 and xr(p.z) + 0.03 < p.x < xf(min(p.z, zt)) - 0.03
+
+    def in_bay(p):  # двигатель и навесное стоят где задумано — к кузову не двигаем
+        return bool(bay) and bay["x0"] - 0.06 < p.x < bay["xh"] + 0.04 and abs(p.y) < bay["bw"] + 0.03 and bay["zf"] - 0.06 < p.z < bay["top"](min(max(p.x, bay["x0"]), bay["xh"])) + 0.02
 
     def near_wheel(p):  # детали колеса (диск, тормоз, гайки) держатся за колесо, не за кузов
         return any(((p.x - wx) ** 2 + (p.z - c["r"]) ** 2) ** 0.5 < c["r"] + 0.05 and abs(p.y) > W - c.get("tw", 0.22) - 0.15
                    for wx in c["wheels"])
 
     # --- кузов одним объектом: скосы на рёбрах, UV
-    body = join([lower, cab] + G.pop("Body"), "Body")
+    body = join([lower, cab] + ([hood] if hood else []) + G.pop("Body"), "Body")
     bev = body.modifiers.new("bevel", "BEVEL")
     bev.width = 0.022
     bev.segments = 2
@@ -869,29 +1190,50 @@ def build(c):
             ctr = p.center
             if xin_r - 0.01 < ctr.x < xin_f + 0.01 and abs(ctr.y) < cav_w + 0.005 and zlow < ctr.z < floor - 0.005:
                 p.material_index = wi
-    # ниши отдельным объектом: в развёртку кузова не попадают
-    sel(body)
-    bpy.ops.object.mode_set(mode="EDIT")
-    bpy.ops.mesh.select_all(action="DESELECT")
-    body.active_material_index = wi
-    bpy.ops.object.material_slot_select()
-    bpy.ops.mesh.separate(type="SELECTED")
-    bpy.ops.object.mode_set(mode="OBJECT")
-    well = next((o for o in bpy.context.selected_objects if o is not body), None)
-    if well:
-        well.name = well.data.name = "Well"
-        well.data.materials.clear()
-        well.data.materials.append(M["Well"])
-    body.data.materials.pop(index=wi)
+
+    def split_slot(name):  # грани с материалом name — отдельным объектом
+        idx = next((i for i, m in enumerate(body.data.materials) if m and m.name.split(".")[0] == name), None)
+        if idx is None or not any(p.material_index == idx for p in body.data.polygons):
+            return None
+        sel(body)
+        bpy.ops.object.mode_set(mode="EDIT")
+        bpy.ops.mesh.select_all(action="DESELECT")
+        body.active_material_index = idx
+        bpy.ops.object.material_slot_select()
+        bpy.ops.mesh.separate(type="SELECTED")
+        bpy.ops.object.mode_set(mode="OBJECT")
+        o = next((o for o in bpy.context.selected_objects if o is not body), None)
+        if o:
+            o.name = o.data.name = name
+            o.data.materials.clear()
+            o.data.materials.append(M[name])
+            for p in o.data.polygons:
+                p.material_index = 0
+        return o
+    # ниши и стенки отсека — отдельными объектами: в развёртку кузова не попадают
+    well = split_slot("Well")
+    bayo = split_slot("Bay")
+    # развёртка общая для кузова и капота: игра красит капот теми же слоями
     unwrap(body)
-    objs = [body] + ([well] if well else [])
+    hoodo = split_slot("Hood")
+    for p in body.data.polygons:
+        p.material_index = 0
+    while len(body.data.materials) > 1:
+        body.data.materials.pop(index=len(body.data.materials) - 1)
+    if hoodo:  # ось петли капота — у основания лобового стекла
+        bpy.context.scene.cursor.location = bay["hinge"]
+        sel(hoodo)
+        bpy.ops.object.origin_set(type="ORIGIN_CURSOR")
+    objs = [body] + [o for o in (well, hoodo) if o]
+    if bayo:  # стенки выреза и обшивка отсека — один объект
+        G["Bay"].append(bayo)
     for k, lst in G.items():
         if lst:
             o = join(lst, k)
             if k == "Glass":
                 unwrap(o)
             objs.append(o)
-    attach(objs, c, is_inside, near_wheel)
+    attach(objs, c, lambda p: is_inside(p) or in_bay(p), near_wheel)
     return objs
 
 
@@ -919,6 +1261,9 @@ for i, (cid, spec) in enumerate(CARS.items()):
     objs = build(spec)
     sel(*objs)
     path = os.path.join(OUT_DIR, cid + ".glb")
+    if globals().get("FLIP_NOEXPORT"):  # проверка в Blender без перезаписи моделей игры
+        result[cid] = {"faces": sum(len(o.data.polygons) for o in objs), "objs": [o.name for o in objs]}
+        continue
     bpy.ops.export_scene.gltf(filepath=path, export_format="GLB", use_selection=True, use_active_scene=True, export_apply=True,
                               export_normals=False, export_meshopt_compression_enable=True)  # игра считает нормали сама (flat)
     result[cid] = {"kb": round(os.path.getsize(path) / 1024), "faces": sum(len(o.data.polygons) for o in objs)}

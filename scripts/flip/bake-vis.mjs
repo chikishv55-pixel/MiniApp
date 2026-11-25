@@ -18,15 +18,16 @@ for (const id of Object.keys(CARS)) {
   const ab = buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength)
   const gltf = await new Promise((res, rej) => new GLTFLoader().setMeshoptDecoder(MeshoptDecoder).parse(ab, '', res, rej))
   const parts = []
-  let body
+  let body, hood
   gltf.scene.updateMatrixWorld(true)
   gltf.scene.traverse((o) => {
     if (!o.isMesh) return
     parts.push(o)
     if (o.material.name === 'Body') body = o
+    if (o.material.name === 'Hood') hood = o // капот закрыт: видимость считаем как у кузова
   })
   if (!body) throw new Error(id + ': в модели нет материала Body')
-  const cover = bakeCover(body, parts, S)
+  const cover = bakeCover(hood ? [body, hood] : body, parts, S)
   writeFileSync(new URL(id + '.vis.png', DIR), png(cover, S))
   let on = 0
   for (const c of cover) on += c

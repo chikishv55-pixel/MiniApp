@@ -44,8 +44,9 @@ export function forEachSample(t, cb) {
 }
 
 // Медленно (секунды): лучи от каждой точки к 36 позициям камеры. Поэтому запекается заранее.
+// body — кузов или [кузов, капот]: капот красится по той же развёртке
 export function bakeCover(body, parts, S) {
-  const { tris } = bodyTris(body, S)
+  const tris = (Array.isArray(body) ? body : [body]).flatMap((b) => bodyTris(b, S).tris)
   const sides = parts.map((o) => o.material.side)
   parts.forEach((o) => (o.material.side = THREE.DoubleSide)) // луч изнутри стыка должен упереться в грань
   const rc = new THREE.Raycaster(), dir = new THREE.Vector3(), from = new THREE.Vector3()

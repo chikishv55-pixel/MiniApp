@@ -192,6 +192,11 @@ body.embed .close{display:inline-block}
 
 /* ---------- кнопка фото, вспышка, пустой гараж ---------- */
 #cam{pointer-events:auto;width:40px;height:40px;padding:0;background:none;border:0}
+#hoodBtn{position:absolute;right:12px;top:72px;width:56px;padding:6px 0 4px;border-radius:12px;background:rgba(30,18,9,.6);box-shadow:inset 0 0 0 1.5px rgba(243,230,200,.25);
+  color:#f3e6c8;font:500 11px/1 Oswald,sans-serif;letter-spacing:.6px;display:flex;flex-direction:column;align-items:center;gap:3px}
+#hoodBtn svg{width:40px;height:26px}
+#hoodBtn.on{background:rgba(232,218,162,.25);box-shadow:inset 0 0 0 2px var(--tape)}
+#garage.empty #hoodBtn{display:none}
 #cam svg{width:40px;height:40px;filter:drop-shadow(0 2px 0 rgba(0,0,0,.45))}
 #flash{position:fixed;inset:0;background:#fff;opacity:0;pointer-events:none;transition:opacity .35s;z-index:25}
 #flash.on{opacity:.85;transition:none}
@@ -319,6 +324,7 @@ body.embed .close{display:inline-block}
   <div id="meter"><div id="meterfill"></div></div>
   <div id="hint"></div>
   <div id="colors" hidden></div>
+  <button id="hoodBtn" aria-label="Открыть капот"><svg viewBox="0 0 40 26" aria-hidden="true"><path d="M3 21h34v3H3z" fill="#26211c"/><path d="M5 20l3-6h24l3 6z" fill="#a8231b"/><path d="M9 14L17 3l17 9" fill="none" stroke="#e8daa2" stroke-width="2.5" stroke-linejoin="round"/><path d="M14 12h12v4H14z" fill="#9aa0a6"/></svg><span>КАПОТ</span></button>
   <div id="tray"></div>
   <div id="toast"></div>
 </section>
@@ -537,7 +543,7 @@ function bodyMaterial(L = { oldPaint, mask, coat, gloss }) {
 }
 
 // К деталям колеса и нишам за ним не прикасаемся: там всегда черно и инструмент не появляется.
-const UNTOUCH = new Set(['Tire', 'Rim', 'Well'])
+const UNTOUCH = new Set(['Tire', 'Rim', 'Well', 'Bay', 'Engine', 'Orange', 'Plastic', 'Accent', 'Blue']) // мотор не трём: палец по нему крутит машину
 function partMaterial(name, car, L) {
   const flat = { flatShading: true } // нормалей в glb нет (меньше вес) — освещение по граням
   switch (name) {
@@ -550,6 +556,13 @@ function partMaterial(name, car, L) {
     case 'Tail': return new THREE.MeshStandardMaterial({ color: 0x8a1408, roughness: 0.35, emissive: 0x200300, ...flat })
     case 'Seat': return new THREE.MeshStandardMaterial({ color: car.seat, roughness: 0.75, ...flat })
     case 'Dash': return new THREE.MeshStandardMaterial({ color: car.dash, roughness: 0.6, ...flat })
+    // моторный отсек (scripts/flip/cars.py): стенки, двигатель, оранжевый блок V8, пластик бачков, жёлтые пробки, синяя крышка омывателя
+    case 'Bay': return new THREE.MeshStandardMaterial({ color: 0x2a2b2e, roughness: 0.75, metalness: 0.2, ...flat })
+    case 'Engine': return new THREE.MeshStandardMaterial({ color: 0x8c9196, roughness: 0.42, metalness: 0.65, ...flat })
+    case 'Orange': return new THREE.MeshStandardMaterial({ color: 0xc8541a, roughness: 0.5, metalness: 0.2, ...flat })
+    case 'Plastic': return new THREE.MeshStandardMaterial({ color: 0xe2ddcf, roughness: 0.6, ...flat })
+    case 'Accent': return new THREE.MeshStandardMaterial({ color: 0xf0b21c, roughness: 0.5, ...flat })
+    case 'Blue': return new THREE.MeshStandardMaterial({ color: 0x2f62d8, roughness: 0.5, ...flat })
     default: return new THREE.MeshStandardMaterial({ color: 0x0e0e10, roughness: 0.7, metalness: 0.3, ...flat })
   }
 }
@@ -679,7 +692,7 @@ function makeThumbs() {
   }
   for (const [id, car] of Object.entries(CARS)) {
     const o = models[id].clone()
-    o.traverse((m) => { if (m.isMesh) m.material = m.material.name === 'Body' ? new THREE.MeshStandardMaterial({ color: car.paint, roughness: 0.85, flatShading: true }) : m.material.name === 'Glass' ? new THREE.MeshStandardMaterial({ color: 0x9fb4bf, transparent: true, opacity: 0.35, flatShading: true }) : partMaterial(m.material.name, car) })
+    o.traverse((m) => { if (m.isMesh) m.material = m.material.name === 'Body' || m.material.name === 'Hood' ? new THREE.MeshStandardMaterial({ color: car.paint, roughness: 0.85, flatShading: true }) : m.material.name === 'Glass' ? new THREE.MeshStandardMaterial({ color: 0x9fb4bf, transparent: true, opacity: 0.35, flatShading: true }) : partMaterial(m.material.name, car) })
     photos[id] = shot(o, 400, 240, new THREE.Vector3(1.15, 0.45, 1), 0xd8cfba, 'image/jpeg')
   }
   for (const g of Object.values(GEAR).flat()) {
@@ -725,6 +738,7 @@ const garageSpots = () => spots
 let job = null // { id, paid, rust, seed, stage, color, done }
 
 let glass = null, glassByFace = [], glassIdx = new Int32Array(0)
+let hood = null, hoodOpen = false, hoodAng = 0 // капот на петле у лобового (origin модели = ось петли)
 
 function mountCar(id) {
   if (car) scene.remove(car)
@@ -733,19 +747,28 @@ function mountCar(id) {
   parts = []
   body = null
   glass = null
+  hood = null
+  const bodyMat = bodyMaterial() // кузов и капот рисуются одними слоями — развёртка у них общая
   car.traverse((o) => {
     if (!o.isMesh) return
     const kind = o.material.name
     o.userData.kind = kind
-    if (kind === 'Body') { body = o; o.material = bodyMaterial() }
+    if (kind === 'Body') { body = o; o.material = bodyMat }
+    else if (kind === 'Hood') { hood = o; o.material = bodyMat }
     else { o.material = partMaterial(kind, spec); if (kind === 'Glass') glass = o }
     parts.push(o)
   })
+  hoodOpen = false; hoodAng = 0; $('hoodBtn').classList.remove('on')
   scene.add(car)
   car.updateMatrixWorld(true)
   for (const o of parts) o.userData.y0 = o.position.y
-  const t = bodyTris(body, S)
-  byFace = t.byFace
+  const t = { tris: [] }
+  for (const m of [body, hood].filter(Boolean)) { // таблицы граней — при закрытом капоте
+    const r = bodyTris(m, S)
+    m.userData.byFace = r.byFace
+    t.tris.push(...r.tris)
+  }
+  byFace = body.userData.byFace
   const cover = vis[id]
   const list = []
   for (const tri of t.tris) forEachSample(tri, (x, y, p) => {
@@ -791,6 +814,28 @@ function applyTune(animate = false) {
   }
   step()
 }
+
+const HOOD_OPEN = 1.05 // рад, ~60°
+function toggleHood() {
+  if (!hood) return
+  audioInit()
+  hideTool()
+  hoodOpen = !hoodOpen
+  $('hoodBtn').classList.toggle('on', hoodOpen)
+  $('hoodBtn').setAttribute('aria-label', hoodOpen ? 'Закрыть капот' : 'Открыть капот')
+  sfx('door', 0.45)
+  const from = hoodAng, to = hoodOpen ? HOOD_OPEN : 0, p0 = view.pitch, t0 = performance.now()
+  const pitchTo = hoodOpen ? Math.max(p0, 0.62) : p0
+  const step = () => {
+    const k = Math.min(1, (performance.now() - t0) / 520), e = 1 - Math.pow(1 - k, 3)
+    hoodAng = from + (to - from) * e
+    if (hood) hood.rotation.z = hoodAng
+    view.pitch = p0 + (pitchTo - p0) * e
+    if (k < 1) requestAnimationFrame(step)
+  }
+  step()
+}
+$('hoodBtn').onclick = toggleHood
 
 const TUNE_ICON = `<svg viewBox="0 0 64 44" aria-hidden="true"><path d="M6 30l5-11c1-3 4-5 7-5h22c3 0 6 2 8 4l6 7c3 1 5 3 5 6v3H6z" fill="#a8231b"/><path d="M19 17h9v8H14zM31 17h9l6 8H31z" fill="#1c1d22" opacity=".9"/><circle cx="17" cy="34" r="7" fill="#151515"/><circle cx="17" cy="34" r="3" fill="#c9ccd0"/><circle cx="47" cy="34" r="7" fill="#151515"/><circle cx="47" cy="34" r="3" fill="#c9ccd0"/><path d="M32 2v8M28 7l4 4 4-4" stroke="#f3e6c8" stroke-width="2.5" fill="none" stroke-linecap="round"/></svg>`
 function openTune() {
@@ -1118,7 +1163,7 @@ addEventListener('visibilitychange', () => { if (!actx) return; if (document.hid
 /* ================= МАЗОК ================= */
 function stamp(hit) {
   const st = stageInfo()
-  const t = byFace[hit.faceIndex]
+  const t = (hit.object.userData.byFace || byFace)[hit.faceIndex]
   if (!t || job.done) return
   if (st.id === 'paint' && !job.paint && !openPaint()) return
   const gr_ = gearFor(st.id)
@@ -1186,7 +1231,7 @@ function rub(x, y) {
   const h = pick(x, y)
   const kind = h?.object.userData.kind
   if (!h || UNTOUCH.has(kind)) { hideTool(); return false }
-  if (kind === 'Body') stamp(h)
+  if (kind === 'Body' || kind === 'Hood') stamp(h)
   else if (kind === 'Glass') stampGlass(h)
   placeTool(h)
   return true
@@ -1550,8 +1595,9 @@ function spotsFor(id) {
   if (studioSpots[id]) return studioSpots[id]
   let b = null
   models[id].updateMatrixWorld(true)
-  models[id].traverse((o) => { if (o.isMesh && o.material.name === 'Body') b = o })
-  const t = bodyTris(b, S), list = [], cover = vis[id]
+  let hd = null
+  models[id].traverse((o) => { if (o.isMesh && o.material.name === 'Body') b = o; if (o.isMesh && o.material.name === 'Hood') hd = o })
+  const t = { tris: [b, hd].filter(Boolean).flatMap((m) => bodyTris(m, S).tris) }, list = [], cover = vis[id]
   for (const tri of t.tris) forEachSample(tri, (x, y, pp) => { if (cover && cover[Math.round(y) * S + Math.round(x)]) list.push({ x, y, wy: pp.y, ppm: tri.pxPerM }) })
   return (studioSpots[id] = { tris: t.tris, spots: list })
 }
@@ -1564,7 +1610,7 @@ function carPhoto(ad, view = 0) {
   paintOld(studioL.oldPaint, spec, ad.livery, sp.tris)
   freshLayers(ad.rust, ad.seed, studioL, sp.spots)
   const o = models[ad.id].clone()
-  o.traverse((m) => { if (m.isMesh) m.material = m.material.name === 'Body' ? bodyMaterial(studioL) : partMaterial(m.material.name, spec, studioL) })
+  o.traverse((m) => { if (m.isMesh) m.material = m.material.name === 'Body' || m.material.name === 'Hood' ? bodyMaterial(studioL) : partMaterial(m.material.name, spec, studioL) })
   const { r, sc, sh, cam } = studio
   sc.add(o)
   const bx = new THREE.Box3().setFromObject(o), c = bx.getCenter(new THREE.Vector3()), size = bx.getSize(new THREE.Vector3())
@@ -2046,7 +2092,7 @@ ready.then(() => {
 
 // для отладки и автотестов
 window.flip = {
-  get job() { return job }, get car() { return car }, openTune, applyTune, value: () => valueNow(), finish: () => { if (job && !job.done && !finishing) finishing = { id: stageInfo().id, n: 0 } }, stage: () => stageInfo().id, canvas, fx, view, openSite, currentAds, coach, pct: () => lastPct, save, tools, camera, shot: () => { renderer.render(scene, camera); return canvas.toDataURL('image/jpeg', 0.8) },
+  get job() { return job }, get car() { return car }, toggleHood, get hood() { return hood }, openTune, applyTune, value: () => valueNow(), finish: () => { if (job && !job.done && !finishing) finishing = { id: stageInfo().id, n: 0 } }, stage: () => stageInfo().id, canvas, fx, view, openSite, currentAds, coach, pct: () => lastPct, save, tools, camera, shot: () => { renderer.render(scene, camera); return canvas.toDataURL('image/jpeg', 0.8) },
   rub: (x, y) => rub(x, y), lift: () => hideTool(), snd: () => ({ ctx: actx?.state, loop: toolLoop.name, level: toolLoop.level, bufs: Object.keys(buffers) }), kindAt: (x, y) => pick(x, y)?.object.userData.kind ?? null,
 }
 </script>
