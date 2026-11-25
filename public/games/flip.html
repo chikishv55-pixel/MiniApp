@@ -291,7 +291,7 @@ import { GLTFLoader } from './vendor/three/GLTFLoader.js'
 import { MeshoptDecoder } from './vendor/three/meshopt_decoder.module.js'
 import { RoomEnvironment } from './vendor/three/RoomEnvironment.js'
 import { bodyTris, forEachSample } from './flip/vis.js'
-import { CARS, STAGES, STAGE_VALUE, VALUE_START, DONE_AT, PAINTS, SELLERS, ADTEXT, HEADS, COND } from './flip/cars.js'
+import { CARS, STAGES, GEAR, STAGE_VALUE, VALUE_START, DONE_AT, PAINTS, SELLERS, ADTEXT, HEADS, COND } from './flip/cars.js'
 
 // внутри меню «Игр Джо» (iframe) Telegram живёт у родителя
 const EMBED = new URLSearchParams(location.search).has('embed')
@@ -565,7 +565,7 @@ function showPaper() {
 }
 
 /* ================= ПРЕВЬЮ (фото в газету, иконки инструментов) ================= */
-const toolIcons = {}
+const toolIcons = {}, gearPics = {}
 function makeThumbs() {
   const tr = new THREE.WebGLRenderer({ antialias: true, alpha: true, preserveDrawingBuffer: true })
   tr.toneMapping = THREE.ACESFilmicToneMapping
@@ -594,11 +594,12 @@ function makeThumbs() {
     o.traverse((m) => { if (m.isMesh) m.material = m.material.name === 'Body' ? new THREE.MeshStandardMaterial({ color: car.paint, roughness: 0.85, flatShading: true }) : m.material.name === 'Glass' ? new THREE.MeshStandardMaterial({ color: 0x9fb4bf, transparent: true, opacity: 0.35, flatShading: true }) : partMaterial(m.material.name, car) })
     photos[id] = shot(o, 400, 240, new THREE.Vector3(1.15, 0.45, 1), 0xd8cfba, 'image/jpeg')
   }
-  for (const st of STAGES) {
-    const o = toolsGltf.scene.getObjectByName(st.tool).clone()
+  for (const g of Object.values(GEAR).flat()) {
+    const o = toolsGltf.scene.getObjectByName(g.tool).clone()
     o.position.set(0, 0, 0)
     o.traverse((m) => { if (m.isMesh) { m.material = m.material.clone(); m.material.flatShading = true } })
-    toolIcons[st.id] = shot(o, 160, 136, new THREE.Vector3(0.7, 1.1, 1.3), null, 'image/png', 0.9)
+    toolIcons[g.id] = shot(o, 160, 136, new THREE.Vector3(0.7, 1.1, 1.3), null, 'image/png', 0.9)
+    gearPics[g.id] = shot(o, 320, 220, new THREE.Vector3(0.8, 0.9, 1.3), 0xf1f2f6, 'image/jpeg', 0.95)
   }
   tr.dispose()
   tr.forceContextLoss()
@@ -607,21 +608,27 @@ function makeThumbs() {
 /* ================= ИНСТРУМЕНТЫ ================= */
 const tools = {}
 function setupTools() {
-  for (const st of STAGES) {
-    const o = toolsGltf.scene.getObjectByName(st.tool)
+  for (const g of Object.values(GEAR).flat()) {
+    const o = toolsGltf.scene.getObjectByName(g.tool)
     o.removeFromParent()
     o.position.set(0, 0, 0)
     o.traverse((m) => { if (m.isMesh) { m.material = m.material.clone(); m.material.envMapIntensity = 0.8; m.material.flatShading = true } })
     const holder = new THREE.Group()
     holder.add(o)
     holder.visible = false
-    holder.userData = { id: st.id, inner: o, pad: o.getObjectByName('ToolPolishPad'), show: 0, target: 0 }
+    holder.userData = { id: g.id, anim: g.anim, inner: o, pad: g.spin ? o.getObjectByName(g.spin) : null, show: 0, target: 0 }
     scene.add(holder)
-    tools[st.id] = holder
+    tools[g.id] = holder
   }
 }
 function setSprayColor(hex) {
-  tools.paint?.traverse((m) => { if (m.isMesh && m.material.name === 'SprayPaint') m.material.color.set(hex) })
+  for (const id of ['can', 'gun']) tools[id]?.traverse((m) => { if (m.isMesh && m.material.name === 'SprayPaint') m.material.color.set(hex) })
+}
+
+// что в руках на этой работе: лучшее из купленного (первое в списке есть всегда)
+function gearFor(stage) {
+  const list = GEAR[stage], own = save.gear || []
+  return [...list].reverse().find((g) => !g.price || own.includes(g.id)) || list[0]
 }
 
 /* ================= МАШИНА В ГАРАЖЕ ================= */
@@ -837,7 +844,7 @@ function drawHud() {
   $('meter').classList.toggle('done', !!job.done)
   $('metertxt').textContent = job.done ? 'готово к продаже' : st.bar
   $('sell').classList.toggle('ready', !!job.done)
-  $('tray').innerHTML = STAGES.map((s, i) => `<div class="slot ${job.done || i < job.stage ? 'done' : i === job.stage ? 'on' : 'lock'}"><img alt="" src="${toolIcons[s.id] || ''}">${s.label}</div>`).join('')
+  $('tray').innerHTML = STAGES.map((s, i) => `<div class="slot ${job.done || i < job.stage ? 'done' : i === job.stage ? 'on' : 'lock'}"><img alt="" src="${toolIcons[gearFor(s.id).id] || ''}">${s.label}</div>`).join('')
 }
 function checkProgress(now) {
   if (!job) return
@@ -916,9 +923,9 @@ function sfx(name, vol = 1) {
 }
 // петля инструмента
 const toolLoop = { name: null, src: null, gain: null, level: 0 }
-function toolSound(stage, amount) {
+function toolSound(stage, amount, gear) {
   if (!actx) return
-  const name = SFX[stage]
+  const name = gear?.snd || SFX[stage]
   if (toolLoop.name !== name) {
     stopToolSound(true)
     const buf = buffers[name]
@@ -932,7 +939,7 @@ function toolSound(stage, amount) {
     Object.assign(toolLoop, { name, src, gain: g })
   }
   toolLoop.level = Math.min(1, Math.max(toolLoop.level * 0.9, amount))
-  const vol = { wash: 0.9, rust: 1.0, paint: 0.7, polish: 0.55 }[stage] ?? 0.8
+  const vol = { sponge: 0.9, washer: 0.8, brush: 1.0, drill: 0.75, can: 0.7, gun: 0.8, rag: 0.45, polisher: 0.55 }[gear?.id] ?? 0.8
   toolLoop.gain.gain.setTargetAtTime(vol * (0.35 + 0.65 * toolLoop.level), actx.currentTime, 0.03)
 }
 function stopToolSound(now) {
@@ -957,7 +964,8 @@ function stamp(hit) {
   const st = stageInfo()
   const t = byFace[hit.faceIndex]
   if (!t || job.done) return
-  const x = hit.uv.x * S, y = hit.uv.y * S, r = st.r * t.pxPerM, a = st.a
+  const gr_ = gearFor(st.id)
+  const x = hit.uv.x * S, y = hit.uv.y * S, r = gr_.r * t.pxPerM, a = gr_.a
   const p = ((y | 0) * S + (x | 0)) * 4
   const g = layerOf(st.id).g
   const grad = (col) => {
@@ -968,7 +976,8 @@ function stamp(hit) {
   const d = readCache
   if (st.id === 'wash') {
     g.globalCompositeOperation = 'darken'; grad((k) => `rgba(255,255,0,${k})`)
-    if (d && d[p + 2] > 40) fxEmit('foam', 1)
+    if (gr_.fx === 'water') fxEmit('water', 3)
+    else if (d && d[p + 2] > 40) fxEmit('foam', 1)
   } else if (st.id === 'rust') {
     g.globalCompositeOperation = 'darken'; grad((k) => `rgba(0,255,255,${k})`)
     if (d && d[p] > 40) { fxEmit('flake', 2); buzz() }
@@ -990,9 +999,10 @@ function stampGlass(hit) {
   if (job.done || st.id !== 'wash') return
   const t = glassByFace[hit.faceIndex]
   if (!t) return
-  const x = hit.uv.x * GS, y = hit.uv.y * GS, r = st.r * t.pxPerM, g = glassLayer.g
+  const gw = gearFor('wash')
+  const x = hit.uv.x * GS, y = hit.uv.y * GS, r = gw.r * t.pxPerM, g = glassLayer.g
   const gr = g.createRadialGradient(x, y, 0, x, y, r)
-  gr.addColorStop(0, `rgba(0,0,0,${st.a})`); gr.addColorStop(0.7, `rgba(0,0,0,${st.a * 0.55})`); gr.addColorStop(1, 'rgba(0,0,0,0)')
+  gr.addColorStop(0, `rgba(0,0,0,${gw.a})`); gr.addColorStop(0.7, `rgba(0,0,0,${gw.a * 0.55})`); gr.addColorStop(1, 'rgba(0,0,0,0)')
   g.globalCompositeOperation = 'darken'; g.fillStyle = gr; g.fillRect(x - r, y - r, r * 2, r * 2)
   g.globalCompositeOperation = 'source-over'
   const d = glassCache, p = ((y | 0) * GS + (x | 0)) * 4
@@ -1081,7 +1091,7 @@ function buzz() {
 const nrm = new THREE.Vector3(), dirV = new THREE.Vector3(1, 0, 0), tmp = new THREE.Vector3(), basis = new THREE.Matrix4()
 let lastHit = null, activeTool = null, moveAmt = 0
 function placeTool(h) {
-  const tool = tools[stageInfo().id]
+  const tool = tools[gearFor(stageInfo().id).id]
   if (!tool || job.done) return
   if (activeTool && activeTool !== tool) { activeTool.visible = false; activeTool.userData.target = 0; activeTool.userData.show = 0 }
   activeTool = tool
@@ -1097,7 +1107,7 @@ function placeTool(h) {
     }
   }
   lastHit = h.point.clone()
-  if (!job.done && !finishing && (h.object.userData.kind !== 'Glass' || stageInfo().id === 'wash')) toolSound(stageInfo().id, Math.min(1, moveAmt * 1.4))
+  if (!job.done && !finishing && (h.object.userData.kind !== 'Glass' || stageInfo().id === 'wash')) toolSound(stageInfo().id, Math.min(1, moveAmt * 1.4), gearFor(stageInfo().id))
   const x = dirV.clone().addScaledVector(nrm, -dirV.dot(nrm))
   if (x.lengthSq() < 1e-4) x.set(0, 1, 0).addScaledVector(nrm, -nrm.y)
   x.normalize()
@@ -1126,9 +1136,10 @@ function animTool(t, dt) {
     inner.position.set(0, 0, 0)
     inner.rotation.set(0, 0, 0)
     inner.scale.set(1, 1, 1)
-    if (u.id === 'rust') { inner.position.x = Math.sin(t * 0.045) * 0.025 * m; inner.rotation.z = Math.sin(t * 0.045) * 0.06 * m }
-    else if (u.id === 'wash') { inner.scale.y = 1 - 0.18 * m * (0.5 + 0.5 * Math.sin(t * 0.03)); inner.position.x = Math.sin(t * 0.02) * 0.02 * m }
-    else if (u.id === 'paint') { inner.position.x = Math.sin(t * 0.07) * 0.004; inner.rotation.z = 0.15 }
+    if (u.anim === 'scrub') { inner.position.x = Math.sin(t * 0.045) * 0.025 * m; inner.rotation.z = Math.sin(t * 0.045) * 0.06 * m }
+    else if (u.anim === 'squish') { inner.scale.y = 1 - 0.18 * m * (0.5 + 0.5 * Math.sin(t * 0.03)); inner.position.x = Math.sin(t * 0.02) * 0.02 * m }
+    else if (u.anim === 'wipe') { const k = t * 0.012; inner.position.x = Math.cos(k) * 0.03 * m; inner.position.z = Math.sin(k) * 0.03 * m; inner.rotation.y = Math.sin(k) * 0.25 * m }
+    else if (u.anim === 'hover') { inner.position.x = Math.sin(t * 0.07) * 0.004; inner.rotation.z = 0.15 }
     else { if (u.pad) u.pad.rotation.y += dt * 0.9; inner.position.x = (Math.random() - 0.5) * 0.004; inner.position.z = (Math.random() - 0.5) * 0.004 }
     // прижат к кузову, пока трёшь; отпустил — приподнимается и тает
     tool.position.copy(u.base).addScaledVector(u.n, (1 - u.show) * 0.15)
@@ -1144,6 +1155,7 @@ function fxEmit(type, n) {
   for (let i = 0; i < n; i++) {
     if (type === 'flake') bits.push({ type, x, y, vx: (Math.random() - 0.5) * 3, vy: -Math.random() * 2.5, g: 0.25, life: 1, d: 0.025, c: ['#9c4f1c', '#c97b38', '#5a2a10'][(Math.random() * 3) | 0], s: 2 + Math.random() * 3 })
     else if (type === 'foam') bits.push({ type, x: x + (Math.random() - 0.5) * 50, y: y + (Math.random() - 0.5) * 30, vx: (Math.random() - 0.5) * 0.4, vy: 0.3 + Math.random() * 0.4, g: 0, life: 1, d: 0.012, s: 3 + Math.random() * 7 })
+    else if (type === 'water') bits.push({ type: 'mist', x: x + (Math.random() - 0.5) * 50, y: y - 10 - Math.random() * 40, vx: (Math.random() - 0.5) * 4, vy: 2 + Math.random() * 3, g: 0.15, life: 1, d: 0.05, c: Math.random() < 0.5 ? '#cfe8ff' : '#ffffff', s: 2 + Math.random() * 3 })
     else if (type === 'mist') bits.push({ type, x: x + (Math.random() - 0.5) * 40, y: y - 30 - Math.random() * 30, vx: (Math.random() - 0.5) * 2, vy: 1.5 + Math.random() * 2, g: 0, life: 1, d: 0.06, c: job.color, s: 1.5 + Math.random() * 2.5 })
     else bits.push({ type, x: x + (Math.random() - 0.5) * 60, y: y + (Math.random() - 0.5) * 40, vx: 0, vy: 0, g: 0, life: 1, d: 0.035, s: 4 + Math.random() * 6 })
   }
@@ -1458,7 +1470,7 @@ const SITES = [
   { id: 'avto', ico: 'А', col: '#e2572c', name: 'Авто с рук', desc: 'Объявления о продаже машин со всей округи', tags: 'машины купить объявления авто' },
   { id: 'jm', ico: 'Д', col: '#1f1f24', name: 'Джо Моторс', desc: 'Твой сайт: фото тачек и продажа', tags: 'продать мой сайт джо моторс' },
   { id: 'bank', ico: '₽', col: '#d9a521', name: 'Банк «Копейка»', desc: 'Твой счёт: деньги на тачки', tags: 'банк счёт деньги' },
-  { id: 'parts', ico: 'З', col: '#2f8f5b', name: 'ЗапчастиТут', desc: 'Инструмент, краски, диски — с доставкой в гараж', tags: 'магазин краска инструмент запчасти диски', soon: true },
+  { id: 'parts', ico: 'З', col: '#2f8f5b', name: 'ЗапчастиТут', desc: 'Оборудование для гаража — с доставкой', tags: 'магазин инструмент оборудование мойка дрель краскопульт полировка' },
   { id: 'forum', ico: 'Ф', col: '#4b6fd6', name: 'Гаражный форум', desc: 'Мужики подскажут, как продать дороже', tags: 'форум советы', soon: true },
 ]
 const LOGO = [['G', '#e2572c'], ['a', '#d9a521'], ['g', '#2f8f5b'], ['e', '#4b6fd6'], ['l', '#e2572c']]
@@ -1485,7 +1497,7 @@ function head(title, sub, col) {
 function openSite(id, arg = null) {
   site = id; siteArg = arg
   $('gbody').className = 'site'
-  const urls = { avto: 'avtosruk.ru', ad: 'avtosruk.ru/ad', bank: 'kopeyka-bank.ru', jm: 'joe-motors.ru' }
+  const urls = { avto: 'avtosruk.ru', ad: 'avtosruk.ru/ad', bank: 'kopeyka-bank.ru', jm: 'joe-motors.ru', parts: 'zapchastitut.ru' }
   $('gurl').textContent = urls[id] + (arg != null && id === 'ad' ? '/' + currentAds()[arg].phone : '')
   let html = ''
   if (id === 'avto') {
@@ -1508,6 +1520,21 @@ function openSite(id, arg = null) {
       ${ad.sold ? '' : `<div class="offers">${[0.9, 0.8, 0.7].map((k) => `<button data-bid="${k}" ${ad.done ? 'disabled' : ''}>${money(Math.round((ad.ask * k) / 10) * 10)}</button>`).join('')}</div>`}
       <button class="bigbtn green" id="buyBtn" ${canBuy ? '' : 'disabled'}>Купить за ${money(ad.ask)}</button>
       ${why ? `<div class="warn">${why}</div>` : '<div class="note">Деньги спишутся со счёта, машину пригонят в гараж.</div>'}</div>`
+  } else if (id === 'parts') {
+    const own = save.gear || []
+    html = head('ЗапчастиТут', 'оборудование для гаража · доставка сразу', '#2f8f5b') + `<div class="sin">
+      <div class="note" style="text-align:left;margin:0 0 10px">На счёте: <b style="color:#1f1f24">${save.bank?.open ? money(save.cash) : 'счёт не открыт'}</b></div>
+      <div class="cards">${STAGES.map((st) => GEAR[st.id].filter((g) => g.price).map((g) => {
+        const has = own.includes(g.id), base = GEAR[st.id][0]
+        const can = !has && save.bank?.open && save.cash >= g.price
+        return `<div class="card"><img alt="" src="${gearPics[g.id] || ''}" style="aspect-ratio:16/11;object-fit:contain;background:#f1f2f6"><div class="cb">
+          <div class="ct"><b>${g.name}</b><span class="pr">${has ? '✓' : money(g.price)}</span></div>
+          <div class="meta">${st.label.charAt(0) + st.label.slice(1).toLowerCase()} · вместо «${base.name.toLowerCase()}»</div>
+          <div class="txt" style="font-size:13px">${g.desc}</div>
+          <div class="facts"><span>шире ×${(g.r / base.r).toFixed(1)}</span><span>быстрее ×${((g.a * g.r) / (base.a * base.r)).toFixed(1)}</span></div>
+          <button class="bigbtn ${has ? 'ghost' : 'green'}" data-gear="${g.id}" ${has || !can ? 'disabled' : ''}>${has ? 'Уже в гараже' : !save.bank?.open ? 'Нужен счёт в банке' : save.cash < g.price ? 'Не хватает денег' : 'Купить за ' + money(g.price)}</button>
+        </div></div>`
+      }).join('')).join('')}</div></div>`
   } else if (id === 'bank') {
     const b = save.bank
     html = head('Банк «Копейка»', 'копейка рубль бережёт', '#d9a521') + `<div class="sin">` + (!b?.open
@@ -1552,6 +1579,18 @@ function openSite(id, arg = null) {
     ad.sold = true
     $('gagel').hidden = true
     buy({ ...ad, price: ad.ask })
+  }
+  for (const el of $('gbody').querySelectorAll('[data-gear]')) el.onclick = () => {
+    const g = Object.values(GEAR).flat().find((x) => x.id === el.dataset.gear)
+    if (!g || (save.gear || []).includes(g.id) || save.cash < g.price) return
+    save.cash -= g.price
+    save.gear = [...(save.gear || []), g.id]
+    bankOp(`ЗапчастиТут: ${g.name}`, -g.price)
+    persist()
+    sfx('door', 0.5)
+    toast(`${g.name} — в гараже!`)
+    if (job) drawHud()
+    openSite('parts')
   }
   if (q('#bankOpen')) q('#bankOpen').onclick = () => {
     const r = () => String(1000 + ((Math.random() * 9000) | 0))

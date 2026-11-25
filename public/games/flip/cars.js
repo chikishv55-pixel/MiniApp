@@ -26,11 +26,36 @@ export const CARS = {
 
 // Работы по порядку. r — радиус инструмента в метрах, a — сила одного мазка.
 export const STAGES = [
-  { id: 'wash', tool: 'ToolSponge', label: 'МОЙКА', what: 'грязь', bar: 'грязь', r: 0.26, a: 0.3, hint: 'Три губкой кузов и стёкла', done: 'Помыто!' },
-  { id: 'rust', tool: 'ToolBrush', label: 'РЖАВЧИНА', what: 'ржавчина', bar: 'ржавчина', r: 0.22, a: 0.32, hint: 'Щёткой сдирай ржавчину до металла', done: 'Ржавчины нет!' },
-  { id: 'paint', tool: 'ToolSpray', label: 'ПОКРАСКА', what: 'не покрашено', bar: 'покрашено', r: 0.3, a: 0.2, hint: 'Води баллончиком по кузову', done: 'Покрашено!' },
-  { id: 'polish', tool: 'ToolPolish', label: 'ПОЛИРОВКА', what: 'тусклое', bar: 'блеск', r: 0.24, a: 0.16, hint: 'Полируй до блеска', done: 'Как с завода!' },
+  { id: 'wash', tool: 'ToolSponge', label: 'МОЙКА', what: 'грязь', bar: 'грязь', r: 0.26, a: 0.3, hint: 'Отмой кузов и стёкла', done: 'Помыто!' },
+  { id: 'rust', tool: 'ToolBrush', label: 'РЖАВЧИНА', what: 'ржавчина', bar: 'ржавчина', r: 0.22, a: 0.32, hint: 'Сдирай ржавчину до металла', done: 'Ржавчины нет!' },
+  { id: 'paint', tool: 'ToolSpray', label: 'ПОКРАСКА', what: 'не покрашено', bar: 'покрашено', r: 0.3, a: 0.2, hint: 'Крась кузов', done: 'Покрашено!' },
+  { id: 'polish', tool: 'ToolRag', label: 'ПОЛИРОВКА', what: 'тусклое', bar: 'блеск', r: 0.24, a: 0.16, hint: 'Наведи блеск', done: 'Как с завода!' },
 ]
+// Оборудование: по два варианта на работу. Первое есть с самого начала, второе покупается в «ЗапчастиТут».
+// r — радиус в метрах, a — сила мазка, snd — звук (flip/snd), anim — как двигается под пальцем.
+export const GEAR = {
+  wash: [
+    { id: 'sponge', tool: 'ToolSponge', name: 'Губка', price: 0, r: 0.26, a: 0.3, snd: 'sponge', anim: 'squish' },
+    { id: 'washer', tool: 'ToolWasher', name: 'Мойка высокого давления', price: 900, r: 0.42, a: 0.55, snd: 'spray', anim: 'hover', fx: 'water',
+      desc: 'Сбивает грязь струёй — моешь в два раза быстрее и шире.' },
+  ],
+  rust: [
+    { id: 'brush', tool: 'ToolBrush', name: 'Щётка по металлу', price: 0, r: 0.22, a: 0.32, snd: 'brush', anim: 'scrub' },
+    { id: 'drill', tool: 'ToolDrill', name: 'Дрель со щёткой-чашкой', price: 1200, r: 0.3, a: 0.62, snd: 'polish', anim: 'spin', spin: 'ToolDrillWheel',
+      desc: 'Проволочная чашка на дрели: ржавчина слетает за пару проходов.' },
+  ],
+  paint: [
+    { id: 'can', tool: 'ToolSpray', name: 'Баллончик', price: 0, r: 0.3, a: 0.2, snd: 'spray', anim: 'hover' },
+    { id: 'gun', tool: 'ToolGun', name: 'Краскопульт', price: 1500, r: 0.46, a: 0.34, snd: 'spray', anim: 'hover',
+      desc: 'Широкий ровный факел — красишь машину без пятен и в разы быстрее.' },
+  ],
+  polish: [
+    { id: 'rag', tool: 'ToolRag', name: 'Тряпка-микрофибра', price: 0, r: 0.2, a: 0.11, snd: 'sponge', anim: 'wipe' },
+    { id: 'polisher', tool: 'ToolPolish', name: 'Полировальная машинка', price: 1100, r: 0.3, a: 0.3, snd: 'polish', anim: 'spin', spin: 'ToolPolishPad',
+      desc: 'Круг крутится сам — блеск как из салона, руки не устают.' },
+  ],
+}
+
 // сделал 80% работы — остальное домывается само (последние пятна в щелях тереть не заставляем)
 export const DONE_AT = 0.2
 // вклад каждой работы в цену продажи (доля от базовой цены машины)
