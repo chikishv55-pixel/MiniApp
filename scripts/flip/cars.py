@@ -18,6 +18,7 @@
 import bpy, bmesh, os
 from math import pi, radians, cos, sin
 from mathutils import Matrix, Vector
+from mathutils.bvhtree import BVHTree
 
 OUT_DIR = r"D:\MiniApp\public\games\flip"
 SCENE = "Flip_Cars"
@@ -212,7 +213,7 @@ def cyl(name, loc, r, depth, axis, material, verts=16, bevel=0.0, tilt=None):
 
 
 def torus(name, loc, R, r, rot, material, seg=20):
-    bpy.ops.mesh.primitive_torus_add(major_radius=R, minor_radius=r, major_segments=seg, minor_segments=6,
+    bpy.ops.mesh.primitive_torus_add(major_radius=R, minor_radius=r, major_segments=seg, minor_segments=8,
                                      location=loc, rotation=rot)
     o = bpy.context.active_object
     o.name = name
@@ -336,44 +337,121 @@ def side_box(name, x0, x1, y, out, z0, z1, s, material, bevel=0.0):
 # ---------------------------------------------------------------- колесо
 
 
+def radial(name, cx, cz, ang, r0, r1, w0, w1, y0, y1, material, lift=0.0):
+    """Брусок в плоскости колеса: от радиуса r0 (ширина w0) до r1 (ширина w1), по оси колеса y0..y1.
+    lift — насколько внутренний конец выступает наружу (выпуклые спицы)."""
+    ux, uz = cos(ang), sin(ang)
+    tx, tz = -uz, ux
+    bm = bmesh.new()
+    vs = []
+    for yy in (y0, y1):
+        for rr, ww, dl in ((r0, w0, lift), (r1, w1, 0.0)):
+            for sg in (-1, 1):
+                vs.append(bm.verts.new((cx + rr * ux + sg * ww * tx, yy + (dl if yy == y1 else 0.0), cz + rr * uz + sg * ww * tz)))
+    # vs: [y0: r0-, r0+, r1-, r1+], [y1: ...]
+    q = lambda a, b, c_, d: bm.faces.new((vs[a], vs[b], vs[c_], vs[d]))
+    q(0, 1, 3, 2); q(4, 6, 7, 5); q(0, 2, 6, 4); q(1, 5, 7, 3); q(0, 4, 5, 1); q(2, 3, 7, 6)
+    bmesh.ops.recalc_face_normals(bm, faces=bm.faces)
+    return obj_from_bm(name, bm, material)
+
+
 def wheel(G, c, x, s, inner=False):
+    """Колесо: шина со скруглёнными боковинами и протектором, литой/штампованный диск, тормоз за спицами."""
     r, tw, W = c["r"], c.get("tw", 0.22), c["W"]
+    kind = c.get("rim", "steel")
+    off = kind == "off" or c.get("tread")
     yc = s * (W - 0.01 - tw / 2)
     if inner:  # второе колесо спарки
         yc -= s * (tw + 0.03)
-    G["Tire"].append(cyl("t", (x, yc, r), r, tw, "Y", "Tire", 20, bevel=0.045))
-    if c.get("tread"):
-        for k in range(14):
-            G["Tire"].append(spin("tr", x, yc, r, k * 2 * pi / 14, 0.03, 0.06, tw * 0.86, r - 0.015, "Tire"))
+    ri = r * (0.6 if off else 0.66)  # радиус обода: у внедорожной резины боковина выше
+    # шина — кольцо (сплющенный тор): круглые боковины, а в середине виден диск
+    m = (r - ri) / 2
+    t = torus("t", (x, yc, r), ri + m, m, (pi / 2, 0, 0), "Tire", 28)
+    t.scale = (1, 1, (tw / 2) / m)
+    G["Tire"].append(t)
+    if off:  # грунтозацепы в шахматку
+        n = 18
+        for k in range(n):
+            a = k * 2 * pi / n
+            for row, sh in ((-1, 0.0), (1, pi / n)):
+                y0, y1 = (yc + row * tw * 0.04, yc + row * tw * 0.47) if row > 0 else (yc - tw * 0.47, yc - tw * 0.04)
+                G["Tire"].append(radial("lug", x, r, a + sh, r - 0.03, r + 0.012, 0.045, 0.04, min(y0, y1), max(y0, y1), "Tire"))
     if inner:
         return
-    yo = yc + s * (tw / 2 - 0.012)  # плоскость диска, чуть утоплена
-    ri = r * 0.64
-    kind = c.get("rim", "steel")
-    if kind == "steel":
-        G["Rim"].append(cyl("rd", (x, yo, r), ri, 0.02, "Y", "Rim", 20))
+    face = yc + s * (tw / 2 - 0.03)  # плоскость лица диска (утоплена в шину)
+    # тормоз: диск и суппорт видны сквозь спицы
+    G["Chrome"].append(cyl("brake", (x, face - s * 0.07, r), ri * 0.78, 0.02, "Y", "Chrome", 20))
+    cal = "Tail" if kind == "multi" else "Dark"
+    G[cal].append(radial("caliper", x, r, radians(115), ri * 0.5, ri * 0.82, 0.07, 0.09,
+                         min(face - s * 0.1, face - s * 0.045), max(face - s * 0.1, face - s * 0.045), cal))
+    # обод: глубокая «бочка» и полированная кромка
+    G["Dark"].append(cyl("barrel", (x, face - s * 0.05, r), ri - 0.005, 0.1, "Y", "Dark", 24))
+    G["Rim"].append(torus("lip", (x, face, r), ri - 0.012, 0.016, (pi / 2, 0, 0), "Rim", 28))
+    yA, yB = sorted((face - s * 0.02, face))
+    if kind == "steel":  # штамповка: тарелка с отверстиями, выпуклое кольцо, ступица
+        G["Rim"].append(cyl("dish", (x, face - s * 0.012, r), ri - 0.015, 0.012, "Y", "Rim", 24))
+        G["Rim"].append(torus("ring", (x, face - s * 0.004, r), ri * 0.62, 0.014, (pi / 2, 0, 0), "Rim", 24))
         for k in range(6):
-            a = k * pi / 3
-            G["Tire"].append(cyl("hole", (x + cos(a) * ri * 0.62, yo + s * 0.011, r + sin(a) * ri * 0.62), 0.035, 0.004, "Y", "Tire", 8))
-        G["Rim"].append(cyl("cap", (x, yo + s * 0.015, r), ri * 0.32, 0.03, "Y", "Rim", 12))
-        return
-    # литьё: тёмная подложка, обод, спицы, колпачок
-    G["Tire"].append(cyl("back", (x, yo - s * 0.03, r), ri, 0.02, "Y", "Tire", 20))
-    G["Rim"].append(torus("lip", (x, yo, r), ri - 0.015, 0.018, (pi / 2, 0, 0), "Rim"))
-    n, w = {"alloy5": (5, 0.07), "multi": (10, 0.035), "off": (6, 0.075)}[kind]
-    for k in range(n):
-        G["Rim"].append(spin("sp", x, yo, r, k * 2 * pi / n + 0.3, ri - 0.06, w, 0.025, 0.04, "Rim"))
-    G["Rim"].append(cyl("cap", (x, yo + s * 0.01, r), 0.06, 0.04, "Y", "Rim", 12))
+            a = k * pi / 3 + pi / 6
+            G["Dark"].append(cyl("hole", (x + cos(a) * ri * 0.8, face - s * 0.004, r + sin(a) * ri * 0.8), ri * 0.12, 0.02, "Y", "Dark", 10))
+        G["Rim"].append(cyl("hub", (x, face + s * 0.006, r), ri * 0.36, 0.03, "Y", "Rim", 14))
+        nuts = 4
+    else:
+        n, w0, w1 = {"alloy5": (5, 0.035, 0.05), "multi": (10, 0.014, 0.022), "off": (6, 0.04, 0.05)}[kind]
+        for k in range(n):
+            a = k * 2 * pi / n + 0.3
+            G["Rim"].append(radial("sp", x, r, a, 0.06, ri - 0.012, w0, w1, yA, yB, "Rim", lift=s * 0.012))
+            if kind == "multi":  # сдвоенные спицы
+                G["Rim"].append(radial("sp2", x, r, a + 0.16, 0.06, ri - 0.012, w0, w1, yA, yB, "Rim", lift=s * 0.012))
+        if kind == "off":  # бэдлок: кольцо с болтами по кромке
+            G["Rim"].append(torus("bead", (x, face + s * 0.008, r), ri - 0.01, 0.02, (pi / 2, 0, 0), "Rim", 28))
+            for k in range(16):
+                a = k * 2 * pi / 16
+                G["Chrome"].append(cyl("bolt", (x + cos(a) * (ri - 0.01), face + s * 0.03, r + sin(a) * (ri - 0.01)), 0.008, 0.016, "Y", "Chrome", 6))
+        G["Rim"].append(cyl("hub", (x, face + s * 0.008, r), 0.07, 0.03, "Y", "Rim", 14))
+        nuts = 5
+    for k in range(nuts):  # гайки и колпачок
+        a = k * 2 * pi / nuts
+        G["Chrome"].append(cyl("nut", (x + cos(a) * 0.045, face + s * 0.026, r + sin(a) * 0.045), 0.011, 0.016, "Y", "Chrome", 6))
+    G["Dark"].append(cyl("cap", (x, face + s * 0.028, r), 0.022, 0.012, "Y", "Dark", 10))
 
 
-def flare(G, c, x, s, material, d):
-    """Расширитель арки: полукольцо над колесом, торчит из борта."""
+def flare(G, c, x, s, material, d, lw, zlow):
+    """Расширитель арки: дуга над колесом, плотно прилегает к борту (по его реальной ширине) и заканчивается
+    над порогом — не висит ниже кузова и не отходит щелью."""
     r, a = c["r"], c["arch"]
-    pts = [(x + cos(t) * (a + d), r + sin(t) * (a + d)) for t in [i * pi / 12 for i in range(13)]]
-    pts += [(x + cos(t) * a, r + sin(t) * a) for t in [i * pi / 12 for i in range(12, -1, -1)]]
-    W = c["W"]
-    y0, y1 = (W - 0.03, W + d * 0.7) if s > 0 else (-W - d * 0.7, -W + 0.03)
-    G[material].append(prism("fl", pts, (y0, y1), material))
+    zmin = zlow + 0.03
+    ts = [i * pi / 16 for i in range(17)]
+    ts = [t for t in ts if r + sin(t) * a >= zmin]
+    # если дуга обрезана порогом — добираем точный конец на высоте zmin
+    def cut(t_from, t_to):
+        lo, hi = t_from, t_to
+        for _ in range(30):
+            m = (lo + hi) / 2
+            if r + sin(m) * a >= zmin: hi = m
+            else: lo = m
+        return hi
+    t0 = cut(-0.5, 0.0) if r < zmin else 0.0
+    t1 = pi - t0
+    ts = [t0] + [t for t in ts if t0 < t < t1] + [t1]
+    bm = bmesh.new()
+    rows = []
+    for t in ts:
+        ring = []
+        for rad in (a - 0.01, a + d):
+            px, pz = x + cos(t) * rad, r + sin(t) * rad
+            yin = lw(px, pz) - 0.015
+            for yy in (yin, yin + d * 0.75 * (1.0 if rad > a else 0.6)):
+                ring.append(bm.verts.new((px, s * yy, pz)))
+        rows.append(ring)  # [внутр-у борта, внутр-наружу, внешн-у борта, внешн-наружу]
+    for k in range(len(rows) - 1):
+        A, B = rows[k], rows[k + 1]
+        for i0, i1 in ((0, 1), (1, 3), (3, 2), (2, 0)):
+            bm.faces.new((A[i0], A[i1], B[i1], B[i0]))
+    for R in (rows[0], rows[-1]):
+        bm.faces.new((R[0], R[1], R[3], R[2]))
+    bmesh.ops.recalc_face_normals(bm, faces=bm.faces)
+    G[material].append(obj_from_bm("fl", bm, material))
 
 
 def headlight(G, F, s, spec_z, spec_y, spec):
@@ -412,6 +490,91 @@ def headlight(G, F, s, spec_z, spec_y, spec):
     elif inner == "round2":  # большая круглая линза
         G["Chrome"].append(cyl("rl", (F + 0.02, s * yc, cz), hh * 0.85, 0.014, "X", "Chrome", 16))
         G["Headlight"].append(cyl("rli", (F + 0.026, s * yc, cz), hh * 0.6, 0.014, "X", "Headlight", 16))
+
+
+def attach(objs, c, is_inside, near_wheel):
+    """Наружные детали «прилипают» к кузову. Детали ставятся по расчётной ширине кузова, а его грани плоские —
+    между опорными точками борт идёт иначе, и ручки, швы, зеркала, решётки висели в 1–6 см от него.
+    Острова (отдельные куски сетки) склеиваем в группы по касанию — решётка вместе с планками, фара с линзой, —
+    и двигаем каждую группу к кузову, пока ближайшая точка не коснётся. Колёса и салон не трогаем;
+    сдвиг больше 15 см — это задумка (выхлоп под будкой), а не ошибка."""
+    body = objs[0]
+    bmb = bmesh.new()
+    bmb.from_mesh(body.data)
+    tree = BVHTree.FromBMesh(bmb)
+    skip_mat = {"Glass", "Tire", "Rim", "Seat", "Dash", "Well"}
+    isl = []  # (объект, bmesh, [вершины], центр)
+    bms = []
+    for o in objs[1:]:
+        if o.data.materials[0].name.split(".")[0] in skip_mat:
+            continue
+        bm = bmesh.new()
+        bm.from_mesh(o.data)
+        bm.verts.ensure_lookup_table()
+        bms.append((o, bm))
+        seen = set()
+        for v in bm.verts:
+            if v.index in seen:
+                continue
+            stack, part = [v], []
+            seen.add(v.index)
+            while stack:
+                u = stack.pop()
+                part.append(u)
+                for e in u.link_edges:
+                    w = e.other_vert(u)
+                    if w.index not in seen:
+                        seen.add(w.index)
+                        stack.append(w)
+            ctr = sum((u.co for u in part), Vector()) / len(part)
+            if is_inside(ctr) or near_wheel(ctr):
+                continue
+            isl.append((part, ctr))
+    # группы по касанию (union-find)
+    parent = list(range(len(isl)))
+
+    def find(i):
+        while parent[i] != i:
+            parent[i] = parent[parent[i]]
+            i = parent[i]
+        return i
+    # близость островов — по ограничивающим коробкам с допуском (быстро и достаточно для «касается»)
+    boxes = []
+    for part, _ in isl:
+        xs = [u.co.x for u in part]; ys = [u.co.y for u in part]; zs = [u.co.z for u in part]
+        boxes.append((min(xs), max(xs), min(ys), max(ys), min(zs), max(zs)))
+    tol = 0.006
+    for i in range(len(isl)):
+        a = boxes[i]
+        for j in range(i + 1, len(isl)):
+            b = boxes[j]
+            if a[0] - tol <= b[1] and b[0] - tol <= a[1] and a[2] - tol <= b[3] and b[2] - tol <= a[3] and a[4] - tol <= b[5] and b[4] - tol <= a[5]:
+                parent[find(i)] = find(j)
+    groups = {}
+    for i in range(len(isl)):
+        groups.setdefault(find(i), []).append(i)
+    moved = 0
+    for members in groups.values():
+        best = None
+        for i in members:
+            for u in isl[i][0]:
+                hit = tree.find_nearest(u.co)
+                if hit[0] is not None and (best is None or hit[3] < best[0]):
+                    best = (hit[3], hit[0] - u.co)
+        if not best or best[0] < 0.006 or best[0] > 0.15:
+            continue
+        d, vec = best
+        shift = vec * ((d - 0.002) / d)
+        for i in members:
+            for u in isl[i][0]:
+                u.co += shift
+        moved += 1
+    for o, bm in bms:
+        bm.to_mesh(o.data)
+        o.data.update()
+        bm.free()
+    bmb.free()
+    return moved
 
 
 # ---------------------------------------------------------------- сборка одной машины
@@ -499,32 +662,60 @@ def build(c):
     if c.get("box"):
         x0, x1, hw, z0, z1 = c["box"]
         G["Body"].append(box("box", x0, x1, -hw, hw, z0, z1, "Body", bevel=0.04))
-        G["Dark"] += [box("frame", x0 + 0.1, x1, s * 0.42 - 0.05, s * 0.42 + 0.05, 0.55, z0, "Dark") for s in (1, -1)]
+        G["Dark"] += [box("frame", x0 - 0.02, x1, s * 0.42 - 0.05, s * 0.42 + 0.05, 0.55, z0, "Dark") for s in (1, -1)]
         rx = c["wheels"][1]
         G["Dark"] += [box("flap", rx - c["r"] - 0.14, rx - c["r"] - 0.11, s * (hw - 0.3) - 0.2, s * (hw - 0.3) + 0.2, 0.2, z0, "Dark") for s in (1, -1)]
 
     # --- салон (виден через стёкла)
+    # Пол салона опущен: в нижней части кузова вырезана «ванна» между колёсными арками — иначе сиденья стоят
+    # на уровне окон. Вырез целиком под кабиной, снаружи его не видно.
     xin_r = xr(floor) + hthick(rb, rt) + 0.01
     xin_f = xf(floor) - hthick(fb, ft) - 0.01
     yin = cw(floor) - T - 0.01
-    G["Dark"].append(box("carpet", xin_r, xin_f, -yin, yin, floor, floor + 0.015, "Dark"))
+    fx, rxw = c["wheels"][0], c["wheels"][1]
+    cav0 = max(xin_r + 0.02, rxw + c["arch"] + 0.06) if xin_r < rxw + c["arch"] + 0.06 else xin_r + 0.02
+    cav1 = min(xin_f - 0.02, fx - c["arch"] - 0.06)
+    zin = max(zlow + 0.12, floor - 0.42)  # уровень пола салона
+    cav_w = min(W - 0.09, CW - T - 0.02)
+    has_cav = cav1 - cav0 > 0.5
+    if has_cav:
+        cutter(lower, box("cav", cav0, cav1, -cav_w, cav_w, zin, floor + 0.3, "Body"))
+        G["Dark"].append(box("carpet", cav0, cav1, -cav_w, cav_w, zin, zin + 0.015, "Dark"))
+        if cav0 > xin_r + 0.02:  # над задними арками пол тоже ниже — сразу над колесом
+            zr = min(floor - 0.1, max(zin, c["r"] + c["arch"] + 0.04))
+            cutter(lower, box("cavr", xin_r + 0.02, cav0 + 0.01, -cav_w, cav_w, zr, floor + 0.3, "Body"))
+            G["Dark"].append(box("carpet", xin_r + 0.02, cav0, -cav_w, cav_w, zr, zr + 0.015, "Dark"))
+        if cav1 < xin_f - 0.02:
+            G["Dark"].append(box("carpet", cav1, xin_f, -yin, yin, floor, floor + 0.015, "Dark"))
+    else:
+        G["Dark"].append(box("carpet", xin_r, xin_f, -yin, yin, floor, floor + 0.015, "Dark"))
+
+    def floor_at(x0, x1):  # на какой высоте пол под сиденьем
+        if has_cav and x0 >= cav0 - 0.05 and x1 <= cav1 + 0.05:
+            return zin
+        if has_cav and cav0 > xin_r + 0.02 and x1 <= cav0 + 0.25:
+            return min(floor - 0.1, max(zin, c["r"] + c["arch"] + 0.04))
+        return floor
+
     dash1 = xf(zw0) - hthick(fb, ft) - 0.04
     dash0 = dash1 - 0.38
-    G["Dash"].append(box("dash", dash0, dash1, -yin, yin, floor, zw0 + 0.05, "Dash", bevel=0.02))
+    G["Dash"].append(box("dash", dash0, dash1, -yin, yin, floor_at(dash0, dash1), zw0 + 0.05, "Dash", bevel=0.02))
     G["Dash"].append(box("dashtop", dash0 - 0.06, dash1, -yin, yin, zw0 + 0.01, zw0 + 0.07, "Dash", bevel=0.02))
     ydrv = 0.40 * CW / 0.86  # руль слева (машина смотрит в +X, левый борт — +Y)
-    G["Dark"].append(torus("wheel", (dash0 - 0.13, ydrv, zw0 + 0.04), 0.15, 0.02, (0, radians(-58), 0), "Dark", 16))
-    G["Dark"].append(cyl("column", (dash0 - 0.05, ydrv, zw0 - 0.02), 0.025, 0.2, "X", "Dark", 8, tilt=Matrix.Rotation(radians(-32), 3, "Y")))
+    G["Dark"].append(torus("wheel", (dash0 - 0.13, ydrv, zw0 + 0.02), 0.15, 0.02, (0, radians(-58), 0), "Dark", 16))
+    G["Dark"].append(cyl("column", (dash0 - 0.05, ydrv, zw0 - 0.04), 0.025, 0.2, "X", "Dark", 8, tilt=Matrix.Rotation(radians(-32), 3, "Y")))
     top = zt - 0.12
 
     def seat(sx, y0, y1):
         cr_ = max(sx - 0.26, xr(floor + 0.2) + hthick(rb, rt) + 0.04)
-        G["Seat"].append(box("cush", cr_, sx + 0.22, y0, y1, floor, floor + 0.2, "Seat", bevel=0.03))
-        tb = min(floor + 0.72, top)
-        tx0 = max(cr_ - 0.10, xr(tb) + hthick(rb, rt) + 0.04)
-        G["Seat"].append(prism("back", [(cr_, floor + 0.12), (cr_ + 0.12, floor + 0.12), (tx0 + 0.12, tb), (tx0, tb)], (y0, y1), "Seat"))
+        fz = floor_at(cr_, sx + 0.22)
+        G["Seat"].append(box("cush", cr_, sx + 0.22, y0, y1, fz, fz + 0.24, "Seat", bevel=0.03))
+        tb = min(fz + 0.78, top)
+        tx0 = max(cr_ - 0.12, xr(tb) + hthick(rb, rt) + 0.04)
+        G["Seat"].append(prism("back", [(cr_, fz + 0.14), (cr_ + 0.13, fz + 0.14), (tx0 + 0.13, tb), (tx0, tb)], (y0, y1), "Seat"))
         if tb + 0.14 < zt - 0.05 and abs(y1 - y0) < 0.6:  # подголовник
             G["Seat"].append(box("head", tx0, tx0 + 0.1, (y0 + y1) / 2 - 0.12, (y0 + y1) / 2 + 0.12, tb + 0.02, tb + 0.15, "Seat", bevel=0.02))
+        return fz
 
     sx = dash0 - 0.58
     if c["seats"] == "bench":
@@ -532,9 +723,10 @@ def build(c):
     else:
         sw = 0.21 * CW / 0.86
         for s in (1, -1):
-            seat(sx, s * ydrv - sw, s * ydrv + sw)
-        G["Dark"].append(cyl("lever", (sx + 0.32, 0, floor + 0.15), 0.015, 0.3, "Z", "Dark", 6))
-        G["Chrome"].append(cyl("knob", (sx + 0.32, 0, floor + 0.31), 0.035, 0.05, "Z", "Chrome", 8))
+            fz = seat(sx, s * ydrv - sw, s * ydrv + sw)
+        G["Dash"].append(box("console", sx - 0.2, dash0, -0.09, 0.09, fz, fz + 0.3, "Dash", bevel=0.02))  # тоннель с рычагом
+        G["Dark"].append(cyl("lever", (sx + 0.2, 0, fz + 0.42), 0.015, 0.24, "Z", "Dark", 6))
+        G["Chrome"].append(cyl("knob", (sx + 0.2, 0, fz + 0.56), 0.035, 0.05, "Z", "Chrome", 8))
     if c.get("rear_seat") and sx - 0.9 - 0.26 > xin_r - 0.2:
         seat(sx - 0.9, -yin + 0.02, yin - 0.02)
 
@@ -545,7 +737,7 @@ def build(c):
             if i == 1 and c.get("dual_rear"):
                 wheel(G, c, x, s, inner=True)
             if c.get("flares") and xmin - 0.3 < x < xmax + 0.3:
-                flare(G, c, x, s, *c["flares"])
+                flare(G, c, x, s, *c["flares"], lw, zlow)
 
     # --- перед: бампер, решётка, фары
     F, R = c["front"], c["rear"]
@@ -651,6 +843,13 @@ def build(c):
     for m_, x0, x1, y0, y1, z0, z1 in c.get("extras", []):
         G[m_].append(box("x", x0, x1, y0, y1, z0, z1, m_))
 
+    def is_inside(p):  # точка в салоне (рычаг, руль, сиденья) — к кузову не двигаем
+        return zlow < p.z < zt and abs(p.y) < cw(min(max(p.z, zb), zt)) - 0.05 and xr(p.z) + 0.03 < p.x < xf(min(p.z, zt)) - 0.03
+
+    def near_wheel(p):  # детали колеса (диск, тормоз, гайки) держатся за колесо, не за кузов
+        return any(((p.x - wx) ** 2 + (p.z - c["r"]) ** 2) ** 0.5 < c["r"] + 0.05 and abs(p.y) > W - c.get("tw", 0.22) - 0.15
+                   for wx in c["wheels"])
+
     # --- кузов одним объектом: скосы на рёбрах, UV
     body = join([lower, cab] + G.pop("Body"), "Body")
     bev = body.modifiers.new("bevel", "BEVEL")
@@ -662,14 +861,37 @@ def build(c):
     sel(body)
     bpy.ops.object.modifier_apply(modifier=bev.name)
     bpy.ops.object.shade_flat()
+    # «ванна» салона изнутри (стенки и дно под ковриком) — тоже в тёмные ниши: её не видно, а место
+    # на развёртке кузова она бы отняла у ржавчины и краски
+    wi = next(i for i, m in enumerate(body.data.materials) if m and m.name.startswith("Well"))
+    if has_cav:
+        for p in body.data.polygons:
+            ctr = p.center
+            if xin_r - 0.01 < ctr.x < xin_f + 0.01 and abs(ctr.y) < cav_w + 0.005 and zlow < ctr.z < floor - 0.005:
+                p.material_index = wi
+    # ниши отдельным объектом: в развёртку кузова не попадают
+    sel(body)
+    bpy.ops.object.mode_set(mode="EDIT")
+    bpy.ops.mesh.select_all(action="DESELECT")
+    body.active_material_index = wi
+    bpy.ops.object.material_slot_select()
+    bpy.ops.mesh.separate(type="SELECTED")
+    bpy.ops.object.mode_set(mode="OBJECT")
+    well = next((o for o in bpy.context.selected_objects if o is not body), None)
+    if well:
+        well.name = well.data.name = "Well"
+        well.data.materials.clear()
+        well.data.materials.append(M["Well"])
+    body.data.materials.pop(index=wi)
     unwrap(body)
-    objs = [body]
+    objs = [body] + ([well] if well else [])
     for k, lst in G.items():
         if lst:
             o = join(lst, k)
             if k == "Glass":
                 unwrap(o)
             objs.append(o)
+    attach(objs, c, is_inside, near_wheel)
     return objs
 
 
