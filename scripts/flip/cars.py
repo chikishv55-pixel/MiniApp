@@ -43,14 +43,14 @@ CARS = {
         cab=[(0.55, 1.22), (2.15, 1.22), (1.55, 2.30), (0.60, 2.32)], CW=0.96, tumble=0.08, floor=1.25,
         split=[(0.95, 9)], rear_window=False, seams=[2.05, 0.62],
         box=(-2.80, 0.48, 1.04, 0.95, 2.75),
-        front=3.00, rear=-2.80, bumper=("dark", 0.45, 0.62), lights=[("swept", 0.95, 0.68, 0.11)],
+        front=3.00, rear=-2.80, bumper=("dark", 0.45, 0.62), lights=[("plate", 0.80, 0.68, (0.19, 0.075, 0.08, "proj"))],
         grille=("bars", 0.64, 0.92, 0.46), tail=("rect", 1.00, 1.22, 0.86), handles=[0.70], seats="bench", rear_seat=False),
     "iaz": dict(  # рамный пикап с двойной кабиной: 5125 / база 3000 / высота 1915
         lower=[(-2.56, 0.50), (2.48, 0.50), (2.56, 0.62), (2.56, 1.00), (2.45, 1.12), (0.95, 1.20), (-2.56, 1.22)],
         W=0.95, endc=(0.10, 0.03), wheels=(1.66, -1.34), r=0.385, tw=0.26, arch=0.48, rim="off", tread=True,
         cab=[(-1.00, 1.18), (0.98, 1.18), (0.32, 1.88), (-0.98, 1.90)], CW=0.90, tumble=0.08, floor=1.20,
         split=[(-9, -0.08), (0.02, 9)], seams=[0.92, -0.05, -0.97], bed=(-2.48, -1.05, 0.86, 0.72),
-        front=2.56, rear=-2.56, bumper=("dark", 0.50, 0.72), lights=[("swept", 0.96, 0.66, 0.11)],
+        front=2.56, rear=-2.56, bumper=("dark", 0.50, 0.72), lights=[("plate", 0.90, 0.63, (0.17, 0.075, 0.03, "round2"))],
         fog=(0.60, 0.66, 0.05), grille=("mesh", 0.74, 1.05, 0.40), tail=("vert", 0.86, 1.18, 0.82),
         flares=("Dark", 0.07), steps=True, roofrails=True, handles=[0.30, -0.68], seats="bucket", rear_seat=True),
     "torolla": dict(  # седан: 4530 / база 2600 / высота 1490
@@ -59,7 +59,7 @@ CARS = {
         W=0.85, endc=(0.13, 0.08), endl=0.9, wheels=(1.385, -1.215), r=0.315, tw=0.21, arch=0.38, rim="alloy5",
         cab=[(-1.62, 0.90), (0.98, 0.90), (0.12, 1.47), (-0.95, 1.48)], CW=0.80, tumble=0.14, floor=0.92,
         split=[(-0.36, 9), (-9, -0.46)], seams=[0.92, -0.40, -1.25],
-        front=2.265, rear=-2.265, lip=(0.32, 0.46, 0.50), lights=[("swept", 0.68, 0.58, 0.10)],
+        front=2.265, rear=-2.265, lip=(0.32, 0.46, 0.50), lights=[("plate", 0.56, 0.52, (0.17, 0.06, 0.05, "proj"))],
         grille=("bars", 0.55, 0.70, 0.30), tail=("wrap", 0.72, 0.88, 0.66), handles=[0.25, -0.62],
         seats="bucket", rear_seat=True, antenna=True),
     "torollah": dict(  # хэтчбек 5-дверный: 4180 / база 2600 / высота 1470
@@ -68,7 +68,7 @@ CARS = {
         W=0.85, endc=(0.13, 0.08), endl=0.9, wheels=(1.21, -1.39), r=0.315, tw=0.21, arch=0.38, rim="alloy5",
         cab=[(-2.02, 0.90), (0.82, 0.90), (-0.02, 1.46), (-1.75, 1.48)], CW=0.80, tumble=0.14, floor=0.92,
         split=[(-0.52, 9), (-1.42, -0.62), (-9, -1.52)], seams=[0.78, -0.56, -1.48],
-        front=2.09, rear=-2.09, lip=(0.32, 0.46, 0.50), lights=[("swept", 0.68, 0.58, 0.10)],
+        front=2.09, rear=-2.09, lip=(0.32, 0.46, 0.50), lights=[("plate", 0.56, 0.52, (0.17, 0.06, 0.05, "proj"))],
         grille=("bars", 0.55, 0.68, 0.30), tail=("vert", 0.80, 1.02, 0.66), handles=[0.10, -0.80],
         seats="bucket", rear_seat=True),
     "dmw3": dict(  # лифтбек «гран туризмо»: 4824 / база 2920 / высота 1508
@@ -77,7 +77,7 @@ CARS = {
         W=0.91, endc=(0.13, 0.10), endl=1.0, wheels=(1.59, -1.33), r=0.335, tw=0.23, arch=0.40, rim="multi",
         cab=[(-2.25, 0.92), (1.02, 0.92), (0.05, 1.49), (-1.05, 1.50)], CW=0.84, tumble=0.16, floor=0.94,
         split=[(-0.48, 9), (-1.40, -0.56), (-9, -1.50)], seams=[1.00, -0.52, -1.45],
-        front=2.41, rear=-2.41, lip=(0.32, 0.48, 0.62), lights=[("swept", 0.68, 0.62, 0.09)],
+        front=2.41, rear=-2.41, lip=(0.32, 0.48, 0.62), lights=[("plate", 0.56, 0.58, (0.17, 0.05, 0.025, "angel"))],
         grille=("kidney", 0.50, 0.78, 0.34), tail=("wrap", 0.80, 0.93, 0.70), handles=[0.30, -0.70],
         seats="bucket", rear_seat=True),
     "dmw5": dict(  # бизнес-седан: 4936 / база 2975 / высота 1479
@@ -86,7 +86,7 @@ CARS = {
         W=0.93, endc=(0.13, 0.10), endl=1.0, wheels=(1.61, -1.365), r=0.34, tw=0.24, arch=0.41, rim="multi",
         cab=[(-1.85, 0.92), (1.08, 0.92), (0.10, 1.47), (-1.10, 1.48)], CW=0.86, tumble=0.16, floor=0.94,
         split=[(-0.42, 9), (-1.25, -0.50), (-9, -1.33)], seams=[1.05, -0.46, -1.30],
-        front=2.47, rear=-2.47, lip=(0.32, 0.48, 0.66), lights=[("swept", 0.68, 0.64, 0.09)],
+        front=2.47, rear=-2.47, lip=(0.32, 0.48, 0.66), lights=[("plate", 0.555, 0.61, (0.17, 0.052, 0.02, "angel"))],
         grille=("kidney", 0.49, 0.80, 0.38), tail=("wrap", 0.80, 0.94, 0.70), handles=[0.35, -0.68],
         seats="bucket", rear_seat=True),
     "sheroki": dict(  # большой SUV: 4828 / база 2915 / высота 1792
@@ -95,7 +95,7 @@ CARS = {
         W=0.95, endc=(0.13, 0.08), endl=0.9, wheels=(1.495, -1.42), r=0.375, tw=0.25, arch=0.46, rim="alloy5",
         cab=[(-2.38, 1.12), (1.08, 1.12), (0.20, 1.74), (-2.15, 1.76)], CW=0.88, tumble=0.14, floor=1.14,
         split=[(-0.38, 9), (-1.40, -0.48), (-9, -1.50)], seams=[1.05, -0.42, -1.45],
-        front=2.415, rear=-2.415, lip=(0.46, 0.62, 0.70), lights=[("swept", 0.92, 0.64, 0.10)],
+        front=2.415, rear=-2.415, lip=(0.46, 0.62, 0.70), lights=[("plate", 0.86, 0.62, (0.17, 0.05, 0.0, "proj"))],
         grille=("slots7", 0.78, 1.02, 0.40), tail=("wrap", 0.95, 1.12, 0.74), cladding=True, roofrails=True,
         handles=[0.35, -0.75], seats="bucket", rear_seat=True),
     "ranger": dict(  # рамный внедорожник 4 двери: 4785 / база 3008 / высота 1840
@@ -196,7 +196,7 @@ def box(name, x0, x1, y0, y1, z0, z1, material, bevel=0.0, rot=None):
     return obj_from_bm(name, bm, material)
 
 
-def cyl(name, loc, r, depth, axis, material, verts=16, bevel=0.0):
+def cyl(name, loc, r, depth, axis, material, verts=16, bevel=0.0, tilt=None):
     bm = bmesh.new()
     bmesh.ops.create_cone(bm, cap_ends=True, segments=verts, radius1=r, radius2=r, depth=depth)
     if bevel:  # скруглённые боковины шины
@@ -205,6 +205,8 @@ def cyl(name, loc, r, depth, axis, material, verts=16, bevel=0.0):
         bmesh.ops.bevel(bm, geom=rim_edges, offset=bevel, segments=1, affect="EDGES", profile=0.5, clamp_overlap=True)
     rot = {"X": Matrix.Rotation(pi / 2, 3, "Y"), "Y": Matrix.Rotation(pi / 2, 3, "X"), "Z": Matrix.Identity(3)}[axis]
     bmesh.ops.rotate(bm, verts=bm.verts, cent=(0, 0, 0), matrix=rot)
+    if tilt is not None:
+        bmesh.ops.rotate(bm, verts=bm.verts, cent=(0, 0, 0), matrix=tilt)
     bmesh.ops.translate(bm, vec=Vector(loc), verts=bm.verts)
     return obj_from_bm(name, bm, material)
 
@@ -374,6 +376,44 @@ def flare(G, c, x, s, material, d):
     G[material].append(prism("fl", pts, (y0, y1), material))
 
 
+def headlight(G, F, s, spec_z, spec_y, spec):
+    """Фара заподлицо с передком: блок-трапеция (наружный край выше — «стреловидно»), тёмная окантовка,
+    внутри — проектор, две «ангельские» линзы или круглая линза. spec = (полуширина, полувысота, подъём, начинка)."""
+    hw, hh, lift, inner = spec
+    zc, yc = spec_z, spec_y
+    yi, yo = yc - hw, yc + hw  # внутренний и наружный край
+    quad = [(yi, zc - hh), (yo, zc - hh + lift * 0.4), (yo, zc + hh + lift), (yi, zc + hh * 0.7)]
+
+    def plate(name, pts, x0, x1, material, grow=0.0):
+        cy = sum(p[0] for p in pts) / 4
+        cz = sum(p[1] for p in pts) / 4
+        pts = [(cy + (y - cy) * (1 + grow), cz + (z - cz) * (1 + grow * 1.6)) for y, z in pts]
+        bm = bmesh.new()
+        a = [bm.verts.new((x0, s * y, z)) for y, z in pts]
+        b = [bm.verts.new((x1, s * y, z)) for y, z in pts]
+        bm.faces.new(a if s > 0 else list(reversed(a)))
+        bm.faces.new(list(reversed(b)) if s > 0 else b)
+        for i in range(4):
+            j = (i + 1) % 4
+            bm.faces.new((a[i], b[i], b[j], a[j]) if s > 0 else (a[j], b[j], b[i], a[i]))
+        bmesh.ops.recalc_face_normals(bm, faces=bm.faces)
+        return obj_from_bm(name, bm, material)
+
+    G["Dark"].append(plate("bezel", quad, F - 0.03, F + 0.008, "Dark", grow=0.12))
+    G["Headlight"].append(plate("lens", quad, F - 0.03, F + 0.014, "Headlight"))
+    cz = zc + lift * 0.35
+    if inner == "angel":  # два кольца-«глазка»
+        for k in (-0.45, 0.4):
+            G["Chrome"].append(cyl("eye", (F + 0.02, s * (yc + k * hw), cz), hh * 0.82, 0.014, "X", "Chrome", 14))
+            G["Dark"].append(cyl("pupil", (F + 0.024, s * (yc + k * hw), cz), hh * 0.5, 0.014, "X", "Dark", 12))
+    elif inner == "proj":  # проектор во внутренней части
+        G["Chrome"].append(cyl("proj", (F + 0.02, s * (yc - hw * 0.35), cz), hh * 0.7, 0.014, "X", "Chrome", 14))
+        G["Dark"].append(box("strip", F + 0.012, F + 0.022, s * (yc + hw * 0.1) - 0.012 * s, s * (yc + hw * 0.85), zc - hh * 0.75, zc - hh * 0.5, "Tail" if False else "Dark"))
+    elif inner == "round2":  # большая круглая линза
+        G["Chrome"].append(cyl("rl", (F + 0.02, s * yc, cz), hh * 0.85, 0.014, "X", "Chrome", 16))
+        G["Headlight"].append(cyl("rli", (F + 0.026, s * yc, cz), hh * 0.6, 0.014, "X", "Headlight", 16))
+
+
 # ---------------------------------------------------------------- сборка одной машины
 
 
@@ -474,9 +514,7 @@ def build(c):
     G["Dash"].append(box("dashtop", dash0 - 0.06, dash1, -yin, yin, zw0 + 0.01, zw0 + 0.07, "Dash", bevel=0.02))
     ydrv = 0.40 * CW / 0.86  # руль слева (машина смотрит в +X, левый борт — +Y)
     G["Dark"].append(torus("wheel", (dash0 - 0.13, ydrv, zw0 + 0.04), 0.15, 0.02, (0, radians(-58), 0), "Dark", 16))
-    colm = cyl("column", (dash0 - 0.05, ydrv, zw0 - 0.02), 0.025, 0.2, "X", "Dark", 8)
-    colm.rotation_euler = (0, radians(-32), 0)
-    G["Dark"].append(colm)
+    G["Dark"].append(cyl("column", (dash0 - 0.05, ydrv, zw0 - 0.02), 0.025, 0.2, "X", "Dark", 8, tilt=Matrix.Rotation(radians(-32), 3, "Y")))
     top = zt - 0.12
 
     def seat(sx, y0, y1):
@@ -540,8 +578,8 @@ def build(c):
     elif kind == "kidney":
         for s in (1, -1):
             yc, kw = s * gw * 0.52, gw * 0.44
-            G["Chrome"].append(box("kf", F - 0.04, gx + 0.012, yc - kw, yc + kw, g0, g1, "Chrome", bevel=0.018))
-            G["Dark"].append(box("ki", F - 0.03, gx + 0.02, yc - kw + 0.02, yc + kw - 0.02, g0 + 0.02, g1 - 0.02, "Dark", bevel=0.015))
+            G["Chrome"].append(box("kf", F - 0.04, gx + 0.012, yc - kw, yc + kw, g0, g1, "Chrome", bevel=0.01))
+            G["Dark"].append(box("ki", F - 0.03, gx + 0.02, yc - kw + 0.02, yc + kw - 0.02, g0 + 0.02, g1 - 0.02, "Dark"))
             for k in range(5):
                 y = yc - kw + 2 * kw * (k + 0.5) / 5
                 G["Chrome"].append(box("ks", gx + 0.01, gx + 0.028, y - 0.006, y + 0.006, g0 + 0.03, g1 - 0.03, "Chrome"))
@@ -553,16 +591,12 @@ def build(c):
     for kind, lz, ly, ls in c["lights"]:
         for s in (1, -1):
             if kind == "round":
-                G["Headlight"].append(cyl("l", (F + 0.025, s * ly, lz), ls, 0.06, "X", "Headlight", 16))
-                G["Chrome"].append(cyl("lr", (F + 0.005, s * ly, lz), ls + 0.022, 0.05, "X", "Chrome", 16))
+                G["Headlight"].append(cyl("l", (F + 0.012, s * ly, lz), ls, 0.04, "X", "Headlight", 16))
+                G["Chrome"].append(cyl("lr", (F + 0.0, s * ly, lz), ls + 0.022, 0.04, "X", "Chrome", 16))
             elif kind == "rect":
                 G["Headlight"].append(box("l", F - 0.02, F + 0.035, s * ly - ls * 1.6, s * ly + ls * 1.6, lz - ls * 0.7, lz + ls * 0.7, "Headlight", bevel=0.01))
-            else:  # «стреловидная» — длинная, заходит на крыло
-                rot = Matrix.Rotation(-s * 0.42, 3, "Z")
-                o = box("l", -ls * 1.4, ls * 1.4, -ls * 0.35, ls * 0.35, -ls * 0.45, ls * 0.45, "Headlight", bevel=0.012, rot=rot)
-                for v in o.data.vertices:
-                    v.co += Vector((F - ls * 0.7, s * (ly + 0.04), lz))
-                G["Headlight"].append(o)
+            else:
+                headlight(G, F, s, lz, ly, ls)
     if c.get("fog"):
         z, y, rr = c["fog"]
         for s in (1, -1):
@@ -593,6 +627,11 @@ def build(c):
         G["Dark"].append(side_box("mir", mx, mx + 0.14, cw(zw0), 0.2, zw0 - 0.02, zw0 + 0.1, s, "Dark", 0.025))
         for sx_ in c.get("seams", []):
             z0, z1 = zlow + 0.06, floor - 0.02
+            for wx in c["wheels"]:  # шов не должен свисать через колёсную арку
+                if abs(sx_ - wx) < c["arch"] + 0.02:
+                    z0 = max(z0, c["r"] + (max(0.0, (c["arch"] + 0.02) ** 2 - (sx_ - wx) ** 2)) ** 0.5 + 0.02)
+            if z1 - z0 < 0.08:
+                continue
             G["Dark"].append(side_box("seam", sx_ - 0.006, sx_ + 0.006, lw(sx_, (z0 + z1) / 2), 0.004, z0, z1, s, "Dark"))
             if c.get("hinges"):
                 for hz in (zlow + 0.18, floor - 0.12):

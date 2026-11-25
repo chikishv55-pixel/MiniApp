@@ -102,6 +102,10 @@ button{font:inherit;color:inherit;border:0;background:none;cursor:pointer}
 .clip .btns{display:flex;gap:10px;margin-top:16px}
 .btn{flex:1;font:700 15px Oswald,sans-serif;letter-spacing:1.5px;padding:11px 6px 10px;background:var(--ink);color:var(--paper)}
 .btn.alt{background:none;color:var(--ink);border:2px solid var(--ink)}
+.snd{pointer-events:auto;width:34px;height:34px;font:700 15px/30px Oswald,sans-serif;text-align:center;border:2px solid currentColor;flex:none}
+.snd.off{opacity:.4;text-decoration:line-through}
+#paper .snd{position:absolute;left:12px;top:10px;color:var(--ink);background:var(--paper)}
+#garage .snd{color:#f3e6c8;margin-left:8px;vertical-align:top;margin-top:2px}
 .close{display:none;pointer-events:auto;width:34px;height:34px;font:700 18px/30px Oswald,sans-serif;text-align:center;border:2px solid currentColor;margin-right:8px;flex:none}
 body.embed .close{display:inline-block}
 #paper .close{position:absolute;right:12px;top:10px;background:var(--paper);color:var(--ink)}
@@ -113,6 +117,7 @@ body.embed .close{display:inline-block}
 <body>
 
 <section id="paper" hidden>
+  <button class="snd" id="sndPaper" aria-label="Звук">♪</button>
   <button class="close" id="xPaper" aria-label="В меню">✕</button>
   <div class="sheet">
     <header class="mast">
@@ -132,7 +137,7 @@ body.embed .close{display:inline-block}
   <canvas id="fx"></canvas>
   <div id="top">
     <div>
-      <button class="close" id="xGarage" aria-label="В меню">✕</button><span class="label" id="carname">Пикап</span>
+      <button class="close" id="xGarage" aria-label="В меню">✕</button><span class="label" id="carname">Пикап</span><button class="snd" id="sndGarage" aria-label="Звук">♪</button>
       <div class="money">купил за <b id="paid">$0</b><br>сейчас дадут <b id="value">$0</b></div>
     </div>
     <button id="sell">ПРОДАТЬ</button>
@@ -374,6 +379,7 @@ function genAds(issue) {
 
 const photos = {}
 function showPaper() {
+  sfx('paper', 0.8)
   $('garage').hidden = true
   $('paper').hidden = false
   $('issue').textContent = save.issue
@@ -694,6 +700,7 @@ function finishStep() {
   const st = stageInfo()
   try { TG?.HapticFeedback?.notificationOccurred('success') } catch {}
   toast(st.done)
+  sfx('coins', 0.35)
   job.stage++
   if (job.stage >= STAGES.length) { job.done = true; job.stage = STAGES.length - 1 }
   saveJob()
@@ -716,6 +723,73 @@ function showHint(text) {
   clearTimeout(hintT)
   hintT = setTimeout(() => (h.style.opacity = 0), 4000)
 }
+
+/* ================= ЗВУК ================= */
+// Настоящие записи (CC0, bigsoundbank.com — список в flip/snd/README.md), нарезаны в scripts/flip/sounds.py.
+// Инструменты звучат петлёй, пока трёшь: громкость — от скорости пальца, смолкают, как только палец встал.
+const SFX = { wash: 'sponge', rust: 'brush', paint: 'spray', polish: 'polish', coins: 'coins', paper: 'paper', door: 'door' }
+let actx = null, master = null, soundOn = true
+const buffers = {}
+try { soundOn = localStorage.getItem('flip-sound') !== '0' } catch {}
+function audioInit() {
+  if (actx) { if (actx.state === 'suspended') actx.resume(); return }
+  const AC = window.AudioContext || window.webkitAudioContext
+  if (!AC) return
+  actx = new AC()
+  master = actx.createGain()
+  master.gain.value = soundOn ? 1 : 0
+  master.connect(actx.destination)
+  for (const name of new Set(Object.values(SFX)))
+    fetch(`flip/snd/${name}.mp3`).then((r) => r.arrayBuffer()).then((b) => actx.decodeAudioData(b)).then((buf) => (buffers[name] = buf)).catch(() => {})
+}
+addEventListener('pointerdown', audioInit, { capture: true }) // звук в браузере можно включить только по касанию
+function sfx(name, vol = 1) {
+  const buf = buffers[SFX[name] || name]
+  if (!actx || !buf) return
+  const src = actx.createBufferSource(), g = actx.createGain()
+  src.buffer = buf
+  src.playbackRate.value = 0.94 + Math.random() * 0.12
+  g.gain.value = vol
+  src.connect(g).connect(master)
+  src.start()
+}
+// петля инструмента
+const toolLoop = { name: null, src: null, gain: null, level: 0 }
+function toolSound(stage, amount) {
+  if (!actx) return
+  const name = SFX[stage]
+  if (toolLoop.name !== name) {
+    stopToolSound(true)
+    const buf = buffers[name]
+    if (!buf) return
+    const src = actx.createBufferSource(), g = actx.createGain()
+    src.buffer = buf
+    src.loop = true
+    g.gain.value = 0
+    src.connect(g).connect(master)
+    src.start(0, Math.random() * buf.duration) // каждый раз с нового места — не слышно повтора
+    Object.assign(toolLoop, { name, src, gain: g })
+  }
+  toolLoop.level = Math.min(1, Math.max(toolLoop.level * 0.9, amount))
+  const vol = { wash: 0.9, rust: 1.0, paint: 0.7, polish: 0.55 }[stage] ?? 0.8
+  toolLoop.gain.gain.setTargetAtTime(vol * (0.35 + 0.65 * toolLoop.level), actx.currentTime, 0.03)
+}
+function stopToolSound(now) {
+  if (!toolLoop.src) return
+  const { src, gain } = toolLoop
+  gain.gain.setTargetAtTime(0, actx.currentTime, now ? 0.01 : 0.06)
+  setTimeout(() => { try { src.stop() } catch {} }, now ? 60 : 300)
+  Object.assign(toolLoop, { name: null, src: null, gain: null, level: 0 })
+}
+function setSound(on) {
+  soundOn = on
+  try { localStorage.setItem('flip-sound', on ? '1' : '0') } catch {}
+  if (master) master.gain.value = on ? 1 : 0
+  for (const id of ['sndPaper', 'sndGarage']) $(id).classList.toggle('off', !on)
+}
+for (const id of ['sndPaper', 'sndGarage']) $(id).onclick = () => { audioInit(); setSound(!soundOn) }
+setSound(soundOn)
+addEventListener('visibilitychange', () => { if (!actx) return; if (document.hidden) actx.suspend(); else actx.resume() })
 
 /* ================= МАЗОК ================= */
 function stamp(hit) {
@@ -791,7 +865,7 @@ function rub(x, y) {
 }
 
 canvas.addEventListener('pointerdown', (e) => {
-  canvas.setPointerCapture(e.pointerId)
+  try { canvas.setPointerCapture(e.pointerId) } catch {}
   ptrs.set(e.pointerId, { x: e.clientX, y: e.clientY })
   if (ptrs.size === 2) {
     mode = 'pinch'; hideTool()
@@ -862,6 +936,7 @@ function placeTool(h) {
     }
   }
   lastHit = h.point.clone()
+  if (!job.done && !finishing && (h.object.userData.kind !== 'Glass' || stageInfo().id === 'wash')) toolSound(stageInfo().id, Math.min(1, moveAmt * 1.4))
   const x = dirV.clone().addScaledVector(nrm, -dirV.dot(nrm))
   if (x.lengthSq() < 1e-4) x.set(0, 1, 0).addScaledVector(nrm, -nrm.y)
   x.normalize()
@@ -875,6 +950,7 @@ function placeTool(h) {
   tool.userData.target = 1
 }
 function hideTool() {
+  stopToolSound()
   if (activeTool) activeTool.userData.target = 0
   lastHit = null
 }
@@ -931,6 +1007,8 @@ function drawFx(dt) {
 /* ================= ПОКУПКА / ПРОДАЖА ================= */
 function buy(ad) {
   if (ad.price > save.cash) return
+  audioInit()
+  sfx('door', 0.9)
   save.cash -= ad.price
   persist()
   job = { id: ad.id, paid: ad.price, rust: ad.rust, seed: ad.seed, livery: ad.livery, stage: 0, color: PAINTS[0], done: false }
@@ -965,6 +1043,7 @@ $('sell').onclick = () => {
   (a) => { if (a === 'yes') sell(v) })
 }
 function sell(v) {
+  sfx('coins', 1)
   const profit = v - job.paid
   save.cash += v
   save.sold++
@@ -1082,7 +1161,7 @@ ready.then(() => {
 // для отладки и автотестов
 window.flip = {
   get job() { return job }, view, pct: () => lastPct, save, tools, camera, shot: () => { renderer.render(scene, camera); return canvas.toDataURL('image/jpeg', 0.8) },
-  rub: (x, y) => rub(x, y), lift: () => hideTool(), kindAt: (x, y) => pick(x, y)?.object.userData.kind ?? null,
+  rub: (x, y) => rub(x, y), lift: () => hideTool(), snd: () => ({ ctx: actx?.state, loop: toolLoop.name, level: toolLoop.level, bufs: Object.keys(buffers) }), kindAt: (x, y) => pick(x, y)?.object.userData.kind ?? null,
 }
 </script>
 </body>
