@@ -116,14 +116,46 @@ button{font:inherit;color:inherit;border:0;background:none;cursor:pointer}
 .paint button:disabled{background:#d5d7de;color:#8b8e99}
 .sw{width:34px;height:34px;border-radius:50%;border:3px solid rgba(255,255,255,.35);box-shadow:0 2px 0 rgba(0,0,0,.4);transition:transform .12s}
 .sw.on{border-color:#fff;transform:scale(1.18)}
-#tray{position:absolute;left:0;right:0;bottom:0;height:116px;display:flex;justify-content:center;align-items:flex-end;gap:4px;padding-bottom:10px;
+/* нижнее меню: пять одинаковых ячеек на перфорированной доске, ширина делится поровну на любом экране */
+#tray{position:absolute;left:0;right:0;bottom:0;padding:10px max(8px,env(safe-area-inset-right)) calc(10px + env(safe-area-inset-bottom)) max(8px,env(safe-area-inset-left));
+  display:grid;grid-template-columns:repeat(5,minmax(0,96px));justify-content:center;gap:6px;
   background-color:var(--wood);background-image:radial-gradient(circle,#2a1a0e 2px,transparent 2.6px),linear-gradient(#8a6040,#664226);background-size:16px 16px,100% 100%;
   border-top:5px solid #4a2f1a;box-shadow:0 -8px 16px rgba(0,0,0,.45)}
-.slot{width:84px;display:flex;flex-direction:column;align-items:center;gap:2px;font:500 11px Oswald,sans-serif;letter-spacing:1px;color:#f3e6c8;text-shadow:0 1px 0 #000;transition:opacity .2s}
-.slot img{width:78px;height:66px;object-fit:contain;filter:drop-shadow(0 5px 3px rgba(0,0,0,.55));transition:transform .2s}
-.slot.on img{transform:translateY(-8px) scale(1.12) rotate(-6deg)}
-.slot.lock{opacity:.3}
-.slot.done{opacity:.55}
+#tray>*{max-width:96px;width:100%;justify-self:center}
+.slot{position:relative;display:flex;flex-direction:column;align-items:center;justify-content:space-between;gap:4px;padding:7px 3px 6px;min-width:0;
+  border-radius:12px;background:rgba(30,18,9,.55);box-shadow:inset 0 0 0 1.5px rgba(243,230,200,.12);
+  font:500 clamp(9px,2.6vw,11px)/1 Oswald,sans-serif;letter-spacing:.3px;color:#f3e6c8;text-shadow:0 1px 0 #000;white-space:nowrap;transition:opacity .2s,background .2s,box-shadow .2s,transform .2s}
+.slot img,.slot svg{display:block;width:100%;height:44px;object-fit:contain;filter:drop-shadow(0 3px 2px rgba(0,0,0,.5))}
+.slot span{max-width:100%;overflow:hidden;text-overflow:ellipsis}
+.slot.on{background:rgba(232,218,162,.2);box-shadow:inset 0 0 0 2px var(--tape),0 4px 10px rgba(0,0,0,.35);transform:translateY(-3px)}
+.slot.lock{opacity:.38}
+.slot.done{opacity:.7}
+.slot.done:after{content:"✓";position:absolute;top:4px;right:5px;width:16px;height:16px;border-radius:50%;background:#3d8f52;color:#fff;font:700 10px/16px system-ui,sans-serif;text-align:center;text-shadow:none}
+.slot.tune{cursor:pointer;background:rgba(168,35,27,.35);box-shadow:inset 0 0 0 1.5px rgba(255,190,150,.35)}
+.slot.tune:active{transform:scale(.96)}
+.slot.tune.has:after{content:"";position:absolute;top:6px;right:7px;width:8px;height:8px;border-radius:50%;background:var(--tape)}
+/* тюнинг: шторка снизу */
+#tune{position:fixed;inset:0;z-index:35;display:flex;align-items:flex-end;justify-content:center;background:linear-gradient(rgba(12,8,5,0) 40%,rgba(12,8,5,.45))}
+.tsheet{width:min(520px,100%);max-height:60%;overflow:auto;background:var(--paper);color:var(--ink);border-radius:18px 18px 0 0;
+  padding:16px 16px calc(18px + env(safe-area-inset-bottom));box-shadow:0 -10px 30px rgba(0,0,0,.45);animation:tune-in .22s ease-out}
+@keyframes tune-in{from{transform:translateY(30px);opacity:0}}
+/* пока открыт тюнинг, гараж уезжает вверх — машину видно над шторкой */
+#c,#fx{transition:transform .3s ease}
+body.tuning #c,body.tuning #fx{transform:translateY(-24vh)}
+.tsheet .th{display:flex;justify-content:space-between;align-items:baseline;border-bottom:3px double var(--ink);padding-bottom:6px}
+.tsheet h3{font:700 28px/1 Oswald,sans-serif;letter-spacing:.5px}
+.tsheet .th small{font:12px "PT Mono",monospace}
+.tsheet h4{font:500 12px Oswald,sans-serif;letter-spacing:3px;margin:12px 0 6px}
+.trow{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px}
+.topt{display:flex;flex-direction:column;align-items:center;gap:3px;min-width:0;padding:8px 4px 7px;border:2px solid rgba(38,33,28,.25);border-radius:12px;background:rgba(255,255,255,.35);text-align:center}
+.topt b{font:600 14px/1.1 "PT Serif",serif}
+.topt i{font:10.5px "PT Mono",monospace;font-style:normal;color:#5b5348;min-height:13px}
+.topt em{font:700 15px Oswald,sans-serif;font-style:normal}
+.topt.on{border-color:var(--ink);background:#fff8e6}
+.topt.on em{color:#3d8f52}
+.topt:disabled{opacity:.45}
+.tsheet .tnote{font:12px/1.4 "PT Mono",monospace;margin-top:10px;color:#5b5348}
+.tsheet .tclose{display:block;width:100%;margin-top:12px;font:700 15px Oswald,sans-serif;letter-spacing:1.5px;padding:11px 6px 10px;background:var(--ink);color:var(--paper)}
 #toast{position:absolute;left:50%;top:38%;background:var(--tape);color:var(--ink);font:600 38px/1 Caveat,cursive;padding:8px 26px 4px;
   transform:translate(-50%,-50%) rotate(-4deg) scale(.6);opacity:0;transition:transform .25s cubic-bezier(.3,1.6,.5,1),opacity .2s;pointer-events:none;white-space:nowrap;box-shadow:0 3px 0 rgba(0,0,0,.3)}
 #toast.show{opacity:1;transform:translate(-50%,-50%) rotate(-4deg) scale(1)}
@@ -284,6 +316,8 @@ body.embed .close{display:inline-block}
   <div id="toast"></div>
 </section>
 
+<div id="tune" hidden><div class="tsheet" id="tsheet"></div></div>
+
 <div id="gagel" hidden>
   <div class="gwin">
     <div class="gbar"><span class="dots"><i></i><i></i><i></i></span><span class="url" id="gurl">gagel.ru</span><button id="gclose" aria-label="Закрыть">✕</button></div>
@@ -303,7 +337,7 @@ import { GLTFLoader } from './vendor/three/GLTFLoader.js'
 import { MeshoptDecoder } from './vendor/three/meshopt_decoder.module.js'
 import { RoomEnvironment } from './vendor/three/RoomEnvironment.js'
 import { bodyTris, forEachSample } from './flip/vis.js'
-import { CARS, STAGES, GEAR, STAGE_VALUE, VALUE_START, DONE_AT, PAINTS, PAINT_PRICE, SELLERS, ADTEXT, HEADS, COND } from './flip/cars.js'
+import { CARS, STAGES, GEAR, STAGE_VALUE, VALUE_START, DONE_AT, PAINTS, PAINT_PRICE, TUNING, SELLERS, ADTEXT, HEADS, COND } from './flip/cars.js'
 
 // внутри меню «Игр Джо» (iframe) Telegram живёт у родителя
 const EMBED = new URLSearchParams(location.search).has('embed')
@@ -506,13 +540,15 @@ glassLayer.t.generateMipmaps = false
 function glassMaterial(gl) {
   gl = gl || glassLayer
   const m = new THREE.MeshStandardMaterial({ map: gl.t, roughness: 0.06, metalness: 0.1, transparent: true, opacity: 0.28, depthWrite: false, side: THREE.DoubleSide, flatShading: true })
+  m.userData.tint = { value: 0 } // 0 — чистое стекло, 1 — «в ноль»
   m.onBeforeCompile = (sh) => {
+    sh.uniforms.tint = m.userData.tint
     sh.fragmentShader = sh.fragmentShader
-      .replace('#include <common>', '#include <common>\nfloat gd;')
+      .replace('#include <common>', '#include <common>\nuniform float tint;\nfloat gd;')
       .replace('#include <map_fragment>', `gd = smoothstep(0.05, 0.8, texture2D(map, vMapUv).r);
-        diffuseColor.rgb = mix(vec3(0.62, 0.71, 0.75), vec3(0.43, 0.38, 0.30), gd);
-        diffuseColor.a = mix(opacity, 0.93, gd);`)
-      .replace('#include <roughnessmap_fragment>', '#include <roughnessmap_fragment>\nroughnessFactor = mix(roughnessFactor, 1.0, gd);')
+        diffuseColor.rgb = mix(mix(vec3(0.62, 0.71, 0.75), vec3(0.04, 0.05, 0.06), tint), vec3(0.43, 0.38, 0.30), gd);
+        diffuseColor.a = mix(mix(opacity, 0.95, tint), 0.93, gd);`)
+      .replace('#include <roughnessmap_fragment>', '#include <roughnessmap_fragment>\nroughnessFactor = mix(mix(roughnessFactor, 0.25, tint), 1.0, gd);')
   }
   return m
 }
@@ -578,6 +614,24 @@ function showPaper() {
 
 /* ================= ПРЕВЬЮ (фото в газету, иконки инструментов) ================= */
 const toolIcons = {}, gearPics = {}
+// прозрачный снимок → по краям объекта: длинная щётка и толстая губка займут ячейку одинаково
+function trimmed(src) {
+  const c = document.createElement('canvas')
+  c.width = src.width; c.height = src.height
+  const g = c.getContext('2d')
+  g.drawImage(src, 0, 0)
+  const d = g.getImageData(0, 0, c.width, c.height).data
+  let x0 = c.width, y0 = c.height, x1 = -1, y1 = -1
+  for (let y = 0; y < c.height; y++) for (let x = 0; x < c.width; x++) {
+    if (d[(y * c.width + x) * 4 + 3] > 8) { if (x < x0) x0 = x; if (x > x1) x1 = x; if (y < y0) y0 = y; if (y > y1) y1 = y }
+  }
+  if (x1 < 0) return c.toDataURL('image/png')
+  const pad = 4, w = x1 - x0 + 1 + pad * 2, h = y1 - y0 + 1 + pad * 2
+  const o = document.createElement('canvas')
+  o.width = w; o.height = h
+  o.getContext('2d').drawImage(c, x0 - pad, y0 - pad, w, h, 0, 0, w, h)
+  return o.toDataURL('image/png')
+}
 function makeThumbs() {
   const tr = new THREE.WebGLRenderer({ antialias: true, alpha: true, preserveDrawingBuffer: true })
   tr.toneMapping = THREE.ACESFilmicToneMapping
@@ -599,7 +653,7 @@ function makeThumbs() {
     cam.lookAt(c)
     tr.render(sc, cam)
     sc.remove(obj)
-    return tr.domElement.toDataURL(type || 'image/png', 0.85)
+    return bg == null ? trimmed(tr.domElement) : tr.domElement.toDataURL(type || 'image/png', 0.85)
   }
   for (const [id, car] of Object.entries(CARS)) {
     const o = models[id].clone()
@@ -610,7 +664,7 @@ function makeThumbs() {
     const o = toolsGltf.scene.getObjectByName(g.tool).clone()
     o.position.set(0, 0, 0)
     o.traverse((m) => { if (m.isMesh) { m.material = m.material.clone(); m.material.flatShading = true } })
-    toolIcons[g.id] = shot(o, 160, 136, new THREE.Vector3(0.7, 1.1, 1.3), null, 'image/png', 0.9)
+    toolIcons[g.id] = shot(o, 240, 240, new THREE.Vector3(0.7, 1.1, 1.3), null, 'image/png', 0.9)
     gearPics[g.id] = shot(o, 320, 220, new THREE.Vector3(0.8, 0.9, 1.3), 0xf1f2f6, 'image/jpeg', 0.95)
   }
   tr.dispose()
@@ -667,6 +721,7 @@ function mountCar(id) {
   })
   scene.add(car)
   car.updateMatrixWorld(true)
+  for (const o of parts) o.userData.y0 = o.position.y
   const t = bodyTris(body, S)
   byFace = t.byFace
   const cover = vis[id]
@@ -691,7 +746,68 @@ function mountCar(id) {
   shadow.scale.set(carSize.x * 1.25, carSize.z * 1.5, 1)
   fitCamera(true)
   paintOld(oldPaint, spec, job?.livery, t.tris)
+  applyTune()
 }
+// тонировка и занижение текущей машины — сразу на модели в гараже (и на фото с неё)
+let lowNow = 0
+function applyTune(animate = false) {
+  if (!car || !job) return
+  const k = TUNING.tint.opts[job.tint || 0].k
+  if (glass) glass.material.userData.tint.value = k
+  const target = TUNING.low.opts[job.low || 0].d
+  const from = lowNow, t0 = performance.now()
+  const set = (d) => {
+    lowNow = d
+    // колёса стоят на полу, всё остальное садится на них; у родителей масштаб 1, высота — в метрах
+    for (const o of parts) if (o.userData.kind !== 'Tire' && o.userData.kind !== 'Rim') o.position.y = o.userData.y0 - d
+  }
+  if (!animate) return set(target)
+  const step = () => {
+    const p = Math.min(1, (performance.now() - t0) / 450)
+    set(from + (target - from) * (1 - Math.pow(1 - p, 3)))
+    if (p < 1) requestAnimationFrame(step)
+  }
+  step()
+}
+
+const TUNE_ICON = `<svg viewBox="0 0 64 44" aria-hidden="true"><path d="M6 30l5-11c1-3 4-5 7-5h22c3 0 6 2 8 4l6 7c3 1 5 3 5 6v3H6z" fill="#a8231b"/><path d="M19 17h9v8H14zM31 17h9l6 8H31z" fill="#1c1d22" opacity=".9"/><circle cx="17" cy="34" r="7" fill="#151515"/><circle cx="17" cy="34" r="3" fill="#c9ccd0"/><circle cx="47" cy="34" r="7" fill="#151515"/><circle cx="47" cy="34" r="3" fill="#c9ccd0"/><path d="M32 2v8M28 7l4 4 4-4" stroke="#f3e6c8" stroke-width="2.5" fill="none" stroke-linecap="round"/></svg>`
+function openTune() {
+  if (!job) return
+  audioInit()
+  hideTool()
+  const row = (kind) => {
+    const T = TUNING[kind], cur = job[kind] || 0, base = CARS[job.id].base
+    return `<h4>${T.title.toUpperCase()} · ${T.opts[cur].name.toLowerCase()}</h4><div class="trow">` + T.opts.map((o, i) => {
+      const on = i === cur, add = Math.round((base * o.value) / 10) * 10
+      const can = on || !o.price || save.cash >= o.price
+      return `<button class="topt${on ? ' on' : ''}" data-k="${kind}" data-i="${i}" ${can ? '' : 'disabled'}><b>${o.short}</b><i>${add ? `+${money(add)} к цене` : '&nbsp;'}</i><em>${on ? '✓' : o.price ? money(o.price) : 'даром'}</em></button>`
+    }).join('') + '</div>'
+  }
+  $('tsheet').innerHTML = `<div class="th"><h3>Тюнинг</h3><small>на счёте ${money(save.cash)}</small></div>${row('tint')}${row('low')}
+    <div class="tnote">Покупатели платят за стиль. Деньги за снятый тюнинг не возвращаются.</div><button class="tclose" id="tuneClose">ГОТОВО</button>`
+  $('tune').hidden = false
+  document.body.classList.add('tuning')
+  for (const el of $('tsheet').querySelectorAll('[data-k]')) el.onclick = () => {
+    const kind = el.dataset.k, i = +el.dataset.i, o = TUNING[kind].opts[i]
+    if ((job[kind] || 0) === i) return
+    if (o.price) {
+      if (save.cash < o.price) return
+      save.cash -= o.price
+      bankOp(`Тюнинг: ${TUNING[kind].title.toLowerCase()} · ${o.name}`, -o.price)
+      persist()
+      sfx(kind === 'tint' ? 'spray' : 'door', 0.5)
+      try { TG?.HapticFeedback?.impactOccurred('medium') } catch {}
+    }
+    job[kind] = i
+    saveJob()
+    applyTune(true)
+    drawHud()
+    openTune()
+  }
+  $('tuneClose').onclick = closeTune
+}
+function closeTune() { $('tune').hidden = true; document.body.classList.remove('tuning') }
+$('tune').onclick = (e) => { if (e.target.id === 'tune') closeTune() }
 
 // старая краска — выгоревший цвет машины (у бывшего развозного фургона — ливрея службы доставки)
 function paintOld(layer, spec, livery, tris) {
@@ -848,6 +964,7 @@ function pctNow() {
 function valueNow() {
   let k = VALUE_START
   STAGES.forEach((st, i) => { k += STAGE_VALUE[i] * (job.done || i < job.stage ? 1 : i === job.stage ? 1 - lastPct / 100 : 0) })
+  k += TUNING.tint.opts[job.tint || 0].value + TUNING.low.opts[job.low || 0].value
   return Math.round((CARS[job.id].base * k) / 10) * 10
 }
 function drawHud() {
@@ -857,7 +974,9 @@ function drawHud() {
   $('meter').classList.toggle('done', !!job.done)
   $('metertxt').textContent = job.done ? 'готово к продаже' : st.bar
   $('sell').classList.toggle('ready', !!job.done)
-  $('tray').innerHTML = STAGES.map((s, i) => `<div class="slot ${job.done || i < job.stage ? 'done' : i === job.stage ? 'on' : 'lock'}"><img alt="" src="${toolIcons[gearFor(s.id).id] || ''}">${s.label}</div>`).join('')
+  $('tray').innerHTML = STAGES.map((s, i) => `<div class="slot ${job.done || i < job.stage ? 'done' : i === job.stage ? 'on' : 'lock'}"><img alt="" src="${toolIcons[gearFor(s.id).id] || ''}"><span>${s.label}</span></div>`).join('')
+    + `<button class="slot tune${job.tint || job.low ? ' has' : ''}" id="tuneBtn" aria-label="Тюнинг">${TUNE_ICON}<span>ТЮНИНГ</span></button>`
+  $('tuneBtn').onclick = openTune
 }
 function checkProgress(now) {
   if (!job) return
@@ -1199,7 +1318,7 @@ function buy(ad) {
   save.cash -= ad.price
   bankOp(`Покупка: ${CARS[ad.id].name}`, -ad.price)
   persist()
-  job = { id: ad.id, paid: ad.price, rust: ad.rust, seed: ad.seed, livery: ad.livery, stage: 0, color: null, v: 2, done: false, photos: [], listing: null }
+  job = { id: ad.id, paid: ad.price, rust: ad.rust, seed: ad.seed, livery: ad.livery, stage: 0, color: null, v: 2, tint: 0, low: 0, done: false, photos: [], listing: null }
   enterGarage(null)
   coach()
 }
@@ -1694,6 +1813,7 @@ $('sell').onclick = () => { audioInit(); hideTool(); openSite('jm'); $('gagel').
 
 /* ================= ПУСТОЙ ГАРАЖ ================= */
 function enterEmpty() {
+  closeTune()
   $('paper').hidden = true
   $('garage').hidden = false
   $('garage').classList.add('empty')
@@ -1781,7 +1901,7 @@ ready.then(() => {
 
 // для отладки и автотестов
 window.flip = {
-  get job() { return job }, view, openSite, currentAds, coach, pct: () => lastPct, save, tools, camera, shot: () => { renderer.render(scene, camera); return canvas.toDataURL('image/jpeg', 0.8) },
+  get job() { return job }, get car() { return car }, openTune, view, openSite, currentAds, coach, pct: () => lastPct, save, tools, camera, shot: () => { renderer.render(scene, camera); return canvas.toDataURL('image/jpeg', 0.8) },
   rub: (x, y) => rub(x, y), lift: () => hideTool(), snd: () => ({ ctx: actx?.state, loop: toolLoop.name, level: toolLoop.level, bufs: Object.keys(buffers) }), kindAt: (x, y) => pick(x, y)?.object.userData.kind ?? null,
 }
 </script>
