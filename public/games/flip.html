@@ -201,10 +201,11 @@ const visPng = (id) => new Promise((res) => {
   im.src = `flip/${id}.vis.png`
 })
 const models = {}, vis = {}
-let toolsGltf = null
+let toolsGltf = null, garageGltf = null
 const ready = Promise.all([
   document.fonts?.load('700 100px Oswald').catch(() => {}), // шрифт для ливрей фургона
   loadGlb('flip/tools.glb').then((g) => (toolsGltf = g)),
+  loadGlb('flip/garage.glb').then((g) => (garageGltf = g)),
   ...Object.keys(CARS).map((id) => loadGlb(`flip/${id}.glb`).then((g) => (models[id] = g.scene))),
   ...Object.keys(CARS).map((id) => visPng(id).then((v) => (vis[id] = v))),
 ])
@@ -216,7 +217,7 @@ renderer.setPixelRatio(Math.min(devicePixelRatio || 1, 2))
 renderer.toneMapping = THREE.ACESFilmicToneMapping
 const scene = new THREE.Scene()
 scene.background = new THREE.Color(0x1b140f)
-scene.fog = new THREE.Fog(0x1b140f, 13, 28)
+scene.fog = new THREE.Fog(0x1b140f, 16, 32)
 const envTex = new THREE.PMREMGenerator(renderer).fromScene(new RoomEnvironment(), 0.04).texture
 scene.environment = envTex
 scene.environmentIntensity = 0.6
@@ -246,19 +247,40 @@ const speckle = (g, s, n, cols, a0, a1, r0, r1) => {
   g.globalAlpha = 1
 }
 
-// пол гаража
-const floor = canvasTex(512, (g, s) => {
-  const r = g.createRadialGradient(s / 2, s / 2, 10, s / 2, s / 2, s / 2)
-  r.addColorStop(0, '#6b5a4a'); r.addColorStop(0.55, '#3a2e24'); r.addColorStop(1, '#1b140f')
-  g.fillStyle = r; g.fillRect(0, 0, s, s)
-  speckle(g, s, 2500, ['#000'], 0, 0.12, 2, 2)
-  const sh = g.createRadialGradient(s / 2, s / 2, 0, s / 2, s / 2, s * 0.2)
-  sh.addColorStop(0, 'rgba(0,0,0,.55)'); sh.addColorStop(1, 'rgba(0,0,0,0)')
-  g.save(); g.translate(s / 2, s / 2); g.scale(1.7, 0.85); g.translate(-s / 2, -s / 2); g.fillStyle = sh; g.fillRect(0, 0, s, s); g.restore()
+// тень под машиной (на полу гаража) — мягкое тёмное пятно
+const shadowTex = canvasTex(256, (g, sz) => {
+  const sh = g.createRadialGradient(sz / 2, sz / 2, 0, sz / 2, sz / 2, sz / 2)
+  sh.addColorStop(0, 'rgba(0,0,0,.6)'); sh.addColorStop(0.6, 'rgba(0,0,0,.35)'); sh.addColorStop(1, 'rgba(0,0,0,0)')
+  g.fillStyle = sh; g.fillRect(0, 0, sz, sz)
 })
-const floorMesh = new THREE.Mesh(new THREE.PlaneGeometry(18, 18), new THREE.MeshStandardMaterial({ map: floor.t, roughness: 0.95 }))
-floorMesh.rotation.x = -Math.PI / 2
-scene.add(floorMesh)
+const shadow = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), new THREE.MeshBasicMaterial({ map: shadowTex.t, transparent: true, depthWrite: false }))
+shadow.rotation.x = -Math.PI / 2
+shadow.position.y = 0.01
+scene.add(shadow)
+
+// Гараж (scripts/flip/garage.py): объекты G_<стена>_<материал>. Стену и всё, что на ней висит, прячем,
+// когда камера снаружи этой стены, — получается «кукольный домик»: машину видно с любой стороны.
+const ROOM = { x0: -4.2, x1: 4.2, z0: -2.9, z1: 2.9, h: 2.8 } // как в garage.py (Y Блендера = −Z здесь)
+const garageWalls = { F: [], B: [], L: [], R: [], T: [], C: [] }
+function setupGarage(gltf) {
+  gltf.scene.traverse((o) => {
+    if (!o.isMesh) return
+    o.material.flatShading = true // нормалей в glb нет
+    o.material.envMapIntensity = 0.35 // иначе крашеный пол выгорает в бликах
+    o.material.needsUpdate = true
+    const w = o.name.split('_')[1]
+    ;(garageWalls[w] || garageWalls.C).push(o)
+  })
+  scene.add(gltf.scene)
+  const lamp = new THREE.PointLight(0xffd9a8, 6, 0, 2) // лампочка под потолком
+  lamp.position.set(1.0, ROOM.h - 0.65, 0)
+  scene.add(lamp)
+}
+function cullGarage() {
+  const c = camera.position
+  const out = { F: c.x > ROOM.x1, B: c.x < ROOM.x0, L: c.z < ROOM.z0, R: c.z > ROOM.z1, T: c.y > ROOM.h, C: false }
+  for (const [w, list] of Object.entries(garageWalls)) for (const o of list) o.visible = !out[w]
+}
 
 /* ================= СЛОИ КУЗОВА ================= */
 // mask: R — ржавчина, G — голый металл, B — грязь. coat: свежая краска (цвет + альфа). gloss: R — блеск.
@@ -514,6 +536,7 @@ function mountCar(id) {
   const b = new THREE.Box3().setFromObject(car)
   carSize = b.getSize(new THREE.Vector3())
   view.ty = carSize.y * 0.42
+  shadow.scale.set(carSize.x * 1.25, carSize.z * 1.5, 1)
   fitCamera(true)
   // старая краска — выгоревший цвет машины (у бывшего развозного фургона — ливрея службы доставки)
   const g = oldPaint.g
@@ -1127,6 +1150,7 @@ function loop(now) {
   const cp = Math.cos(view.pitch)
   camera.position.set(Math.sin(view.yaw) * cp * view.dist, view.ty + Math.sin(view.pitch) * view.dist, Math.cos(view.yaw) * cp * view.dist)
   camera.lookAt(0, view.ty, 0)
+  cullGarage()
   if (texDirty) { layerOf(stageInfo().id).t.needsUpdate = true; texDirty = false; jobDirty = true }
   if (glassDirty) { glassLayer.t.needsUpdate = true; glassDirty = false; jobDirty = true }
   if (finishing) finishStep()
@@ -1144,6 +1168,7 @@ $('xGarage').onclick = exitToMenu
 ready.then(() => {
   makeThumbs() // до setupTools: та забирает инструменты из сцены glb
   setupTools()
+  setupGarage(garageGltf)
   $('load').hidden = true
   let saved = null
   try { saved = JSON.parse(localStorage.getItem(JKEY)) } catch {}
