@@ -58,20 +58,47 @@ button{font:inherit;color:inherit;border:0;background:none;cursor:pointer}
 #fx{pointer-events:none}
 #top{position:absolute;left:0;right:0;top:0;padding:12px 12px 0;display:flex;justify-content:space-between;align-items:flex-start;pointer-events:none}
 .label{display:inline-block;background:var(--tape);color:var(--ink);font:600 27px/1 Caveat,cursive;padding:4px 14px 2px;transform:rotate(-2deg);box-shadow:0 2px 0 rgba(0,0,0,.25)}
-.money{margin-top:8px;font:12px "PT Mono",monospace;line-height:1.5;color:#e9dcc2}
-.money b{font:500 15px Oswald,sans-serif;letter-spacing:.5px;color:#fff}
 #sell{pointer-events:auto;position:relative;background:#f1e7cf;color:var(--ink);font:700 15px Oswald,sans-serif;letter-spacing:1.5px;padding:9px 14px 8px 26px;
   clip-path:polygon(14px 0,100% 0,100% 100%,14px 100%,0 50%);transform:rotate(3deg);box-shadow:0 2px 0 rgba(0,0,0,.3)}
 #sell:before{content:"";position:absolute;left:11px;top:50%;width:7px;height:7px;margin-top:-3.5px;border-radius:50%;background:#17110c}
 #sell.ready{animation:nudge 1.2s ease-in-out infinite}
 @keyframes nudge{50%{transform:rotate(-3deg) scale(1.06)}}
-#steps{position:absolute;top:112px;left:0;right:0;display:flex;justify-content:center;gap:12px;font:500 11px Oswald,sans-serif;letter-spacing:1.5px;pointer-events:none}
-.step{opacity:.35;padding-bottom:3px;border-bottom:2px solid transparent}
-.step.on{opacity:1;border-color:#ffc233}
-.step.done{opacity:.6;text-decoration:line-through}
-#meter{position:absolute;top:137px;left:50%;transform:translateX(-50%);width:min(250px,66vw);height:5px;background:rgba(255,255,255,.14);pointer-events:none}
-#meterfill{height:100%;width:100%;background:#ffc233;transition:width .3s}
-#metertxt{position:absolute;top:146px;left:0;right:0;text-align:center;font:11.5px "PT Mono",monospace;color:#e9dcc2;pointer-events:none}
+#metertxt{position:absolute;top:66px;left:0;right:0;text-align:center;font:600 22px/1 Caveat,cursive;color:#f3e6c8;text-shadow:0 1px 0 rgba(0,0,0,.6);pointer-events:none}
+#meter{position:absolute;top:92px;left:50%;transform:translateX(-50%);width:min(230px,60vw);height:3px;border-radius:2px;background:rgba(255,255,255,.16);pointer-events:none}
+#meterfill{height:100%;width:0;border-radius:2px;background:#ffc233;box-shadow:0 0 6px rgba(255,194,51,.6);transition:width .3s}
+#meter.done #meterfill{background:#8fd16a;box-shadow:0 0 6px rgba(143,209,106,.6)}
+.topr{display:flex;align-items:center;gap:8px}
+#pc{pointer-events:auto;width:46px;height:40px;padding:0;background:none;border:0}
+#pc svg{width:46px;height:40px;filter:drop-shadow(0 2px 0 rgba(0,0,0,.45))}
+/* ---------- Gagel: «интернет» на старом компьютере в гараже ---------- */
+#gagel{position:fixed;inset:0;z-index:30;display:flex;align-items:center;justify-content:center;padding:14px;background:rgba(10,10,14,.55);backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px)}
+.gwin{width:min(420px,100%);max-height:100%;display:flex;flex-direction:column;overflow:hidden;border-radius:18px;background:#fff;color:#1f1f24;
+  font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;box-shadow:0 20px 50px rgba(0,0,0,.45);animation:gwin-in .22s ease-out}
+@keyframes gwin-in{from{opacity:0;transform:translateY(14px) scale(.98)}}
+.gbar{display:flex;align-items:center;gap:8px;padding:10px 10px 10px 12px;background:#f1f2f6;border-bottom:1px solid #e3e4ea}
+.gbar .dots{display:flex;gap:5px}.gbar .dots i{width:9px;height:9px;border-radius:50%;background:#d0d2da}
+.gbar .url{flex:1;min-width:0;display:flex;align-items:center;gap:6px;background:#fff;border-radius:999px;padding:6px 12px;font-size:13px;color:#5b5d68;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;box-shadow:inset 0 0 0 1px #e3e4ea}
+.gbar .url:before{content:"";flex:none;width:8px;height:10px;border:1.5px solid #8b8e99;border-radius:2px;border-top-width:3px}
+.gbar button{flex:none;width:30px;height:30px;border-radius:50%;background:#e6e7ed;color:#3a3b44;font-size:15px;line-height:30px;text-align:center}
+.gbar button:active{background:#d8d9e1}
+.gscroll{flex:1;min-height:0;overflow:auto}
+.gbody{padding:30px 18px 20px;text-align:center}
+.glogo{font:800 50px/1 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;letter-spacing:-1.5px}
+.glogo i{font-style:normal}
+.gsearch{display:flex;align-items:center;margin:18px auto 4px;max-width:320px;border-radius:999px;background:#fff;box-shadow:0 1px 6px rgba(32,33,36,.18),0 0 0 1px #e6e7ed;padding:3px 3px 3px 14px}
+.gsearch:focus-within{box-shadow:0 2px 10px rgba(32,33,36,.25),0 0 0 1px #d4d6de}
+.gsearch:before{content:"";flex:none;width:13px;height:13px;border:2px solid #9a9da8;border-radius:50%;margin-right:8px;box-sizing:border-box}
+.gsearch input{flex:1;min-width:0;border:0;outline:none;background:none;padding:9px 4px;font:15px system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;color:#1f1f24;user-select:text;-webkit-user-select:text}
+.gsearch button{flex:none;border:0;border-radius:999px;background:#1f1f24;color:#fff;font:600 13px system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;padding:9px 14px}
+.gsites{display:grid;grid-template-columns:1fr;gap:8px;margin-top:20px;text-align:left}
+.gsite{display:flex;gap:10px;align-items:flex-start;padding:12px;border-radius:14px;background:#f6f7fa;transition:background .15s}
+.gsite:active{background:#eceef3}
+.gsite .ico{flex:none;width:34px;height:34px;border-radius:10px;display:flex;align-items:center;justify-content:center;color:#fff;font:700 16px system-ui,sans-serif}
+.gsite b{display:block;font-size:14px;font-weight:700;line-height:1.2}
+.gsite small{display:block;margin-top:3px;font-size:12px;line-height:1.3;color:#6a6c78}
+.gsite em{display:inline-block;margin-top:7px;padding:2px 8px;border-radius:999px;background:#ffe9c7;color:#9a5b00;font-size:10.5px;font-style:normal;font-weight:600}
+.gempty{margin-top:22px;font-size:14px;color:#6a6c78}
+.gfoot{margin-top:18px;font-size:11px;color:#a0a2ad}
 #hint{position:absolute;left:16px;right:16px;bottom:136px;text-align:center;font:600 27px/1.05 Caveat,cursive;color:#f3e6c8;text-shadow:0 2px 0 rgba(0,0,0,.55);transition:opacity .6s;pointer-events:none}
 #hint.up{bottom:184px}
 #colors{position:absolute;bottom:130px;left:0;right:0;display:flex;justify-content:center;gap:11px}
@@ -111,6 +138,98 @@ body.embed .close{display:inline-block}
 #paper .close{position:absolute;right:12px;top:10px;background:var(--paper);color:var(--ink)}
 #garage .close{color:#f3e6c8;vertical-align:top;margin-top:2px}
 #load{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;background:var(--paper);color:var(--ink);font:600 30px Caveat,cursive}
+
+/* ---------- кнопка фото, вспышка, пустой гараж ---------- */
+#cam{pointer-events:auto;width:40px;height:40px;padding:0;background:none;border:0}
+#cam svg{width:40px;height:40px;filter:drop-shadow(0 2px 0 rgba(0,0,0,.45))}
+#flash{position:fixed;inset:0;background:#fff;opacity:0;pointer-events:none;transition:opacity .35s;z-index:25}
+#flash.on{opacity:.85;transition:none}
+#pc .dot{position:absolute}
+.badge{position:absolute;top:-2px;right:-2px;min-width:16px;height:16px;padding:0 4px;border-radius:8px;background:#e2572c;color:#fff;font:700 10px/16px system-ui,sans-serif;text-align:center}
+#pc{position:relative}
+#garage.empty #tray,#garage.empty #meter,#garage.empty #metertxt,#garage.empty #sell,#garage.empty #cam,#garage.empty #colors{display:none!important}
+/* ---------- сайты в Gagel ---------- */
+.site{padding:0 0 18px;text-align:left}
+.shead{display:flex;align-items:center;gap:10px;padding:12px 14px;color:#fff}
+.shead b{font-size:17px;font-weight:800;letter-spacing:-.2px}
+.shead small{display:block;font-size:11.5px;opacity:.85;font-weight:500}
+.sback{flex:none;width:30px;height:30px;border-radius:50%;background:rgba(255,255,255,.2);color:#fff;font-size:17px;line-height:30px;text-align:center}
+.sin{padding:12px 14px}
+.cards{display:grid;gap:12px}
+.card{border-radius:14px;overflow:hidden;background:#fff;box-shadow:0 1px 4px rgba(0,0,0,.12),0 0 0 1px #eceef3}
+.card img{display:block;width:100%;aspect-ratio:16/10;object-fit:cover;background:#dde1e6}
+.card .cb{padding:10px 12px 12px}
+.card .ct{display:flex;justify-content:space-between;align-items:baseline;gap:8px}
+.card .ct b{font-size:15px}
+.card .pr{font-size:17px;font-weight:800;white-space:nowrap}
+.card .meta{margin-top:3px;font-size:12px;color:#6a6c78}
+.card .tag{display:inline-block;margin-top:6px;padding:2px 8px;border-radius:999px;font-size:11px;font-weight:600;background:#fde7de;color:#b4421b}
+.gallery{display:flex;gap:6px;overflow-x:auto;scroll-snap-type:x mandatory;margin:0 -14px;padding:0 14px}
+.gallery img{flex:none;width:86%;aspect-ratio:16/10;object-fit:cover;border-radius:12px;scroll-snap-align:center;background:#dde1e6}
+.adh{margin-top:12px;display:flex;justify-content:space-between;align-items:baseline;gap:10px}
+.adh b{font-size:19px;letter-spacing:-.3px}
+.adh .pr{font-size:22px;font-weight:800}
+.adh .pr s{display:block;font-size:13px;font-weight:500;color:#9a9ca8;text-align:right}
+.txt{margin-top:6px;font-size:14px;line-height:1.45;color:#3a3b44}
+.facts{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px}
+.facts span{padding:4px 10px;border-radius:999px;background:#f1f2f6;font-size:12px;color:#3a3b44}
+.chat{margin-top:14px;padding:10px;border-radius:14px;background:#f6f7fa;display:flex;flex-direction:column;gap:6px;min-height:40px}
+.msg{max-width:82%;padding:8px 11px;border-radius:14px;font-size:13.5px;line-height:1.35}
+.msg.them{align-self:flex-start;background:#fff;box-shadow:0 0 0 1px #e6e7ed;border-bottom-left-radius:4px}
+.msg.me{align-self:flex-end;background:#2b6cf0;color:#fff;border-bottom-right-radius:4px}
+.offers{display:flex;gap:6px;margin-top:10px}
+.offers button{flex:1;padding:9px 4px;border-radius:10px;background:#eef1f8;color:#2b4fae;font:600 13px system-ui,sans-serif}
+.offers button:disabled{opacity:.4}
+.bigbtn{display:block;width:100%;margin-top:12px;padding:13px;border-radius:12px;background:#1f1f24;color:#fff;font:700 15px system-ui,sans-serif}
+.bigbtn.green{background:#20a35a}
+.bigbtn.ghost{background:#eef0f4;color:#1f1f24}
+.bigbtn:disabled{opacity:.45}
+.note{margin-top:8px;font-size:12.5px;color:#8a8c97;text-align:center}
+.warn{margin-top:10px;padding:9px 12px;border-radius:10px;background:#fff4e0;color:#8a5a00;font-size:13px}
+.bank{background:linear-gradient(160deg,#f6c445,#e8a317);border-radius:18px;padding:16px;color:#2a2000;box-shadow:0 6px 18px rgba(232,163,23,.35)}
+.bank small{display:block;font-size:12px;opacity:.75}
+.bank .bal{margin-top:4px;font-size:32px;font-weight:800;letter-spacing:-1px}
+.bank .num{margin-top:14px;font:600 14px ui-monospace,Menlo,Consolas,monospace;letter-spacing:2px}
+.hist{margin-top:14px}
+.hist div{display:flex;justify-content:space-between;padding:10px 2px;border-bottom:1px solid #eef0f4;font-size:13.5px}
+.hist div i{font-style:normal;color:#8a8c97;font-size:12px}
+.hist .plus{color:#20a35a;font-weight:700}
+.hist .minus{color:#1f1f24;font-weight:700}
+.hero{padding:18px 4px 6px;text-align:center}
+.hero h3{font-size:22px;letter-spacing:-.5px}
+.hero p{margin-top:6px;font-size:14px;color:#5b5d68;line-height:1.45}
+.pgrid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:10px}
+.pgrid img{width:100%;aspect-ratio:16/10;object-fit:cover;border-radius:10px;background:#dde1e6}
+.pgrid .empty{display:flex;align-items:center;justify-content:center;aspect-ratio:16/10;border-radius:10px;border:2px dashed #d4d6de;color:#a0a2ad;font-size:12px;text-align:center;padding:6px}
+.row{display:flex;gap:8px;align-items:center;margin-top:12px}
+.row input{flex:1;min-width:0;padding:11px 12px;border-radius:10px;border:1px solid #d4d6de;font:600 16px system-ui,sans-serif;user-select:text;-webkit-user-select:text}
+.offer{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:10px 12px;margin-top:8px;border-radius:12px;background:#f6f7fa}
+.offer b{font-size:16px}
+.offer small{display:block;font-size:12px;color:#6a6c78}
+.offer button{padding:8px 12px;border-radius:10px;background:#20a35a;color:#fff;font:700 13px system-ui,sans-serif}
+.h4{margin-top:16px;font-size:13px;font-weight:700;color:#6a6c78;text-transform:uppercase;letter-spacing:.5px}
+/* ---------- обучение ---------- */
+#coach{position:fixed;left:12px;right:12px;bottom:130px;z-index:40;display:flex;flex-direction:column;gap:8px;padding:14px 16px;border-radius:16px;background:#1f1f24;color:#fff;
+  font:500 14.5px/1.4 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;box-shadow:0 10px 30px rgba(0,0,0,.4);animation:gwin-in .25s ease-out}
+#coach.top{bottom:12px}
+#coach .cs{display:flex;justify-content:space-between;align-items:center;gap:10px}
+#coach .cs small{opacity:.55;font-size:12px}
+#coach button{font:600 13px system-ui,sans-serif;color:#fff;opacity:.7;text-decoration:underline}
+#coach .ok{opacity:1;text-decoration:none;background:#2b6cf0;padding:8px 14px;border-radius:10px}
+.tut-hl{position:relative;animation:tut-pulse 1.2s ease-in-out infinite;border-radius:12px}
+@keyframes tut-pulse{0%,100%{box-shadow:0 0 0 0 rgba(43,108,240,.0),0 0 0 3px #2b6cf0}50%{box-shadow:0 0 0 8px rgba(43,108,240,.25),0 0 0 3px #2b6cf0}}
+/* ---------- модалка: современная карточка вместо газетной вырезки ---------- */
+.clip{transform:none!important;clip-path:none!important;border-radius:18px;background:#fff!important;font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif!important;padding:20px!important}
+.clip small{border:0!important;font:600 12px system-ui,sans-serif!important;color:#8a8c97;letter-spacing:.3px!important}
+.clip h2{font:800 30px/1.1 system-ui,sans-serif!important;letter-spacing:-.8px!important}
+.clip .sum{font:800 24px system-ui,sans-serif!important;color:#20a35a}
+.clip .sum.minus{color:#c0392b}
+.clip .stamp{display:none}
+.btn{border-radius:12px;font:700 15px system-ui,sans-serif!important;letter-spacing:0!important;background:#1f1f24;color:#fff}
+.btn.alt{border:0!important;background:#eef0f4!important;color:#1f1f24!important}
+#top .label{white-space:nowrap;max-width:44vw;overflow:hidden;text-overflow:ellipsis;font-size:23px;vertical-align:top}
+#top>div:first-child{display:flex;align-items:flex-start;gap:6px;min-width:0}
+#garage .snd{margin-left:0}
 </style>
 <script type="importmap">{"imports":{"three":"./vendor/three/three.module.min.js"}}</script>
 </head>
@@ -138,18 +257,30 @@ body.embed .close{display:inline-block}
   <div id="top">
     <div>
       <button class="close" id="xGarage" aria-label="В меню">✕</button><span class="label" id="carname">Пикап</span><button class="snd" id="sndGarage" aria-label="Звук">♪</button>
-      <div class="money">купил за <b id="paid">$0</b><br>сейчас дадут <b id="value">$0</b></div>
     </div>
-    <button id="sell">ПРОДАТЬ</button>
+    <div class="topr">
+      <button id="pc" aria-label="Компьютер"><svg viewBox="0 0 46 40"><rect x="3" y="2" width="40" height="28" rx="4" fill="#d9d2c3" stroke="#26211c" stroke-width="2"/><rect x="8" y="6" width="30" height="19" rx="2" fill="#1f3b2c"/><path d="M11 11h14M11 15h20M11 19h10" stroke="#8fd16a" stroke-width="2"/><rect x="16" y="30" width="14" height="4" fill="#b7ae9b" stroke="#26211c" stroke-width="1.5"/><rect x="10" y="34" width="26" height="4" rx="1" fill="#d9d2c3" stroke="#26211c" stroke-width="1.5"/></svg></button>
+      <button id="cam" aria-label="Сфотографировать"><svg viewBox="0 0 40 40"><rect x="3" y="11" width="34" height="23" rx="5" fill="#2a2d33" stroke="#f3e6c8" stroke-width="2"/><rect x="13" y="6" width="14" height="7" rx="2" fill="#2a2d33" stroke="#f3e6c8" stroke-width="2"/><circle cx="20" cy="22.5" r="7" fill="#4a6a8a" stroke="#f3e6c8" stroke-width="2"/><circle cx="18" cy="20.5" r="2" fill="#cfe3f5"/><circle cx="31" cy="16" r="1.6" fill="#f3e6c8"/></svg></button>
+      <button id="sell">ПРОДАТЬ</button>
+    </div>
   </div>
-  <div id="steps"></div>
-  <div id="meter"><div id="meterfill"></div></div>
   <div id="metertxt"></div>
+  <div id="meter"><div id="meterfill"></div></div>
   <div id="hint"></div>
   <div id="colors" hidden></div>
   <div id="tray"></div>
   <div id="toast"></div>
 </section>
+
+<div id="gagel" hidden>
+  <div class="gwin">
+    <div class="gbar"><span class="dots"><i></i><i></i><i></i></span><span class="url" id="gurl">gagel.ru</span><button id="gclose" aria-label="Закрыть">✕</button></div>
+    <div class="gscroll" id="gscroll"><div class="gbody" id="gbody"></div></div>
+  </div>
+</div>
+
+<div id="flash"></div>
+<div id="coach" hidden></div>
 
 <div class="modal" id="modal" hidden><div class="clip" id="clip"></div></div>
 <div id="load">Газета печатается…</div>
@@ -304,10 +435,10 @@ const coat = canvasTex(S)
 const gloss = canvasTex(S, null, false)
 for (const t of [mask.t, gloss.t, coat.t]) { t.minFilter = THREE.LinearFilter; t.generateMipmaps = false }
 
-function bodyMaterial() {
-  const m = new THREE.MeshStandardMaterial({ map: oldPaint.t, roughness: 0.62, metalness: 0.05, flatShading: true })
+function bodyMaterial(L = { oldPaint, mask, coat, gloss }) {
+  const m = new THREE.MeshStandardMaterial({ map: L.oldPaint.t, roughness: 0.62, metalness: 0.05, flatShading: true })
   m.onBeforeCompile = (sh) => {
-    Object.assign(sh.uniforms, { rustMap: { value: rustTex.t }, dirtMap: { value: dirtTex.t }, maskMap: { value: mask.t }, coatMap: { value: coat.t }, glossMap: { value: gloss.t } })
+    Object.assign(sh.uniforms, { rustMap: { value: rustTex.t }, dirtMap: { value: dirtTex.t }, maskMap: { value: L.mask.t }, coatMap: { value: L.coat.t }, glossMap: { value: L.gloss.t } })
     sh.fragmentShader = sh.fragmentShader
       .replace('#include <common>', '#include <common>\nuniform sampler2D rustMap, dirtMap, maskMap, coatMap, glossMap;\nfloat rustA, bare, coatA, glossA, dirtA;')
       .replace('#include <map_fragment>', `#include <map_fragment>
@@ -339,10 +470,10 @@ function bodyMaterial() {
 
 // К деталям колеса и нишам за ним не прикасаемся: там всегда черно и инструмент не появляется.
 const UNTOUCH = new Set(['Tire', 'Rim', 'Well'])
-function partMaterial(name, car) {
+function partMaterial(name, car, L) {
   const flat = { flatShading: true } // нормалей в glb нет (меньше вес) — освещение по граням
   switch (name) {
-    case 'Glass': return glassMaterial()
+    case 'Glass': return glassMaterial(L?.glass)
     case 'Tire': return new THREE.MeshStandardMaterial({ color: 0x141414, roughness: 0.95, ...flat })
     case 'Rim': return new THREE.MeshStandardMaterial({ color: car.rim || 0xb9bdc0, roughness: 0.35, metalness: 0.85, ...flat })
     case 'Well': return new THREE.MeshStandardMaterial({ color: 0x050505, roughness: 1, ...flat })
@@ -360,8 +491,9 @@ const GS = 256
 const glassLayer = canvasTex(GS, null, false)
 glassLayer.t.minFilter = THREE.LinearFilter
 glassLayer.t.generateMipmaps = false
-function glassMaterial() {
-  const m = new THREE.MeshStandardMaterial({ map: glassLayer.t, roughness: 0.06, metalness: 0.1, transparent: true, opacity: 0.28, depthWrite: false, side: THREE.DoubleSide, flatShading: true })
+function glassMaterial(gl) {
+  gl = gl || glassLayer
+  const m = new THREE.MeshStandardMaterial({ map: gl.t, roughness: 0.06, metalness: 0.1, transparent: true, opacity: 0.28, depthWrite: false, side: THREE.DoubleSide, flatShading: true })
   m.onBeforeCompile = (sh) => {
     sh.fragmentShader = sh.fragmentShader
       .replace('#include <common>', '#include <common>\nfloat gd;')
@@ -494,6 +626,7 @@ function setSprayColor(hex) {
 
 /* ================= МАШИНА В ГАРАЖЕ ================= */
 let car = null, body = null, parts = [], byFace = [], spots = null, spotIdx = null
+const garageSpots = () => spots
 let job = null // { id, paid, rust, seed, stage, color, done }
 
 let glass = null, glassByFace = [], glassIdx = new Int32Array(0)
@@ -538,13 +671,17 @@ function mountCar(id) {
   view.ty = carSize.y * 0.42
   shadow.scale.set(carSize.x * 1.25, carSize.z * 1.5, 1)
   fitCamera(true)
-  // старая краска — выгоревший цвет машины (у бывшего развозного фургона — ливрея службы доставки)
-  const g = oldPaint.g
-  const liv = spec.liveries && job?.livery != null ? spec.liveries[job.livery] : null
+  paintOld(oldPaint, spec, job?.livery, t.tris)
+}
+
+// старая краска — выгоревший цвет машины (у бывшего развозного фургона — ливрея службы доставки)
+function paintOld(layer, spec, livery, tris) {
+  const g = layer.g
+  const liv = spec.liveries && livery != null ? spec.liveries[livery] : null
   g.fillStyle = liv ? liv.base : spec.paint; g.fillRect(0, 0, S, S)
-  if (liv) paintLivery(t.tris, spec.box, liv)
+  if (liv) paintLivery(tris, spec.box, liv, g)
   speckle(g, S, 9000, ['rgba(255,235,210,1)', 'rgba(40,20,10,1)'], 0.02, 0.08, 1, 4)
-  oldPaint.t.needsUpdate = true
+  layer.t.needsUpdate = true
 }
 
 // Ливрея: рисуем картинку борта и переносим её на треугольники будки (аффинно, треугольник за треугольником).
@@ -572,9 +709,8 @@ function liveryArt(liv, w, h, side) {
   if (side) { g.font = `500 ${h * 0.07}px Oswald, sans-serif`; g.fillText('ДОСТАВКА · БЫСТРО И БЕРЕЖНО', w / 2, h * 0.76) }
   return cv
 }
-function paintLivery(tris, bx, liv) {
+function paintLivery(tris, bx, liv, g = oldPaint.g) {
   const art = liveryArt(liv, 1024, 512, true), back = liveryArt(liv, 512, 512, false)
-  const g = oldPaint.g
   const len = bx.x1 - bx.x0, hgt = bx.z1 - bx.z0
   for (const t of tris) {
     const c = t.v[0].clone().add(t.v[1]).add(t.v[2]).divideScalar(3)
@@ -609,9 +745,11 @@ function paintLivery(tris, bx, liv) {
   }
 }
 
-function freshLayers(rustLevel, seed) {
+function freshLayers(rustLevel, seed, L = null, sp = null) {
+  const mask_ = L?.mask || mask, coat_ = L?.coat || coat, gloss_ = L?.gloss || gloss, glass_ = L?.glass || glassLayer
+  const spots = sp || garageSpots()
   const rand = mulberry(seed)
-  const g = mask.g
+  const g = mask_.g
   g.globalCompositeOperation = 'source-over'
   g.fillStyle = 'rgb(0,0,175)'; g.fillRect(0, 0, S, S) // грязь везде
   const weights = spots.map((s) => Math.pow(Math.max(0.12, 1.9 - s.wy), 2.4))
@@ -633,15 +771,15 @@ function freshLayers(rustLevel, seed) {
   for (let k = 0; k < 70; k++) { const sp = spots[(rand() * spots.length) | 0]; blob(g, sp.x, sp.y, (0.15 + rand() * 0.3) * sp.ppm, (a) => `rgba(255,255,90,${a})`) } // чуть чище пятнами
   g.globalCompositeOperation = 'source-over'
   // стёкла: мутная плёнка и потёки
-  const gg = glassLayer.g
+  const gg = glass_.g
   gg.globalCompositeOperation = 'source-over'
   gg.fillStyle = 'rgb(150,150,150)'; gg.fillRect(0, 0, GS, GS)
   gg.globalCompositeOperation = 'lighten'
   for (let k = 0; k < 40; k++) blob(gg, rand() * GS, rand() * GS, 10 + rand() * 30, (a) => `rgba(255,255,255,${a * 0.8})`)
   gg.globalCompositeOperation = 'source-over'
-  coat.g.clearRect(0, 0, S, S)
-  gloss.g.fillStyle = '#000'; gloss.g.fillRect(0, 0, S, S)
-  for (const t of [mask.t, coat.t, gloss.t, glassLayer.t]) t.needsUpdate = true
+  coat_.g.clearRect(0, 0, S, S)
+  gloss_.g.fillStyle = '#000'; gloss_.g.fillRect(0, 0, S, S)
+  for (const t of [mask_.t, coat_.t, gloss_.t, glass_.t]) t.needsUpdate = true
 }
 
 /* ================= РАБОТЫ И ПРОГРЕСС ================= */
@@ -694,15 +832,15 @@ function valueNow() {
 }
 function drawHud() {
   const st = stageInfo()
-  $('steps').innerHTML = STAGES.map((s, i) => `<span class="step ${job.done || i < job.stage ? 'done' : i === job.stage ? 'on' : ''}">${s.label}</span>`).join('')
-  $('meterfill').style.width = (job.done ? 0 : lastPct) + '%'
-  $('metertxt').textContent = job.done ? 'все работы сделаны' : `${st.what} ${lastPct}%`
-  $('paid').textContent = money(job.paid)
-  $('value').textContent = money(valueNow())
+  // тонкая линия: сколько сделано на этом этапе, над ней — что делаем
+  $('meterfill').style.width = (job.done ? 100 : 100 - lastPct) + '%'
+  $('meter').classList.toggle('done', !!job.done)
+  $('metertxt').textContent = job.done ? 'готово к продаже' : st.bar
   $('sell').classList.toggle('ready', !!job.done)
   $('tray').innerHTML = STAGES.map((s, i) => `<div class="slot ${job.done || i < job.stage ? 'done' : i === job.stage ? 'on' : 'lock'}"><img alt="" src="${toolIcons[s.id] || ''}">${s.label}</div>`).join('')
 }
 function checkProgress(now) {
+  if (!job) return
   if (finishing || !countDirty || job.done || now - lastCount < 300) return
   lastCount = now
   countDirty = false
@@ -1033,13 +1171,16 @@ function buy(ad) {
   audioInit()
   sfx('door', 0.9)
   save.cash -= ad.price
+  bankOp(`Покупка: ${CARS[ad.id].name}`, -ad.price)
   persist()
-  job = { id: ad.id, paid: ad.price, rust: ad.rust, seed: ad.seed, livery: ad.livery, stage: 0, color: PAINTS[0], done: false }
+  job = { id: ad.id, paid: ad.price, rust: ad.rust, seed: ad.seed, livery: ad.livery, stage: 0, color: PAINTS[0], done: false, photos: [], listing: null }
   enterGarage(null)
+  coach()
 }
 function enterGarage(layers) {
   $('paper').hidden = true
   $('garage').hidden = false
+  $('garage').classList.remove('empty')
   $('carname').textContent = CARS[job.id].name
   mountCar(job.id)
   view.yaw = -0.75; view.pitch = 0.32
@@ -1065,10 +1206,12 @@ $('sell').onclick = () => {
     <div class="btns"><button class="btn alt" data-a="no">ДОДЕЛАТЬ</button><button class="btn" data-a="yes">ПРОДАТЬ</button></div>`,
   (a) => { if (a === 'yes') sell(v) })
 }
-function sell(v) {
+function sell(v, who = 'покупатель') {
   sfx('coins', 1)
   const profit = v - job.paid
   save.cash += v
+  bankOp(`Продажа: ${CARS[job.id].name}`, v)
+  save.tut = 'done' // первая сделка — обучение позади
   save.sold++
   save.issue++
   if (save.best == null || profit > save.best) save.best = profit
@@ -1077,12 +1220,12 @@ function sell(v) {
   const name = CARS[job.id].name
   job = null
   try { localStorage.removeItem(JKEY) } catch {}
-  running = false
-  modal(`<small>ИЗ ХРОНИКИ СДЕЛОК</small><div class="stamp">СДЕЛКА</div><h2>ПРОДАНО!</h2>
-    <p>${name} ушёл за <b>${money(v)}</b>.</p>
+  enterEmpty()
+  modal(`<small>ДЖО МОТОРС · СДЕЛКА</small><h2>Продано!</h2>
+    <p>${name} забрал ${who} за <b>${money(v)}</b>. Деньги уже на счёте.</p>
     <div class="sum ${profit < 0 ? 'minus' : ''}">навар ${profit < 0 ? '' : '+'}${money(profit)}</div>
-    <div class="btns"><button class="btn" data-a="ok">СВЕЖАЯ ГАЗЕТА</button></div>`,
-  () => showPaper())
+    <div class="btns"><button class="btn" data-a="ok">В гараж</button></div>`,
+  () => {})
 }
 function modal(html, cb) {
   $('clip').innerHTML = html
@@ -1146,12 +1289,12 @@ function loop(now) {
   requestAnimationFrame(loop)
   const dt = Math.min(3, (now - prev) / 16.7)
   prev = now
-  if (!running || !car) return
+  if (!running) return
   const cp = Math.cos(view.pitch)
   camera.position.set(Math.sin(view.yaw) * cp * view.dist, view.ty + Math.sin(view.pitch) * view.dist, Math.cos(view.yaw) * cp * view.dist)
   camera.lookAt(0, view.ty, 0)
   cullGarage()
-  if (texDirty) { layerOf(stageInfo().id).t.needsUpdate = true; texDirty = false; jobDirty = true }
+  if (texDirty && job) { layerOf(stageInfo().id).t.needsUpdate = true; texDirty = false; jobDirty = true }
   if (glassDirty) { glassLayer.t.needsUpdate = true; glassDirty = false; jobDirty = true }
   if (finishing) finishStep()
   checkProgress(now)
@@ -1163,6 +1306,347 @@ requestAnimationFrame(loop)
 
 $('xPaper').onclick = exitToMenu
 $('xGarage').onclick = exitToMenu
+
+/* ================= ФОТОСТУДИЯ: цветные фото машин для объявлений ================= */
+// Своя сцена и свой набор слоёв: на фото видно, что продавец не мыл и не чинил (грязь, ржавчина, выгоревшая краска).
+let studio = null
+const studioL = { oldPaint: canvasTex(S), mask: canvasTex(S, null, false), coat: canvasTex(S), gloss: canvasTex(S, null, false), glass: canvasTex(GS, null, false) }
+const studioSpots = {}
+function studioInit() {
+  const r = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true })
+  r.toneMapping = THREE.ACESFilmicToneMapping
+  const sc = new THREE.Scene()
+  sc.environment = envTex
+  sc.environmentIntensity = 0.7
+  sc.background = new THREE.Color(0xb9c6d1)
+  sc.add(new THREE.HemisphereLight(0xdfe8f2, 0x6b6253, 1.0))
+  const sunL = new THREE.DirectionalLight(0xfff3e0, 2.6)
+  sunL.position.set(5, 8, 3)
+  sc.add(sunL)
+  const ground = new THREE.Mesh(new THREE.CircleGeometry(30, 32), new THREE.MeshStandardMaterial({ color: 0x7b7b76, roughness: 0.95 }))
+  ground.rotation.x = -Math.PI / 2
+  sc.add(ground)
+  const sh = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), new THREE.MeshBasicMaterial({ map: shadowTex.t, transparent: true, depthWrite: false }))
+  sh.rotation.x = -Math.PI / 2
+  sh.position.y = 0.01
+  sc.add(sh)
+  studio = { r, sc, sh, cam: new THREE.PerspectiveCamera(32, 16 / 10, 0.1, 80) }
+}
+function spotsFor(id) {
+  if (studioSpots[id]) return studioSpots[id]
+  let b = null
+  models[id].updateMatrixWorld(true)
+  models[id].traverse((o) => { if (o.isMesh && o.material.name === 'Body') b = o })
+  const t = bodyTris(b, S), list = [], cover = vis[id]
+  for (const tri of t.tris) forEachSample(tri, (x, y, pp) => { if (cover && cover[Math.round(y) * S + Math.round(x)]) list.push({ x, y, wy: pp.y, ppm: tri.pxPerM }) })
+  return (studioSpots[id] = { tris: t.tris, spots: list })
+}
+const photoCache = {}
+function carPhoto(ad, view = 0) {
+  const key = `${save.issue}:${ad.seed}:${view}`
+  if (photoCache[key]) return photoCache[key]
+  if (!studio) studioInit()
+  const spec = CARS[ad.id], sp = spotsFor(ad.id)
+  paintOld(studioL.oldPaint, spec, ad.livery, sp.tris)
+  freshLayers(ad.rust, ad.seed, studioL, sp.spots)
+  const o = models[ad.id].clone()
+  o.traverse((m) => { if (m.isMesh) m.material = m.material.name === 'Body' ? bodyMaterial(studioL) : partMaterial(m.material.name, spec, studioL) })
+  const { r, sc, sh, cam } = studio
+  sc.add(o)
+  const bx = new THREE.Box3().setFromObject(o), c = bx.getCenter(new THREE.Vector3()), size = bx.getSize(new THREE.Vector3())
+  sh.scale.set(size.x * 1.25, size.z * 1.5, 1)
+  const rnd = mulberry(ad.seed + view * 7)
+  const dir = view === 0 ? new THREE.Vector3(1.15, 0.38 + rnd() * 0.12, 1 + rnd() * 0.3) : view === 1 ? new THREE.Vector3(-1.1, 0.35, 0.95) : new THREE.Vector3(0.05, 0.3, 1)
+  const rad = size.length() / 2
+  cam.position.copy(c).addScaledVector(dir.normalize(), (rad / Math.sin((cam.fov * Math.PI) / 360)) * 0.92)
+  cam.lookAt(c.x, c.y * 0.8, c.z)
+  r.setSize(640, 400, false)
+  r.render(sc, cam)
+  sc.remove(o)
+  return (photoCache[key] = r.domElement.toDataURL('image/jpeg', 0.82))
+}
+
+/* ================= ФОТО ИЗ ГАРАЖА (для «Джо Моторс») ================= */
+const SUMV = STAGE_VALUE.reduce((a, b) => a + b, 0)
+function carQuality() { return clamp((valueNow() / CARS[job.id].base - VALUE_START) / SUMV, 0, 1) } // 0 — как купил, 1 — всё сделано
+$('cam').onclick = () => {
+  if (!job) return
+  audioInit()
+  hideTool()
+  renderer.render(scene, camera)
+  const tmp = document.createElement('canvas')
+  tmp.width = 480; tmp.height = 300
+  const g = tmp.getContext('2d'), sw = canvas.width, sh = canvas.height, k = Math.min(sw / 480, sh / 300) // по центру кадра, 16:10
+  g.drawImage(canvas, (sw - 480 * k) / 2, (sh - 300 * k) / 2, 480 * k, 300 * k, 0, 0, 480, 300)
+  job.photos = [...(job.photos || []), { url: tmp.toDataURL('image/jpeg', 0.72), q: carQuality() }].slice(-4)
+  saveJob()
+  const f = $('flash'); f.classList.add('on'); requestAnimationFrame(() => requestAnimationFrame(() => f.classList.remove('on')))
+  sfx('paper', 0.25)
+  toast(`Фото ${job.photos.length}/4`)
+}
+
+/* ================= БАНК ================= */
+function bankOp(txt, v) {
+  save.bank.hist = [{ t: Date.now(), txt, v }, ...(save.bank.hist || [])].slice(0, 20)
+  persist()
+}
+
+/* ================= ОБЪЯВЛЕНИЯ «АВТО С РУК» ================= */
+let adsState = { issue: -1, list: [] }
+function currentAds() {
+  if (adsState.issue !== save.issue) {
+    adsState = {
+      issue: save.issue,
+      list: genAds(save.issue).map((ad) => {
+        const r = mulberry(ad.seed * 3 + 1)
+        return { ...ad, ask: ad.price, floor: Math.round((ad.price * (0.72 + r() * 0.13)) / 10) * 10, tries: 0, chat: [], done: false, sold: false }
+      }),
+    }
+  }
+  return adsState.list
+}
+function bargain(ad, k) {
+  const offer = Math.round((ad.ask * k) / 10) * 10
+  ad.chat.push({ me: true, t: `Отдадите за ${money(offer)}?` })
+  ad.tries++
+  if (offer >= ad.floor) {
+    ad.ask = offer
+    ad.chat.push({ t: ['Эх… ладно, забирай.', 'Договорились, приезжай.', 'Ну ты и жук. По рукам!'][ad.tries % 3] })
+    ad.done = true
+  } else if (ad.tries < 3) {
+    ad.ask = Math.max(ad.floor, Math.round((ad.ask + ad.floor * 1.04) / 2 / 10) * 10)
+    ad.chat.push({ t: `Не, так не пойдёт. За ${money(ad.ask)} отдам.` })
+  } else {
+    ad.chat.push({ t: 'Всё, хватит торговаться. Цена окончательная.' })
+    ad.done = true
+  }
+  sfx('paper', 0.2)
+}
+
+/* ================= «ДЖО МОТОРС»: продажа ================= */
+function listingTick() {
+  const L = job?.listing
+  if (!L || !job) return
+  if (Date.now() < L.next) return
+  const best = Math.max(0, ...(job.photos || []).map((x) => x.q))
+  const fair = CARS[job.id].base * (VALUE_START + best * SUMV) // покупатели судят по фото
+  const greedy = L.price > fair * 1.3
+  L.next = Date.now() + (greedy ? 14000 : 6000) + Math.random() * 8000
+  if (greedy && Math.random() > 0.3) return persistJob()
+  const v = Math.round(Math.min(L.price, fair * (0.8 + Math.random() * 0.28)) / 10) * 10
+  const who = ['Артур', 'Серёга с рынка', 'Дядя Миша', 'Влад', 'Тамара', 'Перекупщик Гоша', 'Студент Паша'][(Math.random() * 7) | 0]
+  L.offers = [{ v, who, t: Date.now() }, ...L.offers].sort((a, b) => b.v - a.v).slice(0, 5)
+  L.unread = (L.unread || 0) + 1
+  persistJob()
+  toast(`Предложение ${money(v)}`)
+  sfx('coins', 0.25)
+  pcBadge()
+  if (site === 'jm' && !$('gagel').hidden) openSite('jm')
+}
+function persistJob() { jobDirty = true }
+setInterval(listingTick, 1000)
+function pcBadge() {
+  const n = job?.listing?.unread || 0
+  let b = $('pc').querySelector('.badge')
+  if (!n) { b?.remove(); return }
+  if (!b) { b = document.createElement('span'); b.className = 'badge'; $('pc').appendChild(b) }
+  b.textContent = n
+}
+
+/* ================= КОМПЬЮТЕР: Gagel ================= */
+const SITES = [
+  { id: 'avto', ico: 'А', col: '#e2572c', name: 'Авто с рук', desc: 'Объявления о продаже машин со всей округи', tags: 'машины купить объявления авто' },
+  { id: 'jm', ico: 'Д', col: '#1f1f24', name: 'Джо Моторс', desc: 'Твой сайт: фото тачек и продажа', tags: 'продать мой сайт джо моторс' },
+  { id: 'bank', ico: '₽', col: '#d9a521', name: 'Банк «Копейка»', desc: 'Твой счёт: деньги на тачки', tags: 'банк счёт деньги' },
+  { id: 'parts', ico: 'З', col: '#2f8f5b', name: 'ЗапчастиТут', desc: 'Инструмент, краски, диски — с доставкой в гараж', tags: 'магазин краска инструмент запчасти диски', soon: true },
+  { id: 'forum', ico: 'Ф', col: '#4b6fd6', name: 'Гаражный форум', desc: 'Мужики подскажут, как продать дороже', tags: 'форум советы', soon: true },
+]
+const LOGO = [['G', '#e2572c'], ['a', '#d9a521'], ['g', '#2f8f5b'], ['e', '#4b6fd6'], ['l', '#e2572c']]
+let site = null, siteArg = null
+function gagelHome(q = '') {
+  site = null
+  $('gurl').textContent = q ? `gagel.ru/search?q=${q}` : 'gagel.ru'
+  const words = q.toLowerCase().split(/\s+/).filter(Boolean)
+  const found = SITES.filter((x) => !words.length || words.some((w) => (x.name + ' ' + x.desc + ' ' + x.tags).toLowerCase().includes(w)))
+  $('gbody').className = 'gbody'
+  $('gbody').innerHTML = `<div class="glogo">${LOGO.map(([ch, col]) => `<i style="color:${col}">${ch}</i>`).join('')}</div>
+    <form class="gsearch" id="gform"><input id="gq" placeholder="Поиск в Gagel" autocomplete="off"><button>Найти</button></form>
+    ${found.length ? `<div class="gsites">${found.map((x) => `<div class="gsite" data-site="${x.id}"><span class="ico" style="background:${x.col}">${x.ico}</span><span><b>${x.name}</b><small>${x.desc}</small>${x.soon ? '<em>скоро</em>' : ''}</span></div>`).join('')}</div>`
+      : '<div class="gempty">По запросу ничего не найдено</div>'}
+    <div class="gfoot">Gagel · поиск по округе</div>`
+  $('gq').value = q
+  $('gform').onsubmit = (e) => { e.preventDefault(); sfx('paper', 0.3); gagelHome($('gq').value.trim()) }
+  for (const el of $('gbody').querySelectorAll('.gsite')) el.onclick = () => { const x = SITES.find((y) => y.id === el.dataset.site); if (!x.soon) openSite(x.id) }
+  coach()
+}
+function head(title, sub, col) {
+  return `<div class="shead" style="background:${col}"><button class="sback" data-back>‹</button><span><b>${title}</b><small>${sub}</small></span></div>`
+}
+function openSite(id, arg = null) {
+  site = id; siteArg = arg
+  $('gbody').className = 'site'
+  const urls = { avto: 'avtosruk.ru', ad: 'avtosruk.ru/ad', bank: 'kopeyka-bank.ru', jm: 'joe-motors.ru' }
+  $('gurl').textContent = urls[id] + (arg != null && id === 'ad' ? '/' + currentAds()[arg].phone : '')
+  let html = ''
+  if (id === 'avto') {
+    const ads = currentAds()
+    html = head('Авто с рук', 'частные объявления округи', '#e2572c') + `<div class="sin"><div class="cards">${ads.map((ad, i) => `
+      <div class="card" data-ad="${i}"><img alt="" src="${carPhoto(ad, 0)}"><div class="cb">
+        <div class="ct"><b>${CARS[ad.id].name}</b><span class="pr">${ad.sold ? 'продано' : money(ad.ask)}</span></div>
+        <div class="meta">${CARS[ad.id].kind} · ${ad.cond.replace(/^[^,]*, /, '')}</div>
+        ${ad.ask < ad.price ? '<span class="tag">цена снижена</span>' : ''}</div></div>`).join('')}</div></div>`
+  } else if (id === 'ad') {
+    const ad = currentAds()[arg], spec = CARS[ad.id]
+    const canBuy = !ad.sold && !job && save.bank?.open && save.cash >= ad.ask
+    const why = ad.sold ? 'Машину уже купили.' : job ? 'Гараж занят — сначала продай машину на «Джо Моторс».' : !save.bank?.open ? 'Нужен счёт в банке «Копейка».' : save.cash < ad.ask ? `На счёте ${money(save.cash)} — не хватает.` : ''
+    html = head(spec.name, 'Авто с рук · объявление', '#e2572c') + `<div class="sin">
+      <div class="gallery">${[0, 1, 2].map((v) => `<img alt="" src="${carPhoto(ad, v)}">`).join('')}</div>
+      <div class="adh"><b>${ad.head.charAt(0) + ad.head.slice(1).toLowerCase()}</b><span class="pr">${money(ad.ask)}${ad.ask < ad.price ? `<s>${money(ad.price)}</s>` : ''}</span></div>
+      <div class="txt">${ad.text}</div>
+      <div class="facts"><span>${spec.kind}</span><span>${ad.cond.replace(/^[^,]*, /, '')}</span><span>${ad.who.replace(/^Тел\. [^,]*, /, '').replace(/\.$/, '')}</span></div>
+      <div class="chat">${ad.chat.length ? ad.chat.map((m) => `<div class="msg ${m.me ? 'me' : 'them'}">${m.t}</div>`).join('') : '<div class="msg them">Здравствуйте! Машина на месте, приезжайте смотреть.</div>'}</div>
+      ${ad.sold ? '' : `<div class="offers">${[0.9, 0.8, 0.7].map((k) => `<button data-bid="${k}" ${ad.done ? 'disabled' : ''}>${money(Math.round((ad.ask * k) / 10) * 10)}</button>`).join('')}</div>`}
+      <button class="bigbtn green" id="buyBtn" ${canBuy ? '' : 'disabled'}>Купить за ${money(ad.ask)}</button>
+      ${why ? `<div class="warn">${why}</div>` : '<div class="note">Деньги спишутся со счёта, машину пригонят в гараж.</div>'}</div>`
+  } else if (id === 'bank') {
+    const b = save.bank
+    html = head('Банк «Копейка»', 'копейка рубль бережёт', '#d9a521') + `<div class="sin">` + (!b?.open
+      ? `<div class="hero"><h3>Счёт для перекупщика</h3><p>Деньги за проданные тачки падают сюда, покупки — отсюда. Открытие — за минуту, без справок.</p></div>
+         <button class="bigbtn" id="bankOpen">Открыть счёт</button><div class="note">Открывая счёт, вы соглашаетесь, что копейка рубль бережёт</div>`
+      : `<div class="bank"><small>Баланс</small><div class="bal">${money(save.cash)}</div><div class="num">${b.num}</div></div>
+         <div class="h4">История</div><div class="hist">${(b.hist || []).length ? b.hist.map((h) => `<div><span>${h.txt}<br><i>${new Date(h.t).toLocaleDateString('ru-RU')}</i></span><span class="${h.v > 0 ? 'plus' : 'minus'}">${h.v > 0 ? '+' : ''}${money(h.v)}</span></div>`).join('') : '<div><span>Операций пока нет</span></div>'}</div>`) + `</div>`
+  } else if (id === 'jm') {
+    html = head('Джо Моторс', 'тачки с душой · твой сайт', '#1f1f24') + `<div class="sin">`
+    if (!job) {
+      html += `<div class="hero"><h3>В гараже пусто</h3><p>Купи машину на «Авто с рук», приведи её в порядок и выставь здесь.</p></div><button class="bigbtn" data-go="avto">Открыть «Авто с рук»</button>`
+    } else {
+      const L = job.listing, ph = job.photos || []
+      if (L) L.unread = 0
+      pcBadge()
+      html += `<div class="adh"><b>${CARS[job.id].name}</b><span class="pr" style="font-size:15px;color:#6a6c78">куплена за ${money(job.paid)}</span></div>
+        <div class="h4">Фото (${ph.length}/4)</div>
+        <div class="pgrid">${[0, 1, 2, 3].map((i) => ph[i] ? `<img alt="" src="${ph[i].url}">` : '<div class="empty">сфотографируй в гараже 📷</div>').join('')}</div>
+        <div class="note">Покупатели смотрят на фото: сними машину, когда она блестит.</div>`
+      if (!L) {
+        const def = Math.round((valueNow() * 1.15) / 10) * 10
+        html += `<div class="h4">Цена</div><div class="row"><input id="jmPrice" type="number" inputmode="numeric" value="${def}"></div>
+          <button class="bigbtn" id="jmList" ${ph.length ? '' : 'disabled'}>Выставить на продажу</button>
+          ${ph.length ? '' : '<div class="warn">Без фото объявление не выставить.</div>'}`
+      } else {
+        html += `<div class="h4">Объявление · ${money(L.price)}</div>
+          ${L.offers.length ? L.offers.map((o, i) => `<div class="offer"><span><b>${money(o.v)}</b><small>${o.who}</small></span><button data-sell="${i}">Продать</button></div>`).join('') : '<div class="note">Ждём покупателей… предложения приходят, пока ты в гараже.</div>'}
+          <button class="bigbtn ghost" id="jmOff">Снять с продажи</button>`
+      }
+    }
+    html += `</div>`
+  }
+  $('gbody').innerHTML = html
+  $('gscroll').scrollTop = 0
+  const q = (sel) => $('gbody').querySelector(sel)
+  q('[data-back]').onclick = () => (id === 'ad' ? openSite('avto') : gagelHome())
+  for (const el of $('gbody').querySelectorAll('[data-ad]')) el.onclick = () => openSite('ad', +el.dataset.ad)
+  for (const el of $('gbody').querySelectorAll('[data-bid]')) el.onclick = () => { bargain(currentAds()[arg], +el.dataset.bid); openSite('ad', arg); $('gscroll').scrollTop = 9999 }
+  for (const el of $('gbody').querySelectorAll('[data-go]')) el.onclick = () => openSite(el.dataset.go)
+  if (q('#buyBtn')) q('#buyBtn').onclick = () => {
+    const ad = currentAds()[arg]
+    ad.sold = true
+    $('gagel').hidden = true
+    buy({ ...ad, price: ad.ask })
+  }
+  if (q('#bankOpen')) q('#bankOpen').onclick = () => {
+    const r = () => String(1000 + ((Math.random() * 9000) | 0))
+    save.bank = { open: true, num: `4081 ${r()} ${r()} ${r()}`, hist: [] }
+    bankOp('Открытие счёта · стартовые', save.cash)
+    sfx('coins', 0.6)
+    openSite('bank')
+  }
+  if (q('#jmList')) q('#jmList').onclick = () => {
+    const price = Math.max(10, Math.round(+q('#jmPrice').value || 0))
+    job.listing = { price, offers: [], next: Date.now() + 4000, unread: 0 }
+    saveJob()
+    openSite('jm')
+  }
+  if (q('#jmOff')) q('#jmOff').onclick = () => { job.listing = null; saveJob(); openSite('jm') }
+  for (const el of $('gbody').querySelectorAll('[data-sell]')) el.onclick = () => {
+    const o = job.listing.offers[+el.dataset.sell]
+    $('gagel').hidden = true
+    sell(o.v, o.who)
+  }
+  coach()
+}
+$('pc').onclick = () => {
+  audioInit()
+  hideTool()
+  if (job?.listing?.unread) openSite('jm')
+  else gagelHome()
+  $('gagel').hidden = false
+  coach()
+}
+$('gclose').onclick = () => { $('gagel').hidden = true; coach() }
+$('gagel').onclick = (e) => { if (e.target.id === 'gagel') { $('gagel').hidden = true; coach() } }
+$('sell').onclick = () => { audioInit(); hideTool(); openSite('jm'); $('gagel').hidden = false; coach() }
+
+/* ================= ПУСТОЙ ГАРАЖ ================= */
+function enterEmpty() {
+  $('paper').hidden = true
+  $('garage').hidden = false
+  $('garage').classList.add('empty')
+  if (car) { scene.remove(car); car = null }
+  parts = []; body = null; job = null
+  hideTool()
+  $('carname').textContent = 'Гараж'
+  carSize = new THREE.Vector3(5, 1.8, 2)
+  view.ty = 0.9; view.yaw = -0.75; view.pitch = 0.32
+  shadow.scale.set(0.001, 0.001, 1)
+  fitCamera(true)
+  resize()
+  showHint('Гараж пуст — найди тачку в интернете')
+  running = true
+  pcBadge()
+  coach()
+}
+
+/* ================= ОБУЧЕНИЕ ================= */
+// Ведёт за руку: компьютер → банк → открыть счёт → «Авто с рук» → купить. Можно пропустить.
+function coach() {
+  for (const el of document.querySelectorAll('.tut-hl')) el.classList.remove('tut-hl')
+  const box = $('coach')
+  if (save.tut === 'done') { box.hidden = true; return }
+  const open = !$('gagel').hidden
+  let text = '', hl = null, ok = false
+  if (!save.bank?.open) {
+    if (!open) { text = 'Это твой гараж. Машины ищем в интернете — нажми на компьютер.'; hl = $('pc') }
+    else if (site !== 'bank') { text = 'Сначала открой счёт в банке «Копейка» — без него машину не купить.'; hl = site == null ? $('gbody').querySelector('[data-site="bank"]') : $('gbody').querySelector('[data-back]') }
+    else { text = 'Жми «Открыть счёт».'; hl = $('bankOpen') }
+  } else if (!job) {
+    if (!open) { text = 'Открой компьютер и зайди на «Авто с рук».'; hl = $('pc') }
+    else if (site === 'bank') { text = 'Счёт открыт! Теперь назад и на «Авто с рук» — выбирать машину.'; hl = $('gbody').querySelector('[data-back]') }
+    else if (site == null) { text = 'Заходи на «Авто с рук».'; hl = $('gbody').querySelector('[data-site="avto"]') }
+    else if (site === 'avto') { text = 'Выбери машину по карману. На фото видно, сколько с ней возни.' }
+    else if (site === 'ad') { text = 'Поторгуйся кнопками с ценой — продавец может уступить. Потом «Купить».'; hl = $('gbody').querySelector('.offers') }
+  } else {
+    text = 'Машина твоя! Помой, убери ржавчину, покрась и отполируй. Потом сфотографируй 📷 и продай через «ПРОДАТЬ».'
+    ok = true
+  }
+  if (!text) { box.hidden = true; return }
+  box.hidden = false
+  box.classList.toggle('top', open)
+  box.innerHTML = `<div>${text}</div><div class="cs"><button id="tutSkip">Пропустить обучение</button>${ok ? '<button class="ok" id="tutOk">Понятно</button>' : ''}</div>`
+  if (hl) hl.classList.add('tut-hl')
+  $('tutSkip').onclick = () => tutDone()
+  if (ok) $('tutOk').onclick = () => tutDone()
+}
+function tutDone() {
+  if (!save.bank?.open) {
+    const r = () => String(1000 + ((Math.random() * 9000) | 0))
+    save.bank = { open: true, num: `4081 ${r()} ${r()} ${r()}`, hist: [] }
+    bankOp('Открытие счёта · стартовые', save.cash)
+  }
+  save.tut = 'done'
+  persist()
+  coach()
+  if (site) openSite(site, siteArg)
+}
 
 /* ================= СТАРТ ================= */
 ready.then(() => {
@@ -1179,13 +1663,18 @@ ready.then(() => {
     try { localStorage.removeItem(JKEY) } catch {}
     saved = null
   }
-  if (saved?.job && CARS[saved.job.id]) { job = saved.job; enterGarage(saved) }
-  else showPaper()
+  if (!save.tut && (save.sold > 0 || saved?.job)) { // играл до обучения — сразу со счётом
+    save.tut = 'done'
+    if (!save.bank) { save.bank = { open: true, num: '4081 7810 0000 0001', hist: [] } }
+    persist()
+  }
+  if (saved?.job && CARS[saved.job.id]) { job = saved.job; enterGarage(saved); pcBadge(); coach() }
+  else enterEmpty()
 }).catch((e) => { $('load').textContent = 'Не загрузилось :('; console.error(e) })
 
 // для отладки и автотестов
 window.flip = {
-  get job() { return job }, view, pct: () => lastPct, save, tools, camera, shot: () => { renderer.render(scene, camera); return canvas.toDataURL('image/jpeg', 0.8) },
+  get job() { return job }, view, openSite, currentAds, coach, pct: () => lastPct, save, tools, camera, shot: () => { renderer.render(scene, camera); return canvas.toDataURL('image/jpeg', 0.8) },
   rub: (x, y) => rub(x, y), lift: () => hideTool(), snd: () => ({ ctx: actx?.state, loop: toolLoop.name, level: toolLoop.level, bufs: Object.keys(buffers) }), kindAt: (x, y) => pick(x, y)?.object.userData.kind ?? null,
 }
 </script>
