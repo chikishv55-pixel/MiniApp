@@ -22,7 +22,7 @@ const json = (s: string | null | undefined): any => {
 }
 
 const GROUPS: Record<string, Group> = {
-  // «Перекупщик Джо»: деньги и текущая машина — только вместе, иначе деньги задвоятся или пропадут
+  // «Перекуп Джо»: деньги и текущая машина — только вместе, иначе деньги задвоятся или пропадут
   flip: {
     keys: ['flip-v1', 'flip-job-v1'],
     score: (v) => {
@@ -123,7 +123,7 @@ async function pullGroup(g: string, m: Manifest[string]) {
   return v && typeof v === 'object' ? (v as Record<string, string | null>) : null
 }
 
-// облачная копия «Перекупщика»: картинки слоёв машины пересжимаем, в крайнем случае шлём без них
+// облачная копия «Перекупа»: картинки слоёв машины пересжимаем, в крайнем случае шлём без них
 async function shrink(g: string, v: Record<string, string | null>) {
   if (g !== 'flip' || !v['flip-job-v1']) return null
   const job = json(v['flip-job-v1'])

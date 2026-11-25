@@ -31,7 +31,7 @@ export async function reportStats(): Promise<string> {
   const returned = Math.max(0, uY + uT - uTY)
 
   return [
-    `📊 Игры Джо — статистика (${d[0]})`,
+    `📊 Перекуп Джо — статистика (${d[0]})`,
     '',
     'Сегодня',
     `👥 зашли: ${fmt(uT)} · новых: ${fmt(m[0].new || 0)}`,

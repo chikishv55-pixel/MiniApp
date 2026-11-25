@@ -53,7 +53,7 @@ await call('setChatMenuButton', {
 })
 await call('setMyCommands', {
   commands: [
-    { command: 'start', description: 'Открыть игры' },
+    { command: 'start', description: 'Открыть гараж' },
     { command: 'help', description: 'Как играть' },
     { command: 'privacy', description: 'Приватность' },
   ],
@@ -70,19 +70,23 @@ for (const id of (env.ADMIN_IDS || '').split(',').map((s) => Number(s.replace(/[
       { command: 'shop', description: 'Покупки и пропуск' },
       { command: 'src', description: 'Откуда пришли: по рекламным ссылкам' },
       { command: 'link', description: 'Рекламная ссылка: /link метка' },
-      { command: 'start', description: 'Открыть игры' },
+      { command: 'start', description: 'Открыть гараж' },
       { command: 'help', description: 'Как играть' },
       { command: 'privacy', description: 'Приватность' },
       { command: 'id', description: 'Мой Telegram ID' },
     ],
   })
 }
-await call('setMyName', { name: 'Игры Джо' })
-await call('setMyShortDescription', { short_description: 'Игры про Джо прямо в Telegram. Кидай вызовы друзьям! Канал: @JoesGames' })
+await call('setMyName', { name: 'Перекуп Джо' })
+// короткое описание (до 120 символов) — в профиле бота и при пересылке ссылки
+await call('setMyShortDescription', { short_description: 'Покупай ржавые тачки, доводи до блеска и продавай дороже. Канал: @JoesGames' })
+// описание (до 512) — на пустом экране чата до нажатия «Старт»
 await call('setMyDescription', {
   description:
-    'Игры Джо — аркада про самого меткого парня на диком западе. Меткий Джо, Дуэль, Побег на поезде, Каньон и Дикое родео. ' +
-    'Бей рекорды и кидай вызовы друзьям: кто пройдёт тех же врагов?\n\nКанал игры: @JoesGames',
+    '🔧 Перекуп Джо — симулятор перекупа в Telegram.\n\n' +
+    'Ищи тачки на «Авто с рук», торгуйся с продавцами, загоняй ржавое ведро в гараж и доводи его до блеска пальцем: ' +
+    'мойка, ржавчина, покраска, полировка. Фоткай, выставляй на свой сайт и продавай с наваром.\n\n' +
+    'Прогресс общий на телефоне и компьютере.\n\nКанал игры: @JoesGames',
 })
 
 const info = await call('getWebhookInfo')

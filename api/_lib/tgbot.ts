@@ -20,6 +20,10 @@ export async function tgCall(method: string, body: unknown): Promise<boolean> {
 export const sendText = (chatId: number | string, text: string, extra: Record<string, unknown> = {}) =>
   tgCall('sendMessage', { chat_id: chatId, text, ...extra })
 
+// картинка по ссылке с подписью (до 1024 символов); false — не вышло, можно отправить текстом
+export const sendPhoto = (chatId: number | string, photo: string, caption: string, extra: Record<string, unknown> = {}) =>
+  tgCall('sendPhoto', { chat_id: chatId, photo, caption, ...extra })
+
 export function adminIds(): number[] {
   return (process.env.ADMIN_IDS || '')
     .split(',')

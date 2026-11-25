@@ -1,9 +1,9 @@
 // Вебхук Telegram-бота (Vercel Function). Telegram присылает сюда апдейты.
-// Всем: /start (кнопка «Играть», вызовы по ссылке), /help, /privacy, /id.
+// Всем: /start (приветствие с кнопкой «Играть», вызовы по старым ссылкам), /help, /privacy, /id.
 // Админам из ADMIN_IDS: /stats, /games, /funnel, /ads, /shop — отчёты по статистике.
 import { reportAds, reportFunnel, reportGames, reportShop, reportSources, reportStats } from './_lib/report.js'
 import { noteStart, registerSrc, statsReady } from './_lib/stats.js'
-import { adminIds, sendText } from './_lib/tgbot.js'
+import { adminIds, sendPhoto, sendText } from './_lib/tgbot.js'
 
 const SECRET = process.env.TELEGRAM_WEBHOOK_SECRET
 const APP_URL = process.env.WEBAPP_URL?.replace(/\/+$/, '')
@@ -16,29 +16,24 @@ const CHALLENGE_RE = /^c[34][A-Za-z0-9_-]{22,56}$/
 const AD_START_RE = /^ad_([A-Za-z0-9]{1,16})$/
 
 const HELP = [
-  '🎯 Как играть в «Игры Джо»',
+  '🔧 Как играть в «Перекуп Джо»',
   '',
-  '1️⃣ Жми «Играть» и выбери игру свайпом.',
-  '• Меткий Джо — жми, когда прицел смотрит на врага.',
-  '• Дуэль — стреляй, когда появится «ОГОНЬ!». Раньше — фальстарт.',
-  '• Побег на поезде — тап слева прыжок (держи — выше), тап справа выстрел, свайп вниз — присесть.',
-  '• Каньон — держи палец, Джо копит силу; отпусти — прыжок. В центр столба — очки ×2 и серия.',
-  '• Дикое родео — тяни палец назад и отпускай: лассо летит по дуге. Скунса не лови!',
+  '1️⃣ В гараже жми на компьютер 🖥 и открой счёт в банке «Копейка» — там твои деньги.',
+  '2️⃣ На «Авто с рук» выбери тачку по карману. Поторгуйся — продавцы уступают.',
+  '3️⃣ Приведи её в порядок пальцем: отмой грязь, сдери ржавчину, покрась и отполируй. Краску нужного цвета закажи на «ЗапчастиТут».',
+  '4️⃣ Сфотографируй машину 📷, когда она блестит, и выставь на своём сайте «Джо Моторс».',
+  '5️⃣ Жди предложений и продавай дороже, чем купил. Навар — в новые тачки и инструмент: мойку, дрель, краскопульт, полировальную машинку.',
   '',
-  '2️⃣ Прошёл? Жми «⚔ Вызов другу» — друг пройдёт ТЕ ЖЕ препятствия, и сразу видно, кто лучше.',
-  '',
-  '3️⃣ За монеты — наряды Джо и уровни пропуска с эксклюзивами.',
-  '',
-  CHANNEL ? `Новости и новые игры: @${CHANNEL}` : '',
+  '💾 Прогресс сохраняется в Telegram — играй и с телефона, и с компьютера.',
+  CHANNEL ? `\nНовости игры: @${CHANNEL}` : '',
 ]
-  .filter((l, i, a) => l !== '' || a[i - 1] !== '')
   .join('\n')
   .trim()
 
 const PRIVACY = [
   '🔒 Приватность',
   '',
-  '• Твой прогресс (монеты, наряды, рекорды, ник и аватар) хранится только на твоём устройстве.',
+  '• Твой прогресс (деньги, машины, инструменты, настройки) хранится на устройстве и в облачном хранилище Telegram, привязанном к твоему аккаунту и этому боту. Его видишь только ты, у нас отдельной базы с ним нет.',
   '• На сервере мы считаем лишь общую статистику: сколько людей зашло, сколько игр сыграно. Твои Telegram ID, имя и ник в читаемом виде мы не сохраняем — счётчики ведутся без списка людей.',
   '• Подписку на канал проверяет Telegram в момент входа, результат мы не записываем.',
   '• Хостинг (Vercel) может вести технические журналы запросов — это вне нашего контроля.',
@@ -47,6 +42,21 @@ const PRIVACY = [
 ]
   .join('\n')
   .trim()
+
+// приветствие после /start; картинка — public/bot/welcome.jpg (нет файла — уйдёт просто текстом)
+const WELCOME = [
+  '🔧 Перекуп Джо',
+  '',
+  'Покупай ржавые тачки за копейки, доводи до блеска и продавай втридорога.',
+  '',
+  '🚗 Десять машин — от «Шивы» до DMW 5-series',
+  '🧽 Моешь, сдираешь ржавчину, красишь и полируешь прямо пальцем',
+  '💰 Торгуешься с продавцами и покупателями',
+  '🛠 Копишь на мойку, дрель и краскопульт',
+  '',
+  '💾 Прогресс общий на телефоне и компьютере.',
+  'Как играть — /help',
+].join('\n')
 
 async function adminReport(cmd: string): Promise<string | null> {
   const reports: Record<string, () => Promise<string>> = {
@@ -113,20 +123,19 @@ export async function POST(req: Request): Promise<Response> {
         }
       }
       const url = isChallenge ? `${APP_URL}/?startapp=${payload}` : tag ? `${APP_URL}/?src=${tag}` : APP_URL
-      const share = `https://t.me/share/url?url=${encodeURIComponent(`https://t.me/${BOT_NAME}`)}&text=${encodeURIComponent('Играем в «Игры Джо» — кидаем друг другу вызовы 🎯')}`
-      const rows: unknown[][] = [[{ text: isChallenge ? '⚔ Принять вызов' : '▶ Играть', web_app: { url } }]]
+      const share = `https://t.me/share/url?url=${encodeURIComponent(`https://t.me/${BOT_NAME}`)}&text=${encodeURIComponent('Перекуп Джо: покупаю ржавые тачки, делаю конфетку и продаю дороже 🔧 Залетай!')}`
+      const rows: unknown[][] = [[{ text: isChallenge ? '⚔ Принять вызов' : '🔧 Играть', web_app: { url } }]]
       const second: unknown[] = []
       if (CHANNEL) second.push({ text: '📣 Канал', url: `https://t.me/${CHANNEL}` })
       second.push({ text: '👥 Позвать друга', url: share })
       rows.push(second)
-      await sendText(
-        chatId,
-        isChallenge
-          ? '⚔ Тебе прилетел вызов! Жми и покажи, кто тут меткий.'
-          : '🎯 Игры Джо — игры про Джо прямо в Telegram.\n\n▶ Меткий Джо · ⚡ Дуэль · 🚂 Побег на поезде · 🏜 Каньон · 🤠 Дикое родео\n\n⚔ Кидай вызовы друзьям: они пройдут те же препятствия, что и ты.\n\nПравила — /help' +
-              (CHANNEL ? `\nНовости и новые игры — @${CHANNEL}` : ''),
-        { reply_markup: { inline_keyboard: rows } },
-      )
+      const markup = { reply_markup: { inline_keyboard: rows } }
+      if (isChallenge) await sendText(chatId, '⚔ Тебе прилетел вызов! Жми и покажи, на что способен.', markup)
+      else {
+        const caption = WELCOME + (CHANNEL ? `\nНовости — @${CHANNEL}` : '')
+        // картинки ещё нет или Telegram не смог её скачать — шлём то же самое текстом
+        if (!(await sendPhoto(chatId, `${APP_URL}/bot/welcome.jpg`, caption, markup))) await sendText(chatId, caption, markup)
+      }
     } else if (fromId && adminIds().includes(fromId) && cmd === '/link') {
       // /link pub1 → заводит метку и отдаёт рекламную ссылку (только админам)
       const t = (parts[1] || '').toLowerCase()
@@ -160,5 +169,5 @@ export async function POST(req: Request): Promise<Response> {
 }
 
 export function GET(): Response {
-  return new Response('joe games bot webhook: alive')
+  return new Response('perekup joe bot webhook: alive')
 }

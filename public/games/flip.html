@@ -3,11 +3,11 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
-<title>Перекупщик Джо</title>
+<title>Перекуп Джо</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Caveat:wght@600&family=Oswald:wght@500;700&family=PT+Mono&family=PT+Serif:ital,wght@0,400;0,700;1,400&display=swap">
 <style>
-/* «Перекупщик Джо»: газета объявлений → гараж (мойка, ржавчина, покраска, полировка) → продажа.
+/* «Перекуп Джо»: газета объявлений → гараж (мойка, ржавчина, покраска, полировка) → продажа.
    Машины и инструменты — glb из Blender (scripts/flip/*.py), данные — flip/cars.js. */
 :root{--ink:#26211c;--paper:#ece2ca;--red:#a8231b;--tape:#e8daa2;--wood:#7a5434}
 *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
@@ -1259,7 +1259,7 @@ function openPaint() { // первый мазок: банка выбранног
 $('sell').onclick = () => {
   const v = valueNow()
   if (job.done) return sell(v)
-  modal(`<small>ПЕРЕКУПЩИК ДЖО · ЗАПИСКА</small><h2>ПРОДАТЬ?</h2>
+  modal(`<small>ПЕРЕКУП ДЖО · ЗАПИСКА</small><h2>ПРОДАТЬ?</h2>
     <p>Сейчас за ${CARS[job.id].name} дадут <b>${money(v)}</b>, ты брал за ${money(job.paid)}.<br>Доделаешь все работы — дадут больше.</p>
     <div class="btns"><button class="btn alt" data-a="no">ДОДЕЛАТЬ</button><button class="btn" data-a="yes">ПРОДАТЬ</button></div>`,
   (a) => { if (a === 'yes') sell(v) })

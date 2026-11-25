@@ -1,4 +1,4 @@
-# Постер «Перекупщика Джо» для карточки в главном меню: public/games/flip/poster.jpg
+# Постер «Перекуп Джо» для карточки в главном меню: public/games/flip/poster.jpg
 #   exec(open(r"D:\MiniApp\scripts\flip\poster.py", encoding="utf-8").read())
 # Берёт готовые pickup.glb и tools.glb: перед машины ржавый, зад свежевыкрашен, на границе — баллончик.
 import bpy, os

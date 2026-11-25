@@ -30,10 +30,10 @@ const GAMES: Game[] = [
   { id: 'train', title: 'ПОБЕГ НА ПОЕЗДЕ', desc: 'Прыгай, стреляй, пригибайся', icon: 'cursor', color: '#3dffe0', art: 'train' },
   { id: 'canyon', title: 'КАНЬОН', desc: 'Держи, отпускай — прыгай в центр', icon: 'bolt', color: '#ff9a3d', art: 'canyon', fresh: true },
   { id: 'rodeo', title: 'ДИКОЕ РОДЕО', desc: 'Лови лассо — но не скунса!', icon: 'target', color: '#9bd36a', art: 'rodeo', fresh: true },
-  { id: 'flip', title: 'ПЕРЕКУПЩИК ДЖО', desc: 'Купи ржавую тачку, отмой, покрась — продай дороже', icon: 'bolt', color: '#e8b04a', poster: 'games/flip/poster.jpg', fresh: true },
+  { id: 'flip', title: 'ПЕРЕКУП ДЖО', desc: 'Купи ржавую тачку, отмой, покрась — продай дороже', icon: 'bolt', color: '#e8b04a', poster: 'games/flip/poster.jpg', fresh: true },
 ]
 
-// Пока приложение — одна игра: меню не показываем, сразу открываем «Перекупщика Джо».
+// Пока приложение — одна игра: меню не показываем, сразу открываем «Перекуп Джо».
 // Вернуть меню со всеми играми: SOLO = null.
 const SOLO: GameId | null = 'flip'
 

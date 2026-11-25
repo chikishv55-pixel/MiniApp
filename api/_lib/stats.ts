@@ -23,7 +23,7 @@ const TZ = Number(process.env.STATS_TZ ?? 3) // часовой пояс отчё
 
 export const TTL_SECONDS = 120 * 86400
 export const GAMES = ['joe', 'duel', 'train', 'gold', 'tower', 'canyon', 'rodeo', 'flip'] as const
-export const GAME_NAMES: Record<string, string> = { joe: 'Меткий Джо', duel: 'Дуэль', train: 'Побег на поезде', gold: 'Золотая лихорадка', tower: 'Башня из бочек', canyon: 'Каньон', rodeo: 'Дикое родео', flip: 'Перекупщик Джо' }
+export const GAME_NAMES: Record<string, string> = { joe: 'Меткий Джо', duel: 'Дуэль', train: 'Побег на поезде', gold: 'Золотая лихорадка', tower: 'Башня из бочек', canyon: 'Каньон', rodeo: 'Дикое родео', flip: 'Перекуп Джо' }
 export const statsReady = () => Boolean(BASE && TOKEN)
 
 // рекламная метка: ссылка t.me/бот?start=ad_<метка>

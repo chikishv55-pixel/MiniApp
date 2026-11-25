@@ -1,4 +1,4 @@
-# Нарезка звуков «Перекупщика Джо» из исходников BigSoundBank (CC0), см. public/games/flip/snd/README.md.
+# Нарезка звуков «Перекуп Джо» из исходников BigSoundBank (CC0), см. public/games/flip/snd/README.md.
 # Исходные mp3 скачать по ссылкам из README в папку SRC (имя — номер звука, например 0778.mp3), затем в Blender:
 #   SRC = r"путь\к\исходникам"; exec(open(r"D:\MiniApp\scripts\flip\sounds.py", encoding="utf-8").read())
 import aud, os

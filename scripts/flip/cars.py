@@ -1,4 +1,4 @@
-# Машины для «Перекупщика Джо» — low-poly, собираются целиком из этого скрипта.
+# Машины для «Перекуп Джо» — low-poly, собираются целиком из этого скрипта.
 # Запуск в Blender (через MCP или Text Editor):
 #   exec(open(r"D:\MiniApp\scripts\flip\cars.py", encoding="utf-8").read())
 # Создаёт сцену "Flip_Cars" (сцену пользователя не трогает), экспортирует public/games/flip/<id>.glb

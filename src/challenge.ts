@@ -49,7 +49,7 @@ export const GAME_TEXT: Record<GameId, { title: string; inGame: string; score: (
   canyon: { title: 'КАНЬОН', inGame: 'в «Каньоне»', score: (k) => `${k} ${pluralRu(k, 'очко', 'очка', 'очков')}` },
   rodeo: { title: 'ДИКОЕ РОДЕО', inGame: 'в «Диком родео»', score: (k) => `${k} ${pluralRu(k, 'очко', 'очка', 'очков')}` },
   // вызовов в перекупщике нет, запись нужна для полноты типа
-  flip: { title: 'ПЕРЕКУПЩИК ДЖО', inGame: 'в «Перекупщике Джо»', score: (k) => `$${k} навара` },
+  flip: { title: 'ПЕРЕКУП ДЖО', inGame: 'в «Перекуп Джо»', score: (k) => `$${k} навара` },
 }
 
 // Telegram кладёт ?startapp=... в start_param; кнопка бота передаёт его в адресе

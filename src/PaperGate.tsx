@@ -7,7 +7,7 @@ type Props = {
 
 const tg = (window as any).Telegram?.WebApp
 
-// «Подпишись на канал» в стиле «Перекупщика Джо»: газетная вырезка поверх гаража.
+// «Подпишись на канал» в стиле «Перекуп Джо»: газетная вырезка поверх гаража.
 // Показывается, только если сервер ответил «не подписан» — сама проверка идёт незаметно.
 export default function PaperGate({ channel, checking, miss, onCheck }: Props) {
   const url = `https://t.me/${channel}`
