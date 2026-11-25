@@ -32,6 +32,10 @@ const GAMES: Game[] = [
   { id: 'flip', title: 'ПЕРЕКУПЩИК ДЖО', desc: 'Купи ржавую тачку, отмой, покрась — продай дороже', icon: 'bolt', color: '#e8b04a', poster: 'games/flip/poster.jpg', fresh: true },
 ]
 
+// Пока приложение — одна игра: меню не показываем, сразу открываем «Перекупщика Джо».
+// Вернуть меню со всеми играми: SOLO = null.
+const SOLO: GameId | null = 'flip'
+
 const SHARE_TOAST: Record<string, string | null> = {
   telegram: null,
   shared: 'ВЫЗОВ ОТПРАВЛЕН',
@@ -109,6 +113,11 @@ export default function App() {
   useEffect(() => {
     track({ e: 'open' })
   }, [])
+
+  // одна игра без меню: запуск игры = прошёл подписку (для воронки в статистике)
+  useEffect(() => {
+    if (SOLO && sub.state === 'ok') track({ e: 'play', g: SOLO })
+  }, [sub.state])
 
   useEffect(() => {
     tg?.ready()
@@ -233,6 +242,27 @@ export default function App() {
     },
     [game, nick, showToast],
   )
+
+  if (SOLO) {
+    return (
+      <div className="screen solo">
+        {sub.state === 'ok' ? (
+          <GameFrame
+            launch={{ game: SOLO, mode: 'free' }}
+            solo
+            onExit={() => {}}
+            onChallenge={() => {}}
+            onResult={(r) => {
+              reportRun(SOLO, r.kills)
+              track({ e: 'result', g: SOLO, v: r.kills })
+            }}
+          />
+        ) : (
+          <SubscribeGate channel={sub.channel || 'JoesGames'} checking={sub.state === 'checking'} onCheck={() => checkSub(true)} />
+        )}
+      </div>
+    )
+  }
 
   return (
     <div className="screen" style={{ ['--theme' as string]: current.color }}>

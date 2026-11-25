@@ -8,6 +8,7 @@ type Props = {
   onExit: () => void
   onChallenge: (r: RunInfo) => void
   onResult: (r: RunInfo) => void
+  solo?: boolean // игра — всё приложение: выйти некуда, кнопки «назад» нет
 }
 
 const FILES: Record<GameId, { file: string; title: string }> = {
@@ -33,13 +34,14 @@ function readRun(d: any): RunInfo | null {
   return { seed: seed >>> 0, level, kills }
 }
 
-export default function GameFrame({ launch, onExit, onChallenge, onResult }: Props) {
+export default function GameFrame({ launch, onExit, onChallenge, onResult, solo = false }: Props) {
   const frame = useRef<HTMLIFrameElement>(null)
   const cb = useRef({ onExit, onChallenge, onResult })
   cb.current = { onExit, onChallenge, onResult }
 
   const src = useMemo(() => {
     const q = new URLSearchParams({ embed: '1' })
+    if (solo) q.set('solo', '1')
     if (launch.mode === 'challenge') {
       q.set('mode', 'challenge')
       q.set('seed', String(launch.ch.s))
@@ -48,7 +50,7 @@ export default function GameFrame({ launch, onExit, onChallenge, onResult }: Pro
       q.set('from', launch.ch.n)
     }
     return `${import.meta.env.BASE_URL}${FILES[launch.game].file}?${q}`
-  }, [launch])
+  }, [launch, solo])
 
   // сообщения из игры: принимаем только от нашего iframe, нашего origin и запущенной игры
   useEffect(() => {
@@ -73,7 +75,7 @@ export default function GameFrame({ launch, onExit, onChallenge, onResult }: Pro
   // системная кнопка «Назад» в Telegram
   useEffect(() => {
     const back = tg?.BackButton
-    if (!back) return
+    if (!back || solo) return
     const go = () => cb.current.onExit()
     back.onClick(go)
     back.show()
@@ -81,7 +83,7 @@ export default function GameFrame({ launch, onExit, onChallenge, onResult }: Pro
       back.offClick(go)
       back.hide()
     }
-  }, [])
+  }, [solo])
 
   return <iframe ref={frame} className="game-frame" src={src} title={FILES[launch.game].title} allow="autoplay" />
 }

@@ -1275,3 +1275,8 @@ body.playing .screen * {
   object-fit: cover;
   image-rendering: auto;
 }
+
+/* одна игра без меню — игра на весь экран */
+.screen.solo {
+  padding: 0;
+}

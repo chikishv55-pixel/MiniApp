@@ -160,7 +160,8 @@ import { CARS, STAGES, STAGE_VALUE, VALUE_START, PAINTS, SELLERS, ADTEXT, HEADS,
 const EMBED = new URLSearchParams(location.search).has('embed')
 let TG = window.Telegram?.WebApp
 try { TG = TG || window.parent.Telegram?.WebApp } catch {}
-if (EMBED) document.body.classList.add('embed')
+// solo — игра и есть всё приложение (меню выключено): кнопке «в меню» некуда вести
+if (EMBED && !new URLSearchParams(location.search).has('solo')) document.body.classList.add('embed')
 // сообщения меню: выход и результат (навар со сделки — рекорд на карточке игры)
 function post(m) { if (EMBED) try { window.parent.postMessage({ src: 'flip', ...m }, location.origin) } catch {} }
 const exitToMenu = () => { saveJob(); post({ type: 'exit' }) }
