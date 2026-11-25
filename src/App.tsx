@@ -9,6 +9,7 @@ import GameFrame, { type GameLaunch } from './GameFrame'
 import PixelIcon from './PixelIcon'
 import ProfileModal from './ProfileModal'
 import SubscribeGate from './SubscribeGate'
+import PaperGate from './PaperGate'
 import { api, hasAuth } from './api'
 import {
   GAME_TEXT,
@@ -95,6 +96,7 @@ export default function App() {
   })
   const toastTimer = useRef<number>()
   const gateSeen = useRef(false) // показывали ли в этом заходе экран «подпишись» (для воронки)
+  const [subMiss, setSubMiss] = useState(false) // нажал «Я подписался», а подписки нет
   const { nick, avatar, save, tgNick, best, reportRun } = useProfile()
 
   const current = GAMES[slide]
@@ -168,7 +170,11 @@ export default function App() {
           track({ e: 'gate_passed' })
         }
         setSub({ state: r.subscribed || !r.channel ? 'ok' : 'need', channel: r.channel || '' })
-        if (manual && !r.subscribed && r.channel) showToast('ПОДПИСКИ ПОКА НЕТ')
+        if (manual && !r.subscribed && r.channel) {
+          if (SOLO) setSubMiss(true)
+          else showToast('ПОДПИСКИ ПОКА НЕТ')
+        }
+        if (r.subscribed) setSubMiss(false)
       } catch {
         // сервер недоступен — не держим игрока у закрытой двери
         setSub((s) => ({ ...s, state: 'ok' }))
@@ -246,19 +252,19 @@ export default function App() {
   if (SOLO) {
     return (
       <div className="screen solo">
-        {sub.state === 'ok' ? (
-          <GameFrame
-            launch={{ game: SOLO, mode: 'free' }}
-            solo
-            onExit={() => {}}
-            onChallenge={() => {}}
-            onResult={(r) => {
-              reportRun(SOLO, r.kills)
-              track({ e: 'result', g: SOLO, v: r.kills })
-            }}
-          />
-        ) : (
-          <SubscribeGate channel={sub.channel || 'JoesGames'} checking={sub.state === 'checking'} onCheck={() => checkSub(true)} />
+        {/* игра грузится сразу; подписку проверяем фоном и закрываем гараж, только если сервер сказал «нет» */}
+        <GameFrame
+          launch={{ game: SOLO, mode: 'free' }}
+          solo
+          onExit={() => {}}
+          onChallenge={() => {}}
+          onResult={(r) => {
+            reportRun(SOLO, r.kills)
+            track({ e: 'result', g: SOLO, v: r.kills })
+          }}
+        />
+        {(sub.state === 'need' || (sub.state === 'checking' && gateSeen.current) || (import.meta.env.DEV && location.search.includes('gate'))) && (
+          <PaperGate channel={sub.channel || 'JoesGames'} checking={sub.state === 'checking'} miss={subMiss} onCheck={() => checkSub(true)} />
         )}
       </div>
     )
