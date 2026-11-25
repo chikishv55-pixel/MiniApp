@@ -4,17 +4,19 @@
 import { readFileSync, writeFileSync } from 'node:fs'
 import { deflateSync } from 'node:zlib'
 import { GLTFLoader } from '../../public/games/vendor/three/GLTFLoader.js'
+import { MeshoptDecoder } from '../../public/games/vendor/three/meshopt_decoder.module.js'
 import { bakeCover } from '../../public/games/flip/vis.js'
 import { CARS } from '../../public/games/flip/cars.js'
 
 const S = 512 // как в flip.html
 const DIR = new URL('../../public/games/flip/', import.meta.url)
 
+await MeshoptDecoder.ready // модели сжаты meshopt (scripts/flip/cars.py)
 for (const id of Object.keys(CARS)) {
   const t0 = Date.now()
   const buf = readFileSync(new URL(id + '.glb', DIR))
   const ab = buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength)
-  const gltf = await new Promise((res, rej) => new GLTFLoader().parse(ab, '', res, rej))
+  const gltf = await new Promise((res, rej) => new GLTFLoader().setMeshoptDecoder(MeshoptDecoder).parse(ab, '', res, rej))
   const parts = []
   let body
   gltf.scene.updateMatrixWorld(true)

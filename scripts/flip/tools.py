@@ -7,7 +7,7 @@
 # длинная сторона вдоль X — игра разворачивает её по ходу движения пальца.
 # Материал SprayPaint игра перекрашивает в выбранный цвет.
 import bpy, bmesh, os
-from math import pi, radians
+from math import pi, radians, cos, sin
 
 OUT = r"D:\MiniApp\public\games\flip\tools.glb"
 SCENE = "Flip_Tools"
@@ -45,6 +45,9 @@ M = {
     "Orange": mat("Orange", (0.95, 0.40, 0.08), 0.0, 0.45),
     "Black": mat("Black", (0.05, 0.05, 0.05), 0.0, 0.6),
     "Pad": mat("Pad", (0.95, 0.92, 0.85), 0.0, 1.0),
+    "Brass": mat("Brass", (0.78, 0.62, 0.30), 1.0, 0.45),
+    "Red": mat("Red", (0.85, 0.08, 0.06), 0.0, 0.45),
+    "RedDark": mat("RedDark", (0.55, 0.04, 0.03), 0.0, 0.5),
 }
 
 
@@ -87,20 +90,69 @@ def join(objs, name):
     return o
 
 
-# ---------- проволочная щётка: колодка, ряды щетины, ручка под углом
-parts = [box("b", 0, 0, 0.065, 0.30, 0.10, 0.03, "Wood", 0.006)]
-for i in range(12):
+# ---------- проволочная щётка (как обычная хозяйственная): изогнутая стальная планка, латунная щетина,
+# красная пластиковая ручка с волнами под пальцы и отверстием для подвеса
+import random
+random.seed(7)
+
+
+def prism_y(name, pts, y0, y1, material):
+    bm = bmesh.new()
+    a_ = [bm.verts.new((x, y0, z)) for x, z in pts]
+    b_ = [bm.verts.new((x, y1, z)) for x, z in pts]
+    bm.faces.new(list(reversed(a_)))
+    bm.faces.new(b_)
+    for i in range(len(pts)):
+        j = (i + 1) % len(pts)
+        bm.faces.new((a_[i], a_[j], b_[j], b_[i]))
+    bmesh.ops.recalc_face_normals(bm, faces=bm.faces)
+    return mk(name, bm, material)
+
+
+# планка: ровная над щетиной, у ручки загибается вверх (профиль толщиной 3 мм)
+spine_top = [(-0.15, 0.058), (0.10, 0.058), (0.14, 0.066), (0.17, 0.082), (0.195, 0.10)]
+spine = [(x, z) for x, z in spine_top] + [(x + 0.004, z - 0.004) for x, z in reversed(spine_top)]
+parts = [prism_y("spine", spine, -0.022, 0.022, "Wire")]
+# бортики планки — П-образный профиль, обжимает щетину
+parts += [box("lip", -0.025, s_ * 0.021, 0.05, 0.25, 0.004, 0.018, "Wire") for s_ in (1, -1)]
+# щетина: пучки латунной проволоки с разбросом — «лохматая», как у настоящей
+for i in range(16):
     for j in range(3):
-        x = -0.13 + i * 0.0236
-        y = -0.03 + j * 0.03
-        parts.append(box("w", x, y, 0.025, 0.010, 0.012, 0.05, "Wire"))
-h = box("h", 0.24, 0, 0.12, 0.26, 0.05, 0.035, "WoodDark", 0.008)
-h.rotation_euler = (0, radians(-22), 0)
-parts.append(h)
+        x = -0.14 + i * 0.0158 + random.uniform(-0.003, 0.003)
+        y = -0.014 + j * 0.014 + random.uniform(-0.003, 0.003)
+        h_ = 0.05 + random.uniform(-0.006, 0.006)
+        t = box("w", x, y, 0.056 - h_ / 2, 0.007, 0.007, h_, "Brass")
+        t.rotation_euler = (random.uniform(-0.18, 0.18), random.uniform(-0.18, 0.18), 0)
+        parts.append(t)
+# ручка: по нижнему краю прямая, сверху три волны под пальцы, кончик с крючком
+x0, z0, L, ang = 0.18, 0.09, 0.27, radians(22)
+top = [(0.0, 0.03), (0.04, 0.036), (0.07, 0.028), (0.10, 0.04), (0.13, 0.03), (0.16, 0.042), (0.19, 0.032), (0.23, 0.044), (0.27, 0.036)]
+bot = [(0.27, -0.004), (0.24, -0.012), (0.0, -0.008)]
+prof = [(u * cos(ang) - v * sin(ang) + x0, u * sin(ang) + v * cos(ang) + z0) for u, v in top + bot]
+handle = prism_y("handle", prof, -0.017, 0.017, "Red")
+hole = cyl("hole", 0, 0, -0.05, 0.05, 0.011, "Red", 14)
+hole.rotation_euler = (radians(90), 0, 0)
+hu, hv = 0.235, 0.016
+hole.location = (hu * cos(ang) - hv * sin(ang) + x0, 0, hu * sin(ang) + hv * cos(ang) + z0)
+mod = handle.modifiers.new("hole", "BOOLEAN")
+mod.operation = "DIFFERENCE"
+mod.object = hole
 bpy.ops.object.select_all(action="DESELECT")
-h.select_set(True)
-bpy.context.view_layer.objects.active = h
-bpy.ops.object.transform_apply(rotation=True)
+handle.select_set(True)
+bpy.context.view_layer.objects.active = handle
+bpy.ops.object.modifier_apply(modifier=mod.name)
+bpy.data.objects.remove(hole, do_unlink=True)
+parts.append(handle)
+# рифление на боках ручки
+for k in range(5):
+    u = 0.05 + k * 0.022
+    parts += [box("rib", u * cos(ang) + x0, s_ * 0.0175, u * sin(ang) + z0 + 0.012, 0.006, 0.002, 0.03, "RedDark") for s_ in (1, -1)]
+for o in parts:
+    if o.rotation_euler.x or o.rotation_euler.y:
+        bpy.ops.object.select_all(action="DESELECT")
+        o.select_set(True)
+        bpy.context.view_layer.objects.active = o
+        bpy.ops.object.transform_apply(rotation=True)
 brush = join(parts, "ToolBrush")
 
 # ---------- губка: жёлтая, снизу зелёный абразив
@@ -135,7 +187,8 @@ for o in sc.objects:
 saved = {o.name: o.location.copy() for o in (brush, sponge, spray, body)}
 for o in (brush, sponge, spray, body):
     o.location = (0, 0, 0)
-bpy.ops.export_scene.gltf(filepath=OUT, export_format="GLB", use_selection=True, use_active_scene=True)
+bpy.ops.export_scene.gltf(filepath=OUT, export_format="GLB", use_selection=True, use_active_scene=True,
+                          export_normals=False, export_meshopt_compression_enable=True)
 for o in (brush, sponge, spray, body):
     o.location = saved[o.name]
 result = {"bytes": os.path.getsize(OUT), "objects": [o.name for o in sc.objects]}

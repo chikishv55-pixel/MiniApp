@@ -17,7 +17,7 @@ if old:
 sc = bpy.data.scenes.new(SCENE)
 bpy.context.window.scene = sc
 
-bpy.ops.import_scene.gltf(filepath=os.path.join(DIR, "pickup.glb"))
+bpy.ops.import_scene.gltf(filepath=os.path.join(DIR, "iaz.glb"))
 car = list(bpy.context.selected_objects)
 bpy.ops.import_scene.gltf(filepath=os.path.join(DIR, "tools.glb"))
 tools = {o.name: o for o in bpy.context.selected_objects}

@@ -152,9 +152,10 @@ body.embed .close{display:inline-block}
 <script type="module">
 import * as THREE from 'three'
 import { GLTFLoader } from './vendor/three/GLTFLoader.js'
+import { MeshoptDecoder } from './vendor/three/meshopt_decoder.module.js'
 import { RoomEnvironment } from './vendor/three/RoomEnvironment.js'
 import { bodyTris, forEachSample } from './flip/vis.js'
-import { CARS, STAGES, STAGE_VALUE, VALUE_START, PAINTS, SELLERS, ADTEXT, HEADS, COND } from './flip/cars.js'
+import { CARS, STAGES, STAGE_VALUE, VALUE_START, DONE_AT, PAINTS, SELLERS, ADTEXT, HEADS, COND } from './flip/cars.js'
 
 // внутри меню «Игр Джо» (iframe) Telegram живёт у родителя
 const EMBED = new URLSearchParams(location.search).has('embed')
@@ -179,7 +180,7 @@ try { Object.assign(save, JSON.parse(localStorage.getItem(SKEY)) || {}) } catch 
 const persist = () => { try { localStorage.setItem(SKEY, JSON.stringify(save)) } catch {} }
 
 /* ================= ЗАГРУЗКА МОДЕЛЕЙ ================= */
-const loader = new GLTFLoader()
+const loader = new GLTFLoader().setMeshoptDecoder(MeshoptDecoder) // модели сжаты meshopt
 const loadGlb = (url) => new Promise((res, rej) => loader.load(url, res, undefined, rej))
 const visPng = (id) => new Promise((res) => {
   const im = new Image()
@@ -197,6 +198,7 @@ const visPng = (id) => new Promise((res) => {
 const models = {}, vis = {}
 let toolsGltf = null
 const ready = Promise.all([
+  document.fonts?.load('700 100px Oswald').catch(() => {}), // шрифт для ливрей фургона
   loadGlb('flip/tools.glb').then((g) => (toolsGltf = g)),
   ...Object.keys(CARS).map((id) => loadGlb(`flip/${id}.glb`).then((g) => (models[id] = g.scene))),
   ...Object.keys(CARS).map((id) => visPng(id).then((v) => (vis[id] = v))),
@@ -308,11 +310,15 @@ function bodyMaterial() {
   return m
 }
 
+// К деталям колеса и нишам за ним не прикасаемся: там всегда черно и инструмент не появляется.
+const UNTOUCH = new Set(['Tire', 'Rim', 'Well'])
 function partMaterial(name, car) {
-  const flat = { flatShading: true }
+  const flat = { flatShading: true } // нормалей в glb нет (меньше вес) — освещение по граням
   switch (name) {
-    case 'Glass': return new THREE.MeshStandardMaterial({ color: 0x9fb4bf, roughness: 0.05, metalness: 0.1, transparent: true, opacity: 0.28, depthWrite: false, side: THREE.DoubleSide })
+    case 'Glass': return glassMaterial()
     case 'Tire': return new THREE.MeshStandardMaterial({ color: 0x141414, roughness: 0.95, ...flat })
+    case 'Rim': return new THREE.MeshStandardMaterial({ color: car.rim || 0xb9bdc0, roughness: 0.35, metalness: 0.85, ...flat })
+    case 'Well': return new THREE.MeshStandardMaterial({ color: 0x050505, roughness: 1, ...flat })
     case 'Chrome': return new THREE.MeshStandardMaterial({ color: 0xb9b2a8, roughness: 0.3, metalness: 1, ...flat })
     case 'Headlight': return new THREE.MeshStandardMaterial({ color: 0xfff1c2, roughness: 0.2, emissive: 0x332a10, ...flat })
     case 'Tail': return new THREE.MeshStandardMaterial({ color: 0x8a1408, roughness: 0.35, emissive: 0x200300, ...flat })
@@ -322,22 +328,44 @@ function partMaterial(name, car) {
   }
 }
 
+// Стекло: своя маска грязи (R), грязное — мутное и почти непрозрачное
+const GS = 256
+const glassLayer = canvasTex(GS, null, false)
+glassLayer.t.minFilter = THREE.LinearFilter
+glassLayer.t.generateMipmaps = false
+function glassMaterial() {
+  const m = new THREE.MeshStandardMaterial({ map: glassLayer.t, roughness: 0.06, metalness: 0.1, transparent: true, opacity: 0.28, depthWrite: false, side: THREE.DoubleSide, flatShading: true })
+  m.onBeforeCompile = (sh) => {
+    sh.fragmentShader = sh.fragmentShader
+      .replace('#include <common>', '#include <common>\nfloat gd;')
+      .replace('#include <map_fragment>', `gd = smoothstep(0.05, 0.8, texture2D(map, vMapUv).r);
+        diffuseColor.rgb = mix(vec3(0.62, 0.71, 0.75), vec3(0.43, 0.38, 0.30), gd);
+        diffuseColor.a = mix(opacity, 0.93, gd);`)
+      .replace('#include <roughnessmap_fragment>', '#include <roughnessmap_fragment>\nroughnessFactor = mix(roughnessFactor, 1.0, gd);')
+  }
+  return m
+}
+
 /* ================= ГАЗЕТА ================= */
 function genAds(issue) {
   const r = mulberry(issue * 7919 + 13)
   const pick = (a) => a[(r() * a.length) | 0]
-  const ids = Object.keys(CARS).sort(() => r() - 0.5).slice(0, 4)
+  const all = Object.keys(CARS).sort(() => r() - 0.5)
+  const est = (id) => CARS[id].base * 0.85
+  const cheap = all.filter((id) => est(id) <= save.cash), rest = all.filter((id) => !cheap.includes(id))
+  const ids = [...cheap.slice(0, 2), ...rest, ...cheap.slice(2)].slice(0, 4).sort(() => r() - 0.5)
   return ids.map((id, k) => {
     const car = CARS[id]
     const rust = 0.6 + r() * 0.8
     const price = Math.round((car.base * (1.05 - 0.25 * rust) * (0.94 + r() * 0.12)) / 10) * 10
     const phone = `${2 + ((r() * 7) | 0)}-${10 + ((r() * 89) | 0)}-${10 + ((r() * 89) | 0)}`
+    const livery = car.liveries ? (r() * car.liveries.length) | 0 : null
     return {
-      id, rust, price, seed: (issue * 131 + k * 17) | 0,
+      id, rust, price, livery, seed: (issue * 131 + k * 17) | 0,
       head: pick(HEADS).replace('{N}', car.name.toUpperCase()),
-      text: pick(ADTEXT[id]),
+      text: pick(ADTEXT[id]).replace('{B}', livery == null ? '' : car.liveries[livery].brand),
       who: `Тел. ${phone}, спросить ${pick(SELLERS)}.`,
-      cond: COND.find(([lim]) => rust < lim)[1],
+      cond: `${car.kind}, ${COND.find(([lim]) => rust < lim)[1]}`,
       phone,
       torn: Array.from({ length: 6 }, () => r() < 0.35),
     }
@@ -403,12 +431,13 @@ function makeThumbs() {
   }
   for (const [id, car] of Object.entries(CARS)) {
     const o = models[id].clone()
-    o.traverse((m) => { if (m.isMesh) m.material = m.material.name === 'Body' ? new THREE.MeshStandardMaterial({ color: car.paint, roughness: 0.85, flatShading: true }) : partMaterial(m.material.name, car) })
+    o.traverse((m) => { if (m.isMesh) m.material = m.material.name === 'Body' ? new THREE.MeshStandardMaterial({ color: car.paint, roughness: 0.85, flatShading: true }) : m.material.name === 'Glass' ? new THREE.MeshStandardMaterial({ color: 0x9fb4bf, transparent: true, opacity: 0.35, flatShading: true }) : partMaterial(m.material.name, car) })
     photos[id] = shot(o, 400, 240, new THREE.Vector3(1.15, 0.45, 1), 0xd8cfba, 'image/jpeg')
   }
   for (const st of STAGES) {
     const o = toolsGltf.scene.getObjectByName(st.tool).clone()
     o.position.set(0, 0, 0)
+    o.traverse((m) => { if (m.isMesh) { m.material = m.material.clone(); m.material.flatShading = true } })
     toolIcons[st.id] = shot(o, 160, 136, new THREE.Vector3(0.7, 1.1, 1.3), null, 'image/png', 0.9)
   }
   tr.dispose()
@@ -422,7 +451,7 @@ function setupTools() {
     const o = toolsGltf.scene.getObjectByName(st.tool)
     o.removeFromParent()
     o.position.set(0, 0, 0)
-    o.traverse((m) => { if (m.isMesh) { m.material = m.material.clone(); m.material.envMapIntensity = 0.8 } })
+    o.traverse((m) => { if (m.isMesh) { m.material = m.material.clone(); m.material.envMapIntensity = 0.8; m.material.flatShading = true } })
     const holder = new THREE.Group()
     holder.add(o)
     holder.visible = false
@@ -439,16 +468,21 @@ function setSprayColor(hex) {
 let car = null, body = null, parts = [], byFace = [], spots = null, spotIdx = null
 let job = null // { id, paid, rust, seed, stage, color, done }
 
+let glass = null, glassByFace = [], glassIdx = new Int32Array(0)
+
 function mountCar(id) {
   if (car) scene.remove(car)
   const spec = CARS[id]
   car = models[id].clone()
   parts = []
   body = null
+  glass = null
   car.traverse((o) => {
     if (!o.isMesh) return
-    if (o.material.name === 'Body') { body = o; o.material = bodyMaterial() }
-    else o.material = partMaterial(o.material.name, spec)
+    const kind = o.material.name
+    o.userData.kind = kind
+    if (kind === 'Body') { body = o; o.material = bodyMaterial() }
+    else { o.material = partMaterial(kind, spec); if (kind === 'Glass') glass = o }
     parts.push(o)
   })
   scene.add(car)
@@ -462,16 +496,88 @@ function mountCar(id) {
   })
   spots = list
   spotIdx = new Int32Array(list.map((s) => ((s.y | 0) * S + (s.x | 0)) * 4))
+  // стёкла видны целиком — каждую точку их развёртки считаем
+  const gl = []
+  if (glass) {
+    const gt = bodyTris(glass, GS)
+    glassByFace = gt.byFace
+    for (const tri of gt.tris) forEachSample(tri, (x, y) => gl.push(((y | 0) * GS + (x | 0)) * 4))
+  }
+  glassIdx = new Int32Array(gl)
   // кадр: машина целиком по ширине экрана
   const b = new THREE.Box3().setFromObject(car)
   carSize = b.getSize(new THREE.Vector3())
   view.ty = carSize.y * 0.42
   fitCamera(true)
-  // старая краска — выгоревший цвет машины
+  // старая краска — выгоревший цвет машины (у бывшего развозного фургона — ливрея службы доставки)
   const g = oldPaint.g
-  g.fillStyle = spec.paint; g.fillRect(0, 0, S, S)
+  const liv = spec.liveries && job?.livery != null ? spec.liveries[job.livery] : null
+  g.fillStyle = liv ? liv.base : spec.paint; g.fillRect(0, 0, S, S)
+  if (liv) paintLivery(t.tris, spec.box, liv)
   speckle(g, S, 9000, ['rgba(255,235,210,1)', 'rgba(40,20,10,1)'], 0.02, 0.08, 1, 4)
   oldPaint.t.needsUpdate = true
+}
+
+// Ливрея: рисуем картинку борта и переносим её на треугольники будки (аффинно, треугольник за треугольником).
+function liveryArt(liv, w, h, side) {
+  const cv = document.createElement('canvas')
+  cv.width = w; cv.height = h
+  const g = cv.getContext('2d')
+  g.fillStyle = liv.base; g.fillRect(0, 0, w, h)
+  if (liv.accent) {
+    g.fillStyle = liv.accent
+    for (let x = -h; x < w + h; x += h * 0.42) { // косые полосы
+      g.beginPath(); g.moveTo(x, h); g.lineTo(x + h * 0.15, h); g.lineTo(x + h * 0.85, 0); g.lineTo(x + h * 0.7, 0); g.fill()
+    }
+    g.fillStyle = liv.base // плашка под надпись, чтобы буквы читались
+    g.fillRect(w * 0.08, h * 0.3, w * 0.84, h * 0.4)
+  } else {
+    g.fillStyle = 'rgba(0,0,0,.12)'; g.fillRect(0, h * 0.82, w, h * 0.18)
+  }
+  g.fillStyle = liv.text
+  g.textAlign = 'center'; g.textBaseline = 'middle'
+  let fs = side ? h * 0.34 : h * 0.26
+  g.font = `700 ${fs}px Oswald, Impact, sans-serif`
+  while (g.measureText(liv.brand).width > w * 0.8) { fs *= 0.9; g.font = `700 ${fs}px Oswald, Impact, sans-serif` }
+  g.fillText(liv.brand.toUpperCase(), w / 2, h * 0.5)
+  if (side) { g.font = `500 ${h * 0.07}px Oswald, sans-serif`; g.fillText('ДОСТАВКА · БЫСТРО И БЕРЕЖНО', w / 2, h * 0.76) }
+  return cv
+}
+function paintLivery(tris, bx, liv) {
+  const art = liveryArt(liv, 1024, 512, true), back = liveryArt(liv, 512, 512, false)
+  const g = oldPaint.g
+  const len = bx.x1 - bx.x0, hgt = bx.z1 - bx.z0
+  for (const t of tris) {
+    const c = t.v[0].clone().add(t.v[1]).add(t.v[2]).divideScalar(3)
+    if (c.x < bx.x0 - 0.05 || c.x > bx.x1 + 0.05 || c.y < bx.z0 + 0.03) continue
+    const n = t.normal || new THREE.Triangle(...t.v).getNormal(new THREE.Vector3())
+    let img, map
+    if (Math.abs(n.z) > 0.9) { // борта (в three Z — поперёк машины); надпись читается слева направо с обеих сторон
+      img = art
+      map = (v) => [((n.z > 0 ? v.x - bx.x0 : bx.x1 - v.x) / len) * art.width, (1 - (v.y - bx.z0) / hgt) * art.height]
+    } else if (n.x < -0.9) { // задние двери
+      img = back
+      map = (v) => [((v.z + bx.hw) / (2 * bx.hw)) * back.width, (1 - (v.y - bx.z0) / hgt) * back.height]
+    } else continue
+    const sp = t.v.map(map), dp = t.u
+    // аффинное преобразование: картинка борта -> UV кузова
+    const [s0, s1, s2] = sp, [d0, d1, d2] = dp
+    const sx1 = s1[0] - s0[0], sy1 = s1[1] - s0[1], sx2 = s2[0] - s0[0], sy2 = s2[1] - s0[1]
+    const det = sx1 * sy2 - sx2 * sy1
+    if (Math.abs(det) < 1e-9) continue
+    const dx1 = d1.x - d0.x, dy1 = d1.y - d0.y, dx2 = d2.x - d0.x, dy2 = d2.y - d0.y
+    const a = (dx1 * sy2 - dx2 * sy1) / det, cc = (dx2 * sx1 - dx1 * sx2) / det
+    const b = (dy1 * sy2 - dy2 * sy1) / det, d = (dy2 * sx1 - dy1 * sx2) / det
+    const e = d0.x - a * s0[0] - cc * s0[1], f = d0.y - b * s0[0] - d * s0[1]
+    const mx = (d0.x + d1.x + d2.x) / 3, my = (d0.y + d1.y + d2.y) / 3
+    g.save()
+    g.beginPath()
+    for (const q of [d0, d1, d2]) { const k = 1.5 / Math.max(1e-6, Math.hypot(q.x - mx, q.y - my)); g.lineTo(q.x + (q.x - mx) * k, q.y + (q.y - my) * k) }
+    g.closePath(); g.clip()
+    g.setTransform(a, b, cc, d, e, f)
+    g.drawImage(img, 0, 0)
+    g.restore()
+  }
 }
 
 function freshLayers(rustLevel, seed) {
@@ -482,35 +588,48 @@ function freshLayers(rustLevel, seed) {
   const weights = spots.map((s) => Math.pow(Math.max(0.12, 1.9 - s.wy), 2.4))
   const sum = weights.reduce((a, b) => a + b, 0)
   const pickSpot = () => { let r = rand() * sum, i = 0; while (r > weights[i] && i < weights.length - 1) r -= weights[i++]; return spots[i] }
-  const blob = (x, y, rr, col) => {
-    const gr = g.createRadialGradient(x, y, 0, x, y, rr)
+  const blob = (gg, x, y, rr, col) => {
+    const gr = gg.createRadialGradient(x, y, 0, x, y, rr)
     gr.addColorStop(0, col(1)); gr.addColorStop(0.6, col(0.9)); gr.addColorStop(1, col(0))
-    g.fillStyle = gr; g.fillRect(x - rr, y - rr, rr * 2, rr * 2)
+    gg.fillStyle = gr; gg.fillRect(x - rr, y - rr, rr * 2, rr * 2)
   }
   g.globalCompositeOperation = 'lighten'
-  for (let k = 0; k < 160; k++) { const sp = pickSpot(); blob(sp.x, sp.y, (0.2 + rand() * 0.4) * sp.ppm, (a) => `rgba(0,0,255,${a})`) } // больше грязи снизу
+  for (let k = 0; k < 160; k++) { const sp = pickSpot(); blob(g, sp.x, sp.y, (0.2 + rand() * 0.4) * sp.ppm, (a) => `rgba(0,0,255,${a})`) } // больше грязи снизу
   for (let k = 0; k < Math.round(45 * rustLevel); k++) {
     const sp = pickSpot(), rad = (0.12 + rand() * 0.26) * sp.ppm
-    for (let j = 0; j < 9; j++) blob(sp.x + (rand() - 0.5) * rad * 1.6, sp.y + (rand() - 0.5) * rad * 1.6, rad * (0.35 + rand() * 0.6), (a) => `rgba(255,255,0,${a})`)
+    for (let j = 0; j < 9; j++) blob(g, sp.x + (rand() - 0.5) * rad * 1.6, sp.y + (rand() - 0.5) * rad * 1.6, rad * (0.35 + rand() * 0.6), (a) => `rgba(255,255,0,${a})`)
   }
   for (let k = 0; k < 500 * rustLevel; k++) { const sp = pickSpot(); g.fillStyle = 'rgb(255,255,0)'; g.fillRect(sp.x + (rand() - 0.5) * 6 - 1, sp.y + (rand() - 0.5) * 6 - 1, 2.5, 2.5) }
   g.globalCompositeOperation = 'darken'
-  for (let k = 0; k < 70; k++) { const sp = spots[(rand() * spots.length) | 0]; blob(sp.x, sp.y, (0.15 + rand() * 0.3) * sp.ppm, (a) => `rgba(255,255,90,${a})`) } // чуть чище пятнами
+  for (let k = 0; k < 70; k++) { const sp = spots[(rand() * spots.length) | 0]; blob(g, sp.x, sp.y, (0.15 + rand() * 0.3) * sp.ppm, (a) => `rgba(255,255,90,${a})`) } // чуть чище пятнами
   g.globalCompositeOperation = 'source-over'
+  // стёкла: мутная плёнка и потёки
+  const gg = glassLayer.g
+  gg.globalCompositeOperation = 'source-over'
+  gg.fillStyle = 'rgb(150,150,150)'; gg.fillRect(0, 0, GS, GS)
+  gg.globalCompositeOperation = 'lighten'
+  for (let k = 0; k < 40; k++) blob(gg, rand() * GS, rand() * GS, 10 + rand() * 30, (a) => `rgba(255,255,255,${a * 0.8})`)
+  gg.globalCompositeOperation = 'source-over'
   coat.g.clearRect(0, 0, S, S)
   gloss.g.fillStyle = '#000'; gloss.g.fillRect(0, 0, S, S)
-  for (const t of [mask.t, coat.t, gloss.t]) t.needsUpdate = true
+  for (const t of [mask.t, coat.t, gloss.t, glassLayer.t]) t.needsUpdate = true
 }
 
 /* ================= РАБОТЫ И ПРОГРЕСС ================= */
-let stageTotal = 1, lastPct = 100, lastCount = 0, countDirty = false, texDirty = false
-let readCache = null // данные слоя текущей работы — для частиц «есть ли что тереть»
+let stageTotal = 1, lastPct = 100, lastCount = 0, countDirty = false, texDirty = false, glassDirty = false
+let readCache = null, glassCache = null // данные слоёв — для частиц «есть ли что тереть»
+let finishing = null // сделано 80% — остальное «домывается» само за пару десятков кадров
 
 function layerOf(stage) { return stage === 'paint' ? coat : stage === 'polish' ? gloss : mask }
 function remaining(stage) {
   const d = (readCache = layerOf(stage).g.getImageData(0, 0, S, S).data)
   let s = 0
-  if (stage === 'wash') { for (const i of spotIdx) s += d[i + 2]; return s }
+  if (stage === 'wash') {
+    for (const i of spotIdx) s += d[i + 2]
+    const gd = (glassCache = glassLayer.g.getImageData(0, 0, GS, GS).data)
+    for (const i of glassIdx) s += gd[i]
+    return s
+  }
   if (stage === 'rust') { for (const i of spotIdx) s += d[i] > 20 ? d[i] : 0; return s }
   if (stage === 'paint') { for (const i of spotIdx) s += 255 - d[i + 3]; return s }
   for (const i of spotIdx) s += 255 - d[i]
@@ -519,6 +638,7 @@ function remaining(stage) {
 function stageInfo() { return STAGES[Math.min(job.stage, STAGES.length - 1)] }
 function startStage() {
   const st = stageInfo()
+  finishing = null
   stageTotal = st.id === 'paint' || st.id === 'polish' ? spotIdx.length * 255 : Math.max(1, remaining(st.id))
   if (st.id === 'wash' || st.id === 'rust') {
     // общий объём считаем от исходного состояния машины, иначе после перезапуска прогресс начнётся с 100%
@@ -534,8 +654,9 @@ function startStage() {
   drawHud()
 }
 function pctNow() {
+  // 100% на шкале = 80% настоящей работы: последние пятна в щелях домываются сами
   const left = remaining(stageInfo().id) / stageTotal
-  return clamp(Math.round(((left - 0.05) / 0.95) * 100), 0, 100) // последние 5% — пыль в щелях, её не требуем
+  return clamp(Math.round(((left - DONE_AT) / (1 - DONE_AT)) * 100), 0, 100)
 }
 function valueNow() {
   let k = VALUE_START
@@ -553,21 +674,30 @@ function drawHud() {
   $('tray').innerHTML = STAGES.map((s, i) => `<div class="slot ${job.done || i < job.stage ? 'done' : i === job.stage ? 'on' : 'lock'}"><img alt="" src="${toolIcons[s.id] || ''}">${s.label}</div>`).join('')
 }
 function checkProgress(now) {
-  if (!countDirty || job.done || now - lastCount < 300) return
+  if (finishing || !countDirty || job.done || now - lastCount < 300) return
   lastCount = now
   countDirty = false
   const p = pctNow()
   if (p !== lastPct) { lastPct = p; drawHud() }
-  if (p === 0) {
-    const st = stageInfo()
-    try { TG?.HapticFeedback?.notificationOccurred('success') } catch {}
-    toast(st.done)
-    job.stage++
-    if (job.stage >= STAGES.length) { job.done = true; job.stage = STAGES.length - 1 }
-    hideTool()
-    saveJob()
-    setTimeout(startStage, 50)
-  }
+  if (p === 0) { finishing = { id: stageInfo().id, n: 0 }; hideTool() }
+}
+// «доводка»: слой плавно доходит до идеала по всей машине, потом работа засчитывается
+function finishStep() {
+  const f = finishing, a = 0.3
+  const all = (layer, op, col) => { const g = layer.g, sz = layer.cv.width; g.globalCompositeOperation = op; g.fillStyle = col; g.fillRect(0, 0, sz, sz); g.globalCompositeOperation = 'source-over'; layer.t.needsUpdate = true }
+  if (f.id === 'wash') { all(mask, 'darken', `rgba(255,255,0,${a})`); all(glassLayer, 'darken', `rgba(0,0,0,${a})`) }
+  else if (f.id === 'rust') all(mask, 'darken', `rgba(0,255,255,${a})`)
+  else if (f.id === 'paint') { const c = new THREE.Color(job.color); all(coat, 'source-over', `rgba(${(c.r * 255) | 0},${(c.g * 255) | 0},${(c.b * 255) | 0},${a})`) }
+  else all(gloss, 'lighten', `rgba(255,255,255,${a})`)
+  if (++f.n < 18) return
+  finishing = null
+  const st = stageInfo()
+  try { TG?.HapticFeedback?.notificationOccurred('success') } catch {}
+  toast(st.done)
+  job.stage++
+  if (job.stage >= STAGES.length) { job.done = true; job.stage = STAGES.length - 1 }
+  saveJob()
+  setTimeout(startStage, 50)
 }
 
 let toastT = 0
@@ -620,6 +750,21 @@ function stamp(hit) {
   texDirty = countDirty = true
 }
 
+function stampGlass(hit) {
+  const st = stageInfo()
+  if (job.done || st.id !== 'wash') return
+  const t = glassByFace[hit.faceIndex]
+  if (!t) return
+  const x = hit.uv.x * GS, y = hit.uv.y * GS, r = st.r * t.pxPerM, g = glassLayer.g
+  const gr = g.createRadialGradient(x, y, 0, x, y, r)
+  gr.addColorStop(0, `rgba(0,0,0,${st.a})`); gr.addColorStop(0.7, `rgba(0,0,0,${st.a * 0.55})`); gr.addColorStop(1, 'rgba(0,0,0,0)')
+  g.globalCompositeOperation = 'darken'; g.fillStyle = gr; g.fillRect(x - r, y - r, r * 2, r * 2)
+  g.globalCompositeOperation = 'source-over'
+  const d = glassCache, p = ((y | 0) * GS + (x | 0)) * 4
+  if (d && d[p] > 40) fxEmit('foam', 1)
+  glassDirty = countDirty = true
+}
+
 /* ================= УПРАВЛЕНИЕ ================= */
 const ray = new THREE.Raycaster()
 const ndc = new THREE.Vector2()
@@ -637,9 +782,12 @@ function pick(x, y) {
 function rub(x, y) {
   finger.x = x; finger.y = y
   const h = pick(x, y)
-  if (h && h.object === body) { stamp(h); placeTool(h); return true }
-  hideTool()
-  return false
+  const kind = h?.object.userData.kind
+  if (!h || UNTOUCH.has(kind)) { hideTool(); return false }
+  if (kind === 'Body') stamp(h)
+  else if (kind === 'Glass') stampGlass(h)
+  placeTool(h)
+  return true
 }
 
 canvas.addEventListener('pointerdown', (e) => {
@@ -653,7 +801,7 @@ canvas.addEventListener('pointerdown', (e) => {
   }
   if (ptrs.size > 2 || !car) return
   const h = pick(e.clientX, e.clientY)
-  mode = h ? (h.object === body ? 'rub' : 'none') : 'orbit'
+  mode = h && !UNTOUCH.has(h.object.userData.kind) ? 'rub' : 'orbit' // за колесо — значит крутим машину
   last = { x: e.clientX, y: e.clientY }
   lastHit = null
   if (mode === 'rub') rub(e.clientX, e.clientY)
@@ -702,7 +850,7 @@ function placeTool(h) {
   if (!tool || job.done) return
   if (activeTool && activeTool !== tool) { activeTool.visible = false; activeTool.userData.target = 0; activeTool.userData.show = 0 }
   activeTool = tool
-  nrm.copy(h.face.normal).transformDirection(body.matrixWorld)
+  nrm.copy(h.face.normal).transformDirection(h.object.matrixWorld)
   if (lastHit) {
     tmp.copy(h.point).sub(lastHit)
     const len = tmp.length()
@@ -785,13 +933,13 @@ function buy(ad) {
   if (ad.price > save.cash) return
   save.cash -= ad.price
   persist()
-  job = { id: ad.id, paid: ad.price, rust: ad.rust, seed: ad.seed, stage: 0, color: PAINTS[0], done: false }
+  job = { id: ad.id, paid: ad.price, rust: ad.rust, seed: ad.seed, livery: ad.livery, stage: 0, color: PAINTS[0], done: false }
   enterGarage(null)
 }
 function enterGarage(layers) {
   $('paper').hidden = true
   $('garage').hidden = false
-  $('carname').textContent = CARS[job.id].name[0].toUpperCase() + CARS[job.id].name.slice(1)
+  $('carname').textContent = CARS[job.id].name
   mountCar(job.id)
   view.yaw = -0.75; view.pitch = 0.32
   if (layers) restoreLayers(layers)
@@ -829,7 +977,7 @@ function sell(v) {
   try { localStorage.removeItem(JKEY) } catch {}
   running = false
   modal(`<small>ИЗ ХРОНИКИ СДЕЛОК</small><div class="stamp">СДЕЛКА</div><h2>ПРОДАНО!</h2>
-    <p>${name[0].toUpperCase() + name.slice(1)} ушёл за <b>${money(v)}</b>.</p>
+    <p>${name} ушёл за <b>${money(v)}</b>.</p>
     <div class="sum ${profit < 0 ? 'minus' : ''}">навар ${profit < 0 ? '' : '+'}${money(profit)}</div>
     <div class="btns"><button class="btn" data-a="ok">СВЕЖАЯ ГАЗЕТА</button></div>`,
   () => showPaper())
@@ -851,14 +999,17 @@ let jobDirty = false
 function saveJob() {
   if (!job) return
   jobDirty = false
-  try { localStorage.setItem(JKEY, JSON.stringify({ job, mask: mask.cv.toDataURL(), coat: coat.cv.toDataURL(), gloss: gloss.cv.toDataURL() })) } catch {}
+  try { localStorage.setItem(JKEY, JSON.stringify({ job, mask: mask.cv.toDataURL(), coat: coat.cv.toDataURL(), gloss: gloss.cv.toDataURL(), glass: glassLayer.cv.toDataURL() })) } catch {}
 }
 function restoreLayers(l) {
-  let left = 3
-  for (const [layer, url] of [[mask, l.mask], [coat, l.coat], [gloss, l.gloss]]) {
+  const list = [[mask, l.mask], [coat, l.coat], [gloss, l.gloss], [glassLayer, l.glass]].filter(([, url]) => url)
+  let left = list.length
+  if (!left) { freshLayers(job.rust, job.seed); startStage(); return }
+  for (const [layer, url] of list) {
     const im = new Image()
     im.onload = im.onerror = () => {
-      if (im.naturalWidth) { layer.g.clearRect(0, 0, S, S); layer.g.drawImage(im, 0, 0); layer.t.needsUpdate = true }
+      const sz = layer.cv.width
+      if (im.naturalWidth) { layer.g.clearRect(0, 0, sz, sz); layer.g.drawImage(im, 0, 0); layer.t.needsUpdate = true }
       if (--left === 0) startStage()
     }
     im.src = url
@@ -898,6 +1049,8 @@ function loop(now) {
   camera.position.set(Math.sin(view.yaw) * cp * view.dist, view.ty + Math.sin(view.pitch) * view.dist, Math.cos(view.yaw) * cp * view.dist)
   camera.lookAt(0, view.ty, 0)
   if (texDirty) { layerOf(stageInfo().id).t.needsUpdate = true; texDirty = false; jobDirty = true }
+  if (glassDirty) { glassLayer.t.needsUpdate = true; glassDirty = false; jobDirty = true }
+  if (finishing) finishStep()
   checkProgress(now)
   animTool(now, dt)
   renderer.render(scene, camera)
@@ -915,14 +1068,21 @@ ready.then(() => {
   $('load').hidden = true
   let saved = null
   try { saved = JSON.parse(localStorage.getItem(JKEY)) } catch {}
+  if (saved?.job && !CARS[saved.job.id]) {
+    // машину из прошлой версии игры больше не возим — деньги за неё возвращаем
+    save.cash += saved.job.paid || 0
+    persist()
+    try { localStorage.removeItem(JKEY) } catch {}
+    saved = null
+  }
   if (saved?.job && CARS[saved.job.id]) { job = saved.job; enterGarage(saved) }
   else showPaper()
 }).catch((e) => { $('load').textContent = 'Не загрузилось :('; console.error(e) })
 
 // для отладки и автотестов
 window.flip = {
-  get job() { return job }, view, pct: () => lastPct, save, tools, camera,
-  rub: (x, y) => rub(x, y), lift: () => hideTool(),
+  get job() { return job }, view, pct: () => lastPct, save, tools, camera, shot: () => { renderer.render(scene, camera); return canvas.toDataURL('image/jpeg', 0.8) },
+  rub: (x, y) => rub(x, y), lift: () => hideTool(), kindAt: (x, y) => pick(x, y)?.object.userData.kind ?? null,
 }
 </script>
 </body>
