@@ -1,33 +1,35 @@
-// Запекает маску видимости кузова: public/games/flip/pickup.glb → public/games/flip/pickup.vis.png
+// Запекает маски видимости кузовов: public/games/flip/<id>.glb → public/games/flip/<id>.vis.png
 //   node scripts/flip/bake-vis.mjs
-// Запускать после каждого изменения модели (scripts/flip/pickup.py).
+// Запускать после каждого изменения моделей (scripts/flip/cars.py).
 import { readFileSync, writeFileSync } from 'node:fs'
 import { deflateSync } from 'node:zlib'
 import { GLTFLoader } from '../../public/games/vendor/three/GLTFLoader.js'
 import { bakeCover } from '../../public/games/flip/vis.js'
+import { CARS } from '../../public/games/flip/cars.js'
 
 const S = 512 // как в flip.html
 const DIR = new URL('../../public/games/flip/', import.meta.url)
-const buf = readFileSync(new URL('pickup.glb', DIR))
-const ab = buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength)
 
-const t0 = Date.now()
-const gltf = await new Promise((res, rej) => new GLTFLoader().parse(ab, '', res, rej))
-const parts = []
-let body
-gltf.scene.updateMatrixWorld(true)
-gltf.scene.traverse((o) => {
-  if (!o.isMesh) return
-  parts.push(o)
-  if (o.name.startsWith('Body')) body = o
-})
-if (!body) throw new Error('в модели нет объекта Body')
-const cover = bakeCover(body, parts, S)
-
-writeFileSync(new URL('pickup.vis.png', DIR), png(cover, S))
-let on = 0
-for (const c of cover) on += c
-console.log(`ok pickup.vis.png: ${on} видимых px из ${S * S}, ${Date.now() - t0} мс`)
+for (const id of Object.keys(CARS)) {
+  const t0 = Date.now()
+  const buf = readFileSync(new URL(id + '.glb', DIR))
+  const ab = buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength)
+  const gltf = await new Promise((res, rej) => new GLTFLoader().parse(ab, '', res, rej))
+  const parts = []
+  let body
+  gltf.scene.updateMatrixWorld(true)
+  gltf.scene.traverse((o) => {
+    if (!o.isMesh) return
+    parts.push(o)
+    if (o.material.name === 'Body') body = o
+  })
+  if (!body) throw new Error(id + ': в модели нет материала Body')
+  const cover = bakeCover(body, parts, S)
+  writeFileSync(new URL(id + '.vis.png', DIR), png(cover, S))
+  let on = 0
+  for (const c of cover) on += c
+  console.log(`ok ${id}.vis.png: ${on} видимых px, ${Date.now() - t0} мс`)
+}
 
 // Минимальный PNG: 8-бит серый, 0/255.
 function png(mask, s) {
