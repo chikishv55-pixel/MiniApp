@@ -71,8 +71,9 @@ button{font:inherit;color:inherit;border:0;background:none;cursor:pointer}
 #pc{pointer-events:auto;width:46px;height:40px;padding:0;background:none;border:0}
 #pc svg{width:46px;height:40px;filter:drop-shadow(0 2px 0 rgba(0,0,0,.45))}
 /* ---------- Gagel: «интернет» на старом компьютере в гараже ---------- */
-#gagel{position:fixed;inset:0;z-index:30;display:flex;align-items:center;justify-content:center;padding:14px;background:rgba(10,10,14,.55);backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px)}
-.gwin{width:min(420px,100%);max-height:100%;display:flex;flex-direction:column;overflow:hidden;border-radius:18px;background:#fff;color:#1f1f24;
+#gagel{position:fixed;inset:0;z-index:30;display:flex;background:#fff}
+/* компьютер открывается на весь экран; контент сайтов — колонкой по центру */
+.gwin{width:100%;height:100%;display:flex;flex-direction:column;overflow:hidden;background:#fff;color:#1f1f24;padding:env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
   font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;box-shadow:0 20px 50px rgba(0,0,0,.45);animation:gwin-in .22s ease-out}
 @keyframes gwin-in{from{opacity:0;transform:translateY(14px) scale(.98)}}
 .gbar{display:flex;align-items:center;gap:8px;padding:10px 10px 10px 12px;background:#f1f2f6;border-bottom:1px solid #e3e4ea}
@@ -82,6 +83,7 @@ button{font:inherit;color:inherit;border:0;background:none;cursor:pointer}
 .gbar button{flex:none;width:30px;height:30px;border-radius:50%;background:#e6e7ed;color:#3a3b44;font-size:15px;line-height:30px;text-align:center}
 .gbar button:active{background:#d8d9e1}
 .gscroll{flex:1;min-height:0;overflow:auto}
+.gscroll>*{max-width:560px;margin-left:auto;margin-right:auto}
 .gbody{padding:30px 18px 20px;text-align:center}
 .glogo{font:800 50px/1 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;letter-spacing:-1.5px}
 .glogo i{font-style:normal}
@@ -101,7 +103,17 @@ button{font:inherit;color:inherit;border:0;background:none;cursor:pointer}
 .gfoot{margin-top:18px;font-size:11px;color:#a0a2ad}
 #hint{position:absolute;left:16px;right:16px;bottom:136px;text-align:center;font:600 27px/1.05 Caveat,cursive;color:#f3e6c8;text-shadow:0 2px 0 rgba(0,0,0,.55);transition:opacity .6s;pointer-events:none}
 #hint.up{bottom:184px}
-#colors{position:absolute;bottom:130px;left:0;right:0;display:flex;justify-content:center;gap:11px}
+#colors{position:absolute;bottom:130px;left:8px;right:8px;display:flex;flex-wrap:wrap;justify-content:center;align-items:center;gap:11px}
+.sw{position:relative}
+.sw i{position:absolute;right:-6px;top:-6px;min-width:17px;height:17px;padding:0 4px;border-radius:9px;background:#f3e6c8;color:#26211c;font:700 11px/17px system-ui,sans-serif;font-style:normal}
+.order{height:34px;padding:0 14px;border-radius:17px;background:#2f8f5b;color:#fff;font:600 14px system-ui,sans-serif;box-shadow:0 2px 0 rgba(0,0,0,.4)}
+.paints{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:16px}
+.paint{display:flex;flex-direction:column;align-items:center;gap:6px;padding:10px 6px;border-radius:14px;background:#f6f7fa;text-align:center}
+.paint .can{width:38px;height:38px;border-radius:50%;box-shadow:inset 0 -4px 0 rgba(0,0,0,.18),0 0 0 1px rgba(0,0,0,.12)}
+.paint b{font-size:12.5px;line-height:1.15}
+.paint small{font-size:11px;color:#6a6c78}
+.paint button{margin-top:auto;width:100%;padding:7px 4px;border-radius:9px;background:#2f8f5b;color:#fff;font:600 12.5px system-ui,sans-serif}
+.paint button:disabled{background:#d5d7de;color:#8b8e99}
 .sw{width:34px;height:34px;border-radius:50%;border:3px solid rgba(255,255,255,.35);box-shadow:0 2px 0 rgba(0,0,0,.4);transition:transform .12s}
 .sw.on{border-color:#fff;transform:scale(1.18)}
 #tray{position:absolute;left:0;right:0;bottom:0;height:116px;display:flex;justify-content:center;align-items:flex-end;gap:4px;padding-bottom:10px;
@@ -291,7 +303,7 @@ import { GLTFLoader } from './vendor/three/GLTFLoader.js'
 import { MeshoptDecoder } from './vendor/three/meshopt_decoder.module.js'
 import { RoomEnvironment } from './vendor/three/RoomEnvironment.js'
 import { bodyTris, forEachSample } from './flip/vis.js'
-import { CARS, STAGES, GEAR, STAGE_VALUE, VALUE_START, DONE_AT, PAINTS, SELLERS, ADTEXT, HEADS, COND } from './flip/cars.js'
+import { CARS, STAGES, GEAR, STAGE_VALUE, VALUE_START, DONE_AT, PAINTS, PAINT_PRICE, SELLERS, ADTEXT, HEADS, COND } from './flip/cars.js'
 
 // внутри меню «Игр Джо» (iframe) Telegram живёт у родителя
 const EMBED = new URLSearchParams(location.search).has('embed')
@@ -821,10 +833,11 @@ function startStage() {
     else job[key] = stageTotal
   }
   lastPct = job.done ? 0 : pctNow()
-  $('colors').hidden = st.id !== 'paint' || job.done
+  $('colors').hidden = st.id !== 'paint' || job.done || !!job.paint
+  if (!$('colors').hidden) renderColors()
   $('hint').classList.toggle('up', !$('colors').hidden)
-  showHint(job.done ? 'Готово! Неси продавать' : st.hint)
-  if (st.id === 'paint') setSprayColor(job.color)
+  showHint(job.done ? 'Готово! Неси продавать' : st.id === 'paint' ? paintHint() : st.hint)
+  if (st.id === 'paint' && job.paint) setSprayColor(job.paint)
   drawHud()
 }
 function pctNow() {
@@ -861,7 +874,7 @@ function finishStep() {
   const all = (layer, op, col) => { const g = layer.g, sz = layer.cv.width; g.globalCompositeOperation = op; g.fillStyle = col; g.fillRect(0, 0, sz, sz); g.globalCompositeOperation = 'source-over'; layer.t.needsUpdate = true }
   if (f.id === 'wash') { all(mask, 'darken', `rgba(255,255,0,${a})`); all(glassLayer, 'darken', `rgba(0,0,0,${a})`) }
   else if (f.id === 'rust') all(mask, 'darken', `rgba(0,255,255,${a})`)
-  else if (f.id === 'paint') { const c = new THREE.Color(job.color); all(coat, 'source-over', `rgba(${(c.r * 255) | 0},${(c.g * 255) | 0},${(c.b * 255) | 0},${a})`) }
+  else if (f.id === 'paint') { const c = new THREE.Color(job.paint); all(coat, 'source-over', `rgba(${(c.r * 255) | 0},${(c.g * 255) | 0},${(c.b * 255) | 0},${a})`) }
   else all(gloss, 'lighten', `rgba(255,255,255,${a})`)
   if (++f.n < 18) return
   finishing = null
@@ -964,6 +977,7 @@ function stamp(hit) {
   const st = stageInfo()
   const t = byFace[hit.faceIndex]
   if (!t || job.done) return
+  if (st.id === 'paint' && !job.paint && !openPaint()) return
   const gr_ = gearFor(st.id)
   const x = hit.uv.x * S, y = hit.uv.y * S, r = gr_.r * t.pxPerM, a = gr_.a
   const p = ((y | 0) * S + (x | 0)) * 4
@@ -983,7 +997,7 @@ function stamp(hit) {
     if (d && d[p] > 40) { fxEmit('flake', 2); buzz() }
   } else if (st.id === 'paint') {
     g.globalCompositeOperation = 'source-over'
-    const c = new THREE.Color(job.color)
+    const c = new THREE.Color(job.paint)
     grad((k) => `rgba(${(c.r * 255) | 0},${(c.g * 255) | 0},${(c.b * 255) | 0},${k})`)
     fxEmit('mist', 3)
   } else {
@@ -1156,7 +1170,7 @@ function fxEmit(type, n) {
     if (type === 'flake') bits.push({ type, x, y, vx: (Math.random() - 0.5) * 3, vy: -Math.random() * 2.5, g: 0.25, life: 1, d: 0.025, c: ['#9c4f1c', '#c97b38', '#5a2a10'][(Math.random() * 3) | 0], s: 2 + Math.random() * 3 })
     else if (type === 'foam') bits.push({ type, x: x + (Math.random() - 0.5) * 50, y: y + (Math.random() - 0.5) * 30, vx: (Math.random() - 0.5) * 0.4, vy: 0.3 + Math.random() * 0.4, g: 0, life: 1, d: 0.012, s: 3 + Math.random() * 7 })
     else if (type === 'water') bits.push({ type: 'mist', x: x + (Math.random() - 0.5) * 50, y: y - 10 - Math.random() * 40, vx: (Math.random() - 0.5) * 4, vy: 2 + Math.random() * 3, g: 0.15, life: 1, d: 0.05, c: Math.random() < 0.5 ? '#cfe8ff' : '#ffffff', s: 2 + Math.random() * 3 })
-    else if (type === 'mist') bits.push({ type, x: x + (Math.random() - 0.5) * 40, y: y - 30 - Math.random() * 30, vx: (Math.random() - 0.5) * 2, vy: 1.5 + Math.random() * 2, g: 0, life: 1, d: 0.06, c: job.color, s: 1.5 + Math.random() * 2.5 })
+    else if (type === 'mist') bits.push({ type, x: x + (Math.random() - 0.5) * 40, y: y - 30 - Math.random() * 30, vx: (Math.random() - 0.5) * 2, vy: 1.5 + Math.random() * 2, g: 0, life: 1, d: 0.06, c: job.paint, s: 1.5 + Math.random() * 2.5 })
     else bits.push({ type, x: x + (Math.random() - 0.5) * 60, y: y + (Math.random() - 0.5) * 40, vx: 0, vy: 0, g: 0, life: 1, d: 0.035, s: 4 + Math.random() * 6 })
   }
   if (bits.length > 220) bits.splice(0, bits.length - 220)
@@ -1185,7 +1199,7 @@ function buy(ad) {
   save.cash -= ad.price
   bankOp(`Покупка: ${CARS[ad.id].name}`, -ad.price)
   persist()
-  job = { id: ad.id, paid: ad.price, rust: ad.rust, seed: ad.seed, livery: ad.livery, stage: 0, color: PAINTS[0], done: false, photos: [], listing: null }
+  job = { id: ad.id, paid: ad.price, rust: ad.rust, seed: ad.seed, livery: ad.livery, stage: 0, color: null, v: 2, done: false, photos: [], listing: null }
   enterGarage(null)
   coach()
 }
@@ -1198,17 +1212,49 @@ function enterGarage(layers) {
   view.yaw = -0.75; view.pitch = 0.32
   if (layers) restoreLayers(layers)
   else { freshLayers(job.rust, job.seed); saveJob() }
-  $('colors').innerHTML = PAINTS.map((c) => `<button class="sw${c === job.color ? ' on' : ''}" style="background:${c}" data-c="${c}"></button>`).join('')
   resize()
   startStage()
   running = true
 }
+// краска: банки на складе гаража (save.paints) → игрок выбирает цвет → первый мазок вскрывает банку (job.paint)
+const paintName = (c) => PAINTS.find((p) => p.c === c)?.name || 'краска'
+const owned = () => PAINTS.filter((p) => (save.paints?.[p.c] || 0) > 0)
+function renderColors() {
+  const list = owned()
+  if (!list.some((p) => p.c === job.color)) job.color = list[0]?.c || null
+  $('colors').innerHTML = list.map((p) => `<button class="sw${p.c === job.color ? ' on' : ''}" style="background:${p.c}" data-c="${p.c}" aria-label="${p.name}"><i>${save.paints[p.c]}</i></button>`).join('')
+    + `<button class="order" data-order>${list.length ? '+ краска' : 'Заказать краску'}</button>`
+  if (job.color) setSprayColor(job.color)
+}
+function paintHint() {
+  return job.paint ? 'Крась кузов' : owned().length ? `Выбери цвет и крась · ${paintName(job.color)}` : 'Нет краски — закажи на «ЗапчастиТут»'
+}
 $('colors').onclick = (e) => {
-  const c = e.target.dataset?.c
+  const b = e.target.closest('button')
+  if (!b) return
+  if (b.dataset.order != null) { audioInit(); hideTool(); openSite('parts'); $('gagel').hidden = false; coach(); return }
+  const c = b.dataset.c
   if (!c) return
   job.color = c
   setSprayColor(c)
-  for (const b of $('colors').children) b.classList.toggle('on', b.dataset.c === c)
+  showHint(paintHint())
+  for (const x of $('colors').children) x.classList.toggle('on', x.dataset.c === c)
+}
+let noPaintT = 0
+function openPaint() { // первый мазок: банка выбранного цвета уходит со склада на эту машину
+  const c = job.color
+  if (!c || !(save.paints?.[c] > 0)) {
+    const now = performance.now()
+    if (now - noPaintT > 1500) { noPaintT = now; toast('Нет краски!'); showHint(paintHint()) }
+    return false
+  }
+  save.paints[c]--
+  if (!save.paints[c]) delete save.paints[c]
+  persist()
+  job.paint = c
+  saveJob()
+  startStage()
+  return true
 }
 $('sell').onclick = () => {
   const v = valueNow()
@@ -1524,6 +1570,13 @@ function openSite(id, arg = null) {
     const own = save.gear || []
     html = head('ЗапчастиТут', 'оборудование для гаража · доставка сразу', '#2f8f5b') + `<div class="sin">
       <div class="note" style="text-align:left;margin:0 0 10px">На счёте: <b style="color:#1f1f24">${save.bank?.open ? money(save.cash) : 'счёт не открыт'}</b></div>
+      <div class="h4" style="margin-top:0">Краска · ${money(PAINT_PRICE)} за банку, банки хватает на одну машину</div>
+      <div class="paints">${PAINTS.map((p) => {
+        const n = save.paints?.[p.c] || 0, can = save.bank?.open && save.cash >= PAINT_PRICE
+        return `<div class="paint"><span class="can" style="background:${p.c}"></span><b>${p.name}</b><small>${n ? `в гараже: ${n}` : '&nbsp;'}</small>
+          <button data-paint="${p.c}" ${can ? '' : 'disabled'}>${!save.bank?.open ? 'Нет счёта' : can ? money(PAINT_PRICE) : 'Мало денег'}</button></div>`
+      }).join('')}</div>
+      <div class="h4">Оборудование</div>
       <div class="cards">${STAGES.map((st) => GEAR[st.id].filter((g) => g.price).map((g) => {
         const has = own.includes(g.id), base = GEAR[st.id][0]
         const can = !has && save.bank?.open && save.cash >= g.price
@@ -1591,6 +1644,20 @@ function openSite(id, arg = null) {
     toast(`${g.name} — в гараже!`)
     if (job) drawHud()
     openSite('parts')
+  }
+  for (const el of $('gbody').querySelectorAll('[data-paint]')) el.onclick = () => {
+    const c = el.dataset.paint
+    if (!save.bank?.open || save.cash < PAINT_PRICE) return
+    const top = $('gscroll').scrollTop
+    save.cash -= PAINT_PRICE
+    save.paints = { ...(save.paints || {}), [c]: (save.paints?.[c] || 0) + 1 }
+    bankOp(`ЗапчастиТут: краска «${paintName(c)}»`, -PAINT_PRICE)
+    persist()
+    sfx('door', 0.5)
+    toast('Краска в гараже!')
+    if (job && !job.paint) { job.color = c; if (stageInfo().id === 'paint' && !job.done) startStage() }
+    openSite('parts')
+    $('gscroll').scrollTop = top
   }
   if (q('#bankOpen')) q('#bankOpen').onclick = () => {
     const r = () => String(1000 + ((Math.random() * 9000) | 0))
@@ -1664,7 +1731,7 @@ function coach() {
     else if (site === 'avto') { text = 'Выбери машину по карману. На фото видно, сколько с ней возни.' }
     else if (site === 'ad') { text = 'Поторгуйся кнопками с ценой — продавец может уступить. Потом «Купить».'; hl = $('gbody').querySelector('.offers') }
   } else {
-    text = 'Машина твоя! Помой, убери ржавчину, покрась и отполируй. Потом сфотографируй 📷 и продай через «ПРОДАТЬ».'
+    text = 'Машина твоя! Помой, убери ржавчину, покрась и отполируй. Краску нужного цвета закажи на «ЗапчастиТут». Потом сфотографируй 📷 и продай через «ПРОДАТЬ».'
     ok = true
   }
   if (!text) { box.hidden = true; return }
@@ -1707,6 +1774,7 @@ ready.then(() => {
     if (!save.bank) { save.bank = { open: true, num: '4081 7810 0000 0001', hist: [] } }
     persist()
   }
+  if (saved?.job && CARS[saved.job.id] && !saved.job.v && !saved.job.paint) saved.job.paint = saved.job.color || PAINTS[0].c // начатые до магазина красок — краска уже куплена
   if (saved?.job && CARS[saved.job.id]) { job = saved.job; enterGarage(saved); pcBadge(); coach() }
   else enterEmpty()
 }).catch((e) => { $('load').textContent = 'Не загрузилось :('; console.error(e) })

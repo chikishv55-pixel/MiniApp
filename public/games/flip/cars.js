@@ -62,7 +62,19 @@ export const DONE_AT = 0.2
 export const STAGE_VALUE = [0.15, 0.45, 0.35, 0.25]
 export const VALUE_START = 0.7
 
-export const PAINTS = ['#b3261e', '#1f4e8c', '#2f6b3a', '#ece6d6', '#1b1b1d', '#e0a21b']
+// Краска заказывается в «ЗапчастиТут»: одна банка — одна машина, цвет выбирает игрок.
+export const PAINT_PRICE = 150
+export const PAINTS = [
+  { c: '#b3261e', name: 'Вишня' },
+  { c: '#d9641e', name: 'Апельсин' },
+  { c: '#e0a21b', name: 'Горчица' },
+  { c: '#2f6b3a', name: 'Хаки' },
+  { c: '#1f4e8c', name: 'Синяя ночь' },
+  { c: '#a9adb3', name: 'Серебро' },
+  { c: '#4a4f55', name: 'Мокрый асфальт' },
+  { c: '#ece6d6', name: 'Белая ночь' },
+  { c: '#1b1b1d', name: 'Чёрный' },
+]
 
 export const SELLERS = ['Михалыча', 'тётю Зину', 'Гену с автобазы', 'деда Семёна', 'Вована', 'Палыча', 'шерифа в отставке', 'Любу из бара', 'кузнеца Борю']
 
