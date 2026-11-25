@@ -1,0 +1,453 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>Перекупщик Джо</title>
+<style>
+/* Прототип «Перекупщика Джо»: 3D-гараж, ржавчину оттираешь пальцем.
+   Модель — public/games/flip/pickup.glb, собирается скриптом scripts/flip/pickup.py в Blender. */
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent;user-select:none;-webkit-user-select:none}
+[hidden]{display:none!important}
+html,body{height:100%;background:#1b140f;overflow:hidden;touch-action:none;color:#fff;
+  font-family:"Arial Black","Segoe UI Black","Trebuchet MS","Segoe UI",system-ui,sans-serif;font-weight:900}
+button{font:inherit;color:inherit;border:0;background:none;cursor:pointer}
+#c{position:fixed;inset:0;width:100%;height:100%;display:block}
+#fx{position:fixed;inset:0;width:100%;height:100%;pointer-events:none}
+
+#hud{position:fixed;left:0;right:0;top:0;padding:16px;pointer-events:none;text-align:center}
+#job{font-size:15px;letter-spacing:2px;opacity:.75}
+#bar{position:relative;height:28px;width:min(300px,80vw);margin:8px auto 0;border-radius:14px;background:rgba(255,255,255,.15);overflow:hidden}
+#fill{position:absolute;left:0;top:0;bottom:0;width:100%;background:linear-gradient(90deg,#b8461b,#e0802e);transition:width .3s}
+#bartxt{position:relative;display:block;line-height:28px;font-size:15px;text-shadow:0 2px 0 rgba(0,0,0,.4)}
+
+#hint{position:fixed;left:16px;right:16px;bottom:120px;text-align:center;font-size:15px;line-height:1.35;opacity:.85;pointer-events:none;transition:opacity .6s}
+#tools{position:fixed;left:0;right:0;bottom:24px;display:flex;justify-content:center;gap:12px}
+.tool{width:84px;height:76px;border-radius:18px;border:3px solid rgba(255,255,255,.35);background:rgba(0,0,0,.35);
+  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;font-size:11px;letter-spacing:.5px}
+.tool i{font-style:normal;font-size:28px;line-height:1}
+.tool.on{border-color:#ffc233;background:rgba(255,194,51,.16)}
+.tool.soon{opacity:.35}
+
+#over{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;background:rgba(10,6,3,.55)}
+#over .box{text-align:center;padding:28px 24px;border-radius:22px;background:#2a1c12;border:3px solid #ffc233;width:min(320px,86vw)}
+#over h2{font-size:28px;color:#ffc233;letter-spacing:1px}
+#over p{margin:12px 0 20px;font:700 15px/1.4 "Segoe UI",system-ui,sans-serif;opacity:.85}
+.big{width:100%;height:54px;border-radius:14px;background:#ffc233;color:#2a1c12;font-size:18px;letter-spacing:1px}
+#load{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;font-size:16px;letter-spacing:2px;opacity:.7}
+</style>
+<script type="importmap">{"imports":{"three":"./vendor/three/three.module.min.js"}}</script>
+</head>
+<body>
+<canvas id="c"></canvas>
+<canvas id="fx"></canvas>
+<div id="load">ГАРАЖ ОТКРЫВАЕТСЯ…</div>
+
+<div id="hud">
+  <div id="job">СТАРЫЙ ПИКАП · СНЯТЬ РЖАВЧИНУ</div>
+  <div id="bar"><div id="fill"></div><span id="bartxt">РЖАВЧИНА 100%</span></div>
+</div>
+
+<div id="hint">Три ржавчину пальцем прямо по машине.<br>Тяни за фон — машина повернётся, двумя пальцами — приблизить.</div>
+
+<div id="tools">
+  <button class="tool on" id="tBrush"><i>🪥</i>ЩЁТКА</button>
+  <button class="tool soon" disabled><i>🧽</i>МОЙКА</button>
+  <button class="tool soon" disabled><i>🎨</i>КРАСКА</button>
+  <button class="tool soon" disabled><i>✨</i>ПОЛИРОЛЬ</button>
+</div>
+
+<div id="over" hidden>
+  <div class="box">
+    <h2>ЧИСТО!</h2>
+    <p id="overtxt">Ржавчина снята, под ней голый металл.<br>Дальше — грунт и покраска (скоро).</p>
+    <button class="big" id="bAgain">НОВЫЙ ПИКАП</button>
+  </div>
+</div>
+
+<script type="module">
+import * as THREE from 'three'
+import { GLTFLoader } from './vendor/three/GLTFLoader.js'
+import { RoomEnvironment } from './vendor/three/RoomEnvironment.js'
+import { bodyTris, forEachSample, bakeCover } from './flip/vis.js'
+
+const TG = window.Telegram?.WebApp
+const $ = (id) => document.getElementById(id)
+
+/* ================= СЦЕНА ================= */
+const canvas = $('c')
+const renderer = new THREE.WebGLRenderer({ canvas, antialias: true })
+renderer.setPixelRatio(Math.min(devicePixelRatio || 1, 2))
+renderer.toneMapping = THREE.ACESFilmicToneMapping
+renderer.toneMappingExposure = 1.05
+const scene = new THREE.Scene()
+scene.background = new THREE.Color(0x1b140f)
+scene.fog = new THREE.Fog(0x1b140f, 12, 26)
+const pmrem = new THREE.PMREMGenerator(renderer)
+scene.environment = pmrem.fromScene(new RoomEnvironment(), 0.04).texture
+scene.environmentIntensity = 0.55
+
+const camera = new THREE.PerspectiveCamera(38, 1, 0.1, 60)
+scene.add(new THREE.HemisphereLight(0xffe2c0, 0x2a1a10, 0.9))
+const sun = new THREE.DirectionalLight(0xfff0dd, 2.2)
+sun.position.set(4, 7, 3)
+scene.add(sun)
+
+// пол гаража: бетон с пятном света под машиной
+function canvasTex(size, draw, srgb = true) {
+  const cv = document.createElement('canvas')
+  cv.width = cv.height = size
+  const g = cv.getContext('2d', { willReadFrequently: !srgb })
+  draw(g, size)
+  const t = new THREE.CanvasTexture(cv)
+  if (srgb) t.colorSpace = THREE.SRGBColorSpace
+  t.flipY = false // UV из glTF: (0,0) — левый верхний угол холста
+  return { cv, g, t }
+}
+const floor = canvasTex(512, (g, s) => {
+  const r = g.createRadialGradient(s / 2, s / 2, 10, s / 2, s / 2, s / 2)
+  r.addColorStop(0, '#6b5a4a'); r.addColorStop(0.55, '#3a2e24'); r.addColorStop(1, '#1b140f')
+  g.fillStyle = r; g.fillRect(0, 0, s, s)
+  for (let i = 0; i < 2500; i++) { g.fillStyle = `rgba(0,0,0,${Math.random() * 0.12})`; g.fillRect(Math.random() * s, Math.random() * s, 2, 2) }
+  const sh = g.createRadialGradient(s / 2, s / 2, 0, s / 2, s / 2, s * 0.2)
+  sh.addColorStop(0, 'rgba(0,0,0,.55)'); sh.addColorStop(1, 'rgba(0,0,0,0)')
+  g.save(); g.translate(s / 2, s / 2); g.scale(1.7, 0.85); g.translate(-s / 2, -s / 2); g.fillStyle = sh; g.fillRect(0, 0, s, s); g.restore()
+})
+const floorMesh = new THREE.Mesh(new THREE.PlaneGeometry(18, 18), new THREE.MeshStandardMaterial({ map: floor.t, roughness: 0.95 }))
+floorMesh.rotation.x = -Math.PI / 2
+scene.add(floorMesh)
+
+/* ================= ТЕКСТУРЫ КУЗОВА ================= */
+// Маска 512×512: R — ржавчина (стирается щёткой), G — где краска уже съедена (там голый металл).
+const S = 512
+const rand = mulberry(Date.now() & 0xffff)
+function mulberry(a) { return () => { a |= 0; a = (a + 0x6d2b79f5) | 0; let t = Math.imul(a ^ (a >>> 15), 1 | a); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296 } }
+
+const paint = canvasTex(S, (g, s) => {
+  g.fillStyle = '#8f3524'; g.fillRect(0, 0, s, s) // выгоревший красный
+  for (let i = 0; i < 9000; i++) {
+    const l = Math.random()
+    g.fillStyle = `rgba(${l > 0.5 ? '255,220,200' : '40,10,5'},${Math.random() * 0.07})`
+    g.fillRect(Math.random() * s, Math.random() * s, 1 + Math.random() * 3, 1 + Math.random() * 3)
+  }
+})
+const rust = canvasTex(S, (g, s) => {
+  g.fillStyle = '#7a3b17'; g.fillRect(0, 0, s, s)
+  const cols = ['#5a2a10', '#9c4f1c', '#b8642a', '#3e1d0c', '#c97b38']
+  for (let i = 0; i < 14000; i++) {
+    g.fillStyle = cols[(Math.random() * cols.length) | 0]
+    g.globalAlpha = 0.25 + Math.random() * 0.5
+    const r = 1 + Math.random() * 2.5
+    g.fillRect(Math.random() * s, Math.random() * s, r, r)
+  }
+  g.globalAlpha = 1
+})
+const mask = canvasTex(S, () => {}, false)
+mask.t.minFilter = THREE.LinearFilter
+mask.t.generateMipmaps = false
+
+function bodyMaterial() {
+  const m = new THREE.MeshStandardMaterial({ map: paint.t, roughness: 0.6, metalness: 0.05, flatShading: true })
+  m.onBeforeCompile = (sh) => {
+    sh.uniforms.rustMap = { value: rust.t }
+    sh.uniforms.maskMap = { value: mask.t }
+    sh.fragmentShader = sh.fragmentShader
+      .replace('#include <common>', '#include <common>\nuniform sampler2D rustMap;\nuniform sampler2D maskMap;')
+      .replace('#include <map_fragment>', `#include <map_fragment>
+        vec4 mk = texture2D(maskMap, vMapUv);
+        float rustA = smoothstep(0.08, 0.55, mk.r);
+        float bare = smoothstep(0.5, 1.0, mk.g);
+        vec3 metal = vec3(0.62, 0.61, 0.58);
+        diffuseColor.rgb = mix(diffuseColor.rgb, metal, bare);
+        diffuseColor.rgb = mix(diffuseColor.rgb, texture2D(rustMap, vMapUv).rgb, rustA);`)
+      .replace('#include <roughnessmap_fragment>', '#include <roughnessmap_fragment>\nroughnessFactor = mix(mix(roughnessFactor, 0.38, bare), 1.0, rustA);')
+      .replace('#include <metalnessmap_fragment>', '#include <metalnessmap_fragment>\nmetalnessFactor = mix(mix(metalnessFactor, 0.85, bare), 0.0, rustA);')
+  }
+  return m
+}
+
+const PART = {
+  Glass: () => new THREE.MeshStandardMaterial({ color: 0x1d2a33, roughness: 0.08, metalness: 0.2, transparent: true, opacity: 0.6, side: THREE.DoubleSide }),
+  Tire: () => new THREE.MeshStandardMaterial({ color: 0x141414, roughness: 0.95, flatShading: true }),
+  Chrome: () => new THREE.MeshStandardMaterial({ color: 0xb9b2a8, roughness: 0.35, metalness: 1, flatShading: true }),
+  Headlight: () => new THREE.MeshStandardMaterial({ color: 0xfff1c2, roughness: 0.2, emissive: 0x332a10, flatShading: true }),
+  Tail: () => new THREE.MeshStandardMaterial({ color: 0x8a1408, roughness: 0.35, emissive: 0x200300, flatShading: true }),
+  Dark: () => new THREE.MeshStandardMaterial({ color: 0x0e0e10, roughness: 0.7, metalness: 0.3, flatShading: true }),
+}
+
+/* ================= МАШИНА ================= */
+let car, body
+const parts = []
+// по треугольникам кузова: площадь в мире и в пикселях маски — чтобы кисть была одного размера в метрах
+let tris = [] // {v: вершины в мире, u: uv в пикселях маски, area, pxPerM}
+let byFace = [] // faceIndex рейкаста → треугольник
+let cover = null // Uint8Array: пиксели маски, которые реально лежат на кузове
+let rustTotal = 1
+
+// Маска видимости запечена заранее (на телефоне её расчёт — секунды): node scripts/flip/bake-vis.mjs
+const visReady = new Promise((res) => {
+  const im = new Image()
+  im.onload = () => {
+    const g = document.createElement('canvas').getContext('2d', { willReadFrequently: true })
+    g.canvas.width = g.canvas.height = S
+    g.drawImage(im, 0, 0)
+    const d = g.getImageData(0, 0, S, S).data, v = new Uint8Array(S * S)
+    for (let i = 0; i < S * S; i++) v[i] = d[i * 4] > 127 ? 1 : 0
+    res(v)
+  }
+  im.onerror = () => res(null) // нет файла — посчитаем на месте, просто дольше
+  im.src = 'flip/pickup.vis.png'
+})
+
+new GLTFLoader().load('flip/pickup.glb', async (gltf) => {
+  car = gltf.scene
+  car.traverse((o) => {
+    if (!o.isMesh) return
+    const key = Object.keys(PART).find((k) => o.name.startsWith(k))
+    if (o.name.startsWith('Body')) { body = o; o.material = bodyMaterial() }
+    else if (key) o.material = PART[key]()
+    parts.push(o)
+  })
+  scene.add(car)
+  car.updateMatrixWorld(true)
+  const vis = await visReady
+  const tb = performance.now(); buildTris(vis); buildMs = Math.round(performance.now() - tb)
+  newRust()
+  $('load').hidden = true
+  resize()
+  requestAnimationFrame(loop)
+}, undefined, (e) => { $('load').textContent = 'НЕ ЗАГРУЗИЛОСЬ :('; console.error(e) })
+
+// Видимые точки кузова на сетке маски: на них рождается ржавчина, по ним считается прогресс.
+let buildMs = 0
+let spots = [] // {x, y (px маски), wy (высота в мире), ppm (px на метр)}
+function buildTris(vis) {
+  ;({ tris, byFace } = bodyTris(body, S))
+  cover = vis || bakeCover(body, parts, S)
+  for (const t of tris) forEachSample(t, (x, y, p) => {
+    if (cover[Math.round(y) * S + Math.round(x)]) spots.push({ x, y, wy: p.y, ppm: t.pxPerM, w: p.clone(), n: t.normal })
+  })
+}
+
+// Ржавчина гнездится снизу: пороги, низ дверей, арки — шанс пятна выше у земли.
+function newRust() {
+  const g = mask.g
+  g.globalCompositeOperation = 'source-over'
+  g.fillStyle = '#000'; g.fillRect(0, 0, S, S)
+  const weights = spots.map((s) => Math.pow(Math.max(0.12, 1.9 - s.wy), 2.4))
+  const sum = weights.reduce((a, b) => a + b, 0)
+  const pickSpot = () => { let r = rand() * sum, i = 0; while (r > weights[i] && i < weights.length - 1) r -= weights[i++]; return spots[i] }
+  g.globalCompositeOperation = 'lighten' // R и G копятся, не затирая друг друга
+  for (let k = 0; k < 45; k++) {
+    const sp = pickSpot()
+    const rad = (0.12 + rand() * 0.26) * sp.ppm
+    for (let j = 0; j < 9; j++) { // пятно из кружков — рваный край
+      const ox = sp.x + (rand() - 0.5) * rad * 1.6, oy = sp.y + (rand() - 0.5) * rad * 1.6, rr = rad * (0.35 + rand() * 0.6)
+      const gr = g.createRadialGradient(ox, oy, 0, ox, oy, rr)
+      gr.addColorStop(0, 'rgb(255,255,0)'); gr.addColorStop(0.6, 'rgba(255,255,0,.9)'); gr.addColorStop(1, 'rgba(255,255,0,0)')
+      g.fillStyle = gr; g.fillRect(ox - rr, oy - rr, rr * 2, rr * 2)
+    }
+  }
+  // мелкая сыпь
+  for (let k = 0; k < 500; k++) {
+    const sp = pickSpot()
+    g.fillStyle = 'rgb(255,255,0)'; g.fillRect(sp.x + (rand() - 0.5) * 6 - 1, sp.y + (rand() - 0.5) * 6 - 1, 2.5, 2.5)
+  }
+  g.globalCompositeOperation = 'source-over'
+  mask.t.needsUpdate = true
+  rustTotal = Math.max(1, countRust(true))
+  lastPct = 100
+  showPct(100)
+  done = false
+  $('over').hidden = true
+}
+
+let maskData = null
+function countRust(refresh) {
+  if (refresh || !maskData) maskData = mask.g.getImageData(0, 0, S, S).data
+  let s = 0
+  for (let i = 0; i < S * S; i++) if (cover[i]) s += maskData[i * 4] > 20 ? maskData[i * 4] : 0
+  return s
+}
+
+/* ================= ЩЁТКА ================= */
+const BRUSH_M = 0.14 // радиус щётки в метрах
+let texDirty = false, countDirty = false
+function scrubAt(hit) {
+  const t = byFace[hit.faceIndex]
+  if (!t) return
+  const ratio = t.pxPerM
+  const x = hit.uv.x * S, y = hit.uv.y * S, r = BRUSH_M * ratio
+  const g = mask.g
+  g.globalCompositeOperation = 'darken' // уменьшает только R, G (голый металл) остаётся
+  const gr = g.createRadialGradient(x, y, 0, x, y, r)
+  gr.addColorStop(0, 'rgba(0,255,255,.32)'); gr.addColorStop(0.7, 'rgba(0,255,255,.18)'); gr.addColorStop(1, 'rgba(0,255,255,0)')
+  g.fillStyle = gr; g.fillRect(x - r, y - r, r * 2, r * 2)
+  g.globalCompositeOperation = 'source-over'
+  texDirty = countDirty = true
+  // крошки ржавчины летят, только если под щёткой есть ржавчина
+  if (maskData) {
+    const p = ((y | 0) * S + (x | 0)) * 4
+    if (maskData[p] > 40) { flakes(lastScreen.x, lastScreen.y); buzz() }
+  }
+}
+
+/* ================= УПРАВЛЕНИЕ ================= */
+const ray = new THREE.Raycaster()
+const ndc = new THREE.Vector2()
+const view = { yaw: -0.75, pitch: 0.32, dist: 9.5, tx: 0, ty: 0.6 }
+let distMin = 4.5, distMax = 13
+const ptrs = new Map()
+let mode = null, last = null, pinch0 = 0, dist0 = 0
+const lastScreen = { x: 0, y: 0 }
+
+function pick(x, y) {
+  ndc.set((x / innerWidth) * 2 - 1, -(y / innerHeight) * 2 + 1)
+  ray.setFromCamera(ndc, camera)
+  const h = ray.intersectObjects(parts, false)[0]
+  return h || null
+}
+
+canvas.addEventListener('pointerdown', (e) => {
+  canvas.setPointerCapture(e.pointerId)
+  ptrs.set(e.pointerId, { x: e.clientX, y: e.clientY })
+  hideHint()
+  if (ptrs.size === 2) {
+    mode = 'pinch'
+    const [a, b] = [...ptrs.values()]
+    pinch0 = Math.hypot(a.x - b.x, a.y - b.y); dist0 = view.dist
+    return
+  }
+  if (ptrs.size > 2 || !car) return
+  const h = pick(e.clientX, e.clientY)
+  mode = h ? (h.object === body ? 'scrub' : 'none') : 'orbit'
+  last = { x: e.clientX, y: e.clientY }
+  if (mode === 'scrub') { lastScreen.x = e.clientX; lastScreen.y = e.clientY; scrubAt(h) }
+})
+canvas.addEventListener('pointermove', (e) => {
+  if (!ptrs.has(e.pointerId)) return
+  ptrs.set(e.pointerId, { x: e.clientX, y: e.clientY })
+  if (mode === 'pinch' && ptrs.size === 2) {
+    const [a, b] = [...ptrs.values()]
+    view.dist = clamp(dist0 * pinch0 / Math.max(20, Math.hypot(a.x - b.x, a.y - b.y)), distMin, distMax)
+    return
+  }
+  if (!last) return
+  const dx = e.clientX - last.x, dy = e.clientY - last.y
+  if (mode === 'orbit') {
+    view.yaw -= dx * 0.008
+    view.pitch = clamp(view.pitch + dy * 0.006, 0.05, 1.2)
+  } else if (mode === 'scrub') {
+    // шаги вдоль пути пальца, чтобы быстрый свайп не оставлял пропусков
+    const steps = Math.max(1, Math.ceil(Math.hypot(dx, dy) / 6))
+    for (let i = 1; i <= steps; i++) {
+      const x = last.x + (dx * i) / steps, y = last.y + (dy * i) / steps
+      const h = pick(x, y)
+      lastScreen.x = x; lastScreen.y = y
+      if (h && h.object === body) scrubAt(h)
+    }
+  }
+  last = { x: e.clientX, y: e.clientY }
+})
+const up = (e) => {
+  ptrs.delete(e.pointerId)
+  if (ptrs.size === 0) { mode = null; last = null }
+  else if (mode === 'pinch') { mode = 'none'; last = null }
+}
+canvas.addEventListener('pointerup', up)
+canvas.addEventListener('pointercancel', up)
+canvas.addEventListener('wheel', (e) => { view.dist = clamp(view.dist * (1 + Math.sign(e.deltaY) * 0.08), distMin, distMax) }, { passive: true })
+
+const clamp = (v, a, b) => Math.max(a, Math.min(b, v))
+let hintGone = false
+function hideHint() { if (!hintGone) { hintGone = true; setTimeout(() => ($('hint').style.opacity = 0), 2500) } }
+
+let lastBuzz = 0
+function buzz() {
+  const now = performance.now()
+  if (now - lastBuzz < 90) return
+  lastBuzz = now
+  try { TG?.HapticFeedback?.selectionChanged() } catch {}
+}
+
+/* ================= КРОШКИ ================= */
+const fx = $('fx'), fg = fx.getContext('2d')
+const bits = []
+function flakes(x, y) {
+  for (let i = 0; i < 2; i++) bits.push({ x, y, vx: (Math.random() - 0.5) * 3, vy: -Math.random() * 2.5, life: 1, c: ['#9c4f1c', '#c97b38', '#5a2a10'][(Math.random() * 3) | 0], s: 2 + Math.random() * 3 })
+  if (bits.length > 160) bits.splice(0, bits.length - 160)
+}
+function drawFx(dt) {
+  const dpr = fx.width / innerWidth
+  fg.setTransform(dpr, 0, 0, dpr, 0, 0)
+  fg.clearRect(0, 0, innerWidth, innerHeight)
+  for (let i = bits.length - 1; i >= 0; i--) {
+    const b = bits[i]
+    b.vy += 0.25 * dt; b.x += b.vx * dt; b.y += b.vy * dt; b.life -= 0.025 * dt
+    if (b.life <= 0) { bits.splice(i, 1); continue }
+    fg.globalAlpha = b.life; fg.fillStyle = b.c; fg.fillRect(b.x, b.y, b.s, b.s)
+  }
+  fg.globalAlpha = 1
+}
+
+/* ================= ПРОГРЕСС ================= */
+let lastPct = 100, lastCount = 0, done = false
+function showPct(p) {
+  $('fill').style.width = p + '%'
+  $('bartxt').textContent = p > 0 ? `РЖАВЧИНА ${p}%` : 'РЖАВЧИНЫ НЕТ'
+}
+function checkProgress(now) {
+  if (!countDirty || now - lastCount < 350) return
+  lastCount = now
+  countDirty = false
+  const left = countRust(true) / rustTotal
+  // последние проценты — едва заметная пыль по краям островков, её не заставляем тереть
+  const p = Math.max(0, Math.round(((left - 0.05) / 0.95) * 100))
+  if (p !== lastPct) { lastPct = p; showPct(p) }
+  if (p === 0 && !done) {
+    done = true
+    try { TG?.HapticFeedback?.notificationOccurred('success') } catch {}
+    setTimeout(() => ($('over').hidden = false), 600)
+  }
+}
+$('bAgain').onclick = () => newRust()
+
+/* ================= ЦИКЛ ================= */
+function resize() {
+  const w = innerWidth, h = innerHeight
+  renderer.setSize(w, h, false)
+  camera.aspect = w / h
+  // в узком экране телефона машина должна влезать по длине
+  camera.fov = w / h < 0.75 ? 50 : 38
+  camera.updateProjectionMatrix()
+  // дистанция, при которой машина (≈5.4 м) целиком влезает по ширине экрана
+  const hfov = 2 * Math.atan(Math.tan((camera.fov * Math.PI) / 360) * camera.aspect)
+  const fit = 3.0 / Math.tan(hfov / 2)
+  distMax = Math.max(13, fit * 1.3); distMin = Math.min(4.5, fit * 0.45)
+  if (!resized) { view.dist = Math.max(9.5, fit); resized = true }
+  view.dist = clamp(view.dist, distMin, distMax)
+  const d = Math.min(devicePixelRatio || 1, 2)
+  fx.width = w * d; fx.height = h * d
+}
+let resized = false
+addEventListener('resize', resize)
+
+let prev = performance.now()
+function loop(now) {
+  const dt = Math.min(3, (now - prev) / 16.7)
+  prev = now
+  const cp = Math.cos(view.pitch)
+  camera.position.set(view.tx + Math.sin(view.yaw) * cp * view.dist, view.ty + Math.sin(view.pitch) * view.dist, Math.cos(view.yaw) * cp * view.dist)
+  camera.lookAt(view.tx, view.ty, 0)
+  if (texDirty) { mask.t.needsUpdate = true; texDirty = false }
+  checkProgress(now)
+  renderer.render(scene, camera)
+  drawFx(dt)
+  requestAnimationFrame(loop)
+}
+
+// для отладки и автотестов
+window.flip = {
+  buildMs: () => buildMs, newRust, view, spots: () => spots, mask: () => mask, pct: () => lastPct, scrubScreen: (x, y) => { const h = pick(x, y); if (h && h.object === body) { lastScreen.x = x; lastScreen.y = y; scrubAt(h); return true } return false } }
+</script>
+</body>
