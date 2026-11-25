@@ -1,6 +1,6 @@
 import { api, hasAuth } from './api'
 
-export type GameId = 'joe' | 'duel' | 'train' | 'gold' | 'tower' | 'canyon' | 'rodeo'
+export type GameId = 'joe' | 'duel' | 'train' | 'gold' | 'tower' | 'canyon' | 'rodeo' | 'flip'
 
 // Вызов целиком живёт в ссылке, но подписан сервером: t.me/бот?start=c4...
 // Поменять игру, сид или счёт в ссылке нельзя — сервер не примет подпись.
@@ -48,6 +48,8 @@ export const GAME_TEXT: Record<GameId, { title: string; inGame: string; score: (
   },
   canyon: { title: 'КАНЬОН', inGame: 'в «Каньоне»', score: (k) => `${k} ${pluralRu(k, 'очко', 'очка', 'очков')}` },
   rodeo: { title: 'ДИКОЕ РОДЕО', inGame: 'в «Диком родео»', score: (k) => `${k} ${pluralRu(k, 'очко', 'очка', 'очков')}` },
+  // вызовов в перекупщике нет, запись нужна для полноты типа
+  flip: { title: 'ПЕРЕКУПЩИК ДЖО', inGame: 'в «Перекупщике Джо»', score: (k) => `$${k} навара` },
 }
 
 // Telegram кладёт ?startapp=... в start_param; кнопка бота передаёт его в адресе

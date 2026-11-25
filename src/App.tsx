@@ -29,6 +29,7 @@ const GAMES: Game[] = [
   { id: 'train', title: 'ПОБЕГ НА ПОЕЗДЕ', desc: 'Прыгай, стреляй, пригибайся', icon: 'cursor', color: '#3dffe0', art: 'train' },
   { id: 'canyon', title: 'КАНЬОН', desc: 'Держи, отпускай — прыгай в центр', icon: 'bolt', color: '#ff9a3d', art: 'canyon', fresh: true },
   { id: 'rodeo', title: 'ДИКОЕ РОДЕО', desc: 'Лови лассо — но не скунса!', icon: 'target', color: '#9bd36a', art: 'rodeo', fresh: true },
+  { id: 'flip', title: 'ПЕРЕКУПЩИК ДЖО', desc: 'Купи ржавую тачку, отмой, покрась — продай дороже', icon: 'bolt', color: '#e8b04a', poster: 'games/flip/poster.jpg', fresh: true },
 ]
 
 const SHARE_TOAST: Record<string, string | null> = {

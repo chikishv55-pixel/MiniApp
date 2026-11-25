@@ -9,7 +9,7 @@ import { createHmac, timingSafeEqual } from 'node:crypto'
 import { authUser, cleanNick, fail, isInt, json, readJson, tgNickOf } from './_lib/http.js'
 
 // порядок важен: номер игры зашит в ссылку — новые только в конец
-const GAMES = ['joe', 'duel', 'train', 'gold', 'tower', 'canyon', 'rodeo'] as const
+const GAMES = ['joe', 'duel', 'train', 'gold', 'tower', 'canyon', 'rodeo', 'flip'] as const // новые — только в конец: индекс зашит в старые ссылки
 type GameId = (typeof GAMES)[number]
 
 const HEAD = 9 // сид 4 | уровень 2 | счёт 3

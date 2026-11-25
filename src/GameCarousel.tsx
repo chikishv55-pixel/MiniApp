@@ -11,6 +11,7 @@ export type Game = {
   soon?: boolean
   fresh?: boolean // игра новая — показываем бейдж, пока её не открыли
   art?: 'joe' | 'duel' | 'train' | 'gold' | 'tower' | 'canyon' | 'rodeo' // вместо иконки — живая сцена из игры
+  poster?: string // или кадр из игры картинкой (3D-игру пиксельной сценой не нарисуешь)
 }
 
 type Props = {
@@ -54,7 +55,11 @@ export default function GameCarousel({ games, index, onIndex, onPlay, best, look
             >
               {g.soon && <span className="badge">СКОРО</span>}
               {!g.soon && g.fresh && <span className="badge">НОВОЕ</span>}
-              {g.art ? (
+              {g.poster ? (
+                <span className="slide-art">
+                  <img className="joe-scene poster" src={g.poster} alt={g.title} />
+                </span>
+              ) : g.art ? (
                 <span className="slide-art">
                   <JoeScene key={lookKey} variant={g.art} />
                 </span>
@@ -68,7 +73,7 @@ export default function GameCarousel({ games, index, onIndex, onPlay, best, look
               {!g.soon && (best[g.id] ?? 0) > 0 && (
                 <span className="slide-best">
                   РЕКОРД: {best[g.id]}
-                  {({ duel: ' ПОДРЯД', train: ' ВАГ.', gold: ' ЗОЛ.', tower: ' ЭТ.', canyon: ' ОЧ.', rodeo: ' ОЧ.' } as Record<string, string>)[g.id] ?? ''}
+                  {({ duel: ' ПОДРЯД', train: ' ВАГ.', gold: ' ЗОЛ.', tower: ' ЭТ.', canyon: ' ОЧ.', rodeo: ' ОЧ.', flip: ' $ НАВАРА' } as Record<string, string>)[g.id] ?? ''}
                 </span>
               )}
             </button>

@@ -1269,3 +1269,9 @@ body.playing .screen * {
 .ctl-opt.on small {
   color: #0d3b36;
 }
+
+/* постер-картинка вместо пиксельной сцены (3D-игры) */
+.joe-scene.poster {
+  object-fit: cover;
+  image-rendering: auto;
+}

@@ -65,7 +65,7 @@ export async function reportGames(): Promise<string> {
     const plays = all[`play:${g}`] || 0
     const res = all[`res:${g}`] || 0
     const avg = res ? (all[`sum:${g}`] || 0) / res : 0
-    const unit = ({ joe: 'врагов', duel: 'побед подряд', train: 'вагонов', gold: 'золота', tower: 'этажей', canyon: 'очков', rodeo: 'очков' } as Record<string, string>)[g] || ''
+    const unit = ({ joe: 'врагов', duel: 'побед подряд', train: 'вагонов', gold: 'золота', tower: 'этажей', canyon: 'очков', rodeo: 'очков', flip: '$ навара' } as Record<string, string>)[g] || ''
     lines.push(`${GAME_NAMES[g]}`)
     lines.push(`  запусков: ${fmt(plays)} · забегов: ${fmt(res)}`)
     lines.push(`  средний результат: ${avg.toFixed(1)} ${unit} · рекорд: ${best == null ? '—' : fmt(Number(best))}`)
